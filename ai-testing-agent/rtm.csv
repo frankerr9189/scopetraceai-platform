@@ -1,0 +1,15 @@
+requirement_id,requirement_description,coverage_status,covered_by_tests
+ATA-13-REQ-001,Input accepts full JIRA URL,COVERED,"HAPPY-001, DATA-VAL-001"
+ATA-13-REQ-002,Backend parses the ticket ID,COVERED,"HAPPY-002, DATA-VAL-002"
+ATA-13-REQ-003,"Retrieves: Summary, Description, Acceptance Criteria",COVERED,HAPPY-003
+ATA-13-REQ-004,Returns text merged into a single ticket_text string,COVERED,HAPPY-004
+ATA-13-REQ-005,"Shows meaningful errors for: Missing permissions, Invalid URL, Bad token",COVERED,"HAPPY-005, AUTH-001"
+ATA-36-REQ-001,The system generates an RTM after a test plan is created.,COVERED,HAPPY-006
+ATA-36-REQ-002,Each RTM entry includes Requirement ID.,COVERED,HAPPY-007
+ATA-36-REQ-003,Each RTM entry includes Requirement description.,COVERED,HAPPY-008
+ATA-36-REQ-004,Each RTM entry includes Associated test case ID(s).,COVERED,HAPPY-009
+ATA-36-REQ-005,Each RTM entry includes Coverage status (Covered / Not Covered).,COVERED,HAPPY-010
+ATA-36-REQ-006,Every requirement appears exactly once in the RTM.,COVERED,HAPPY-011
+ATA-36-REQ-007,The RTM is derived directly from the test plan and does not require additional user input.,COVERED,"HAPPY-012, DATA-VAL-003"
+ATA-36-REQ-008,"If a requirement is not covered by any test, this condition is clearly identified.",COVERED,HAPPY-013
+ATA-36-REQ-009,RTM generation does not block test plan creation.,COVERED,HAPPY-014

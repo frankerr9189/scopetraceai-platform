@@ -1,0 +1,359 @@
+{
+  "business_intent": "To automate the generation of a Requirement Traceability Matrix for improved test coverage transparency and compliance with ISO audit requirements.",
+  "metadata": {
+    "generated_at": "2026-01-12T03:43:32Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "Expected negative testing not covered"
+        ],
+        "score": 0.65
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "expected",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]. The system generates an RTM after a test plan is created.",
+      "id": "ATA-36-REQ-001",
+      "quality": {
+        "clarity_score": 1.0,
+        "issues": [
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.7
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[2]. Each RTM entry includes:",
+      "id": "ATA-36-REQ-002",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[3]. Requirement ID",
+      "id": "ATA-36-REQ-003",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[4]. Requirement description",
+      "id": "ATA-36-REQ-004",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.7
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[5]. Associated test case ID(s)",
+      "id": "ATA-36-REQ-005",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[6]. Coverage status (Covered / Not Covered)",
+      "id": "ATA-36-REQ-006",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[7]. Every requirement appears exactly once in the RTM.",
+      "id": "ATA-36-REQ-007",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[8]. The RTM is derived directly from the test plan",
+      "id": "ATA-36-REQ-008-001",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "_classification": "ui_structure",
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "Expected data validation testing not covered",
+          "All coverage is inferred"
+        ],
+        "score": 0.55
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "expected",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "does not require additional user input.",
+      "id": "ATA-36-REQ-008-002",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability"
+        ],
+        "score": 0.6
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[9]. If a requirement is not covered by any test, this condition is clearly identified.",
+      "id": "ATA-36-REQ-009",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[10]. RTM generation does not block test plan creation.",
+      "id": "ATA-36-REQ-010",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    }
+  ],
+  "scope": {
+    "id": "MANUAL",
+    "name": "",
+    "type": "manual"
+  }
+}

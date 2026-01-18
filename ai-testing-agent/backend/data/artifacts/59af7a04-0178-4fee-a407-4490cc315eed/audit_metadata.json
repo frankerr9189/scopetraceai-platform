@@ -1,0 +1,38 @@
+{
+  "agent_metadata": {
+    "agent": "test-plan-agent",
+    "agent_version": "1.0.0",
+    "change_policy": "idempotent",
+    "determinism": "LLM + deterministic post-pass",
+    "logic_version": "testplan-v1+coverage-enforcer-v1"
+  },
+  "agent_version": "1.0.0",
+  "algorithms": {
+    "confidence_calculation": "Risk-weighted coverage confidence with dimension analysis",
+    "coverage_analysis": "Requirement-to-test mapping with RTM generation",
+    "quality_scoring": "Heuristic-based clarity and testability scoring",
+    "test_generation": "LLM-based structured generation with deterministic ID assignment"
+  },
+  "approved_at": null,
+  "approved_by": null,
+  "environment": "development",
+  "generated_at": "2026-01-14T17:56:02Z",
+  "jira_created_at": null,
+  "jira_created_by": null,
+  "jira_issue_key": null,
+  "model": {
+    "name": "gpt-4o-mini",
+    "response_format": "json_object",
+    "temperature": 0.2
+  },
+  "review_status": "generated",
+  "reviewed_at": null,
+  "reviewed_by": null,
+  "run_id": "59af7a04-0178-4fee-a407-4490cc315eed",
+  "source": {
+    "scope_id": "MANUAL",
+    "scope_type": "manual",
+    "ticket_count": 1,
+    "type": "jira"
+  }
+}

@@ -1,0 +1,344 @@
+{
+  "schema_version": "1.0",
+  "metadata": {
+    "source": "jira",
+    "source_id": "MANUAL",
+    "generated_at": "2026-01-17T21:01:40Z"
+  },
+  "requirements": [],
+  "business_intent": "",
+  "assumptions": [],
+  "gaps_detected": [],
+  "test_plan": {
+    "api_tests": [],
+    "ui_tests": [],
+    "data_validation_tests": [],
+    "edge_cases": [],
+    "negative_tests": []
+  },
+  "summary": "",
+  "rtm": [
+    {
+      "requirement_id": "ATA-36-ITEM-007",
+      "requirement_description": "Identification of uncovered requirements",
+      "covered_by_tests": [],
+      "coverage_status": "N/A",
+      "trace_type": "informational",
+      "testability": "not_testable",
+      "rationale": "Informational content; not independently testable",
+      "source_section": "description"
+    },
+    {
+      "requirement_id": "ATA-36-ITEM-010",
+      "requirement_description": "Editing of test plans",
+      "covered_by_tests": [],
+      "coverage_status": "N/A",
+      "trace_type": "informational",
+      "testability": "not_testable",
+      "rationale": "Informational content; not independently testable",
+      "source_section": "description"
+    },
+    {
+      "requirement_id": "ATA-36-ITEM-012",
+      "requirement_description": "Editing test cases against requirements within Jira",
+      "covered_by_tests": [],
+      "coverage_status": "N/A",
+      "trace_type": "informational",
+      "testability": "not_testable",
+      "rationale": "Informational content; not independently testable",
+      "source_section": "description"
+    }
+  ],
+  "rtm_agent_metadata": {
+    "agent": "rtm-generator",
+    "agent_version": "1.0.0",
+    "logic_version": "rtm-v1",
+    "determinism": "deterministic mapping",
+    "change_policy": "idempotent"
+  },
+  "scope_summary": {
+    "scope_type": "manual",
+    "scope_id": "MANUAL",
+    "tickets_analyzed": 1,
+    "tickets_requested": 1,
+    "tickets_failed": 0,
+    "requirements_total": 0,
+    "requirements_covered": 0,
+    "requirements_uncovered": 0,
+    "ticket_details": [
+      {
+        "ticket_id": "ATA-36",
+        "summary": "Add Requirement Traceability Matrix (RTM) Generation for Test Plans",
+        "description": "Normalized Requirements:\n1) Automatic generation of Requirement Traceability Matrix (RTM)\n   This capability shall automatically generate a Requirement Traceability Matrix (RTM) for each test plan to ...",
+        "requirements_count": 0,
+        "has_explicit_requirements": false,
+        "has_acceptance_criteria": false,
+        "explanation": "This ticket lacks explicit acceptance criteria or numbered requirements. The AI could not extract testable requirements from the available content.",
+        "status": "processed"
+      }
+    ],
+    "failed_tickets": null
+  },
+  "ticket_traceability": [
+    {
+      "ticket_id": "ATA-36",
+      "items": [
+        {
+          "item_id": "ATA-36-ITEM-001",
+          "text": "Automatic generation of Requirement Traceability Matrix (RTM)",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-002",
+          "text": "Inclusion of coverage status in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-003",
+          "text": "Deriving RTM directly from test plan",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-004",
+          "text": "Non-blocking RTM generation for test plan creation",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-005",
+          "text": "Inclusion of Requirement ID in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-006",
+          "text": "Inclusion of associated test case ID(s) in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-007",
+          "text": "Identification of uncovered requirements",
+          "classification": "informational_only",
+          "source_section": "description",
+          "testable": false,
+          "note": "Informational content; not independently testable"
+        },
+        {
+          "item_id": "ATA-36-ITEM-008",
+          "text": "Inclusion of Requirement description in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-009",
+          "text": "Ensuring each requirement appears once in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-010",
+          "text": "Editing of test plans",
+          "classification": "informational_only",
+          "source_section": "description",
+          "testable": false,
+          "note": "Informational content; not independently testable"
+        },
+        {
+          "item_id": "ATA-36-ITEM-011",
+          "text": "Manual input of requirements into RTM",
+          "classification": "ui_element",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-012",
+          "text": "Editing test cases against requirements within Jira",
+          "classification": "informational_only",
+          "source_section": "description",
+          "testable": false,
+          "note": "Informational content; not independently testable"
+        },
+        {
+          "item_id": "ATA-36-ITEM-013",
+          "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured.",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-014",
+          "text": "[scope] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "testable": true
+        }
+      ]
+    }
+  ],
+  "ticket_item_coverage": [
+    {
+      "item_id": "ATA-36-ITEM-001",
+      "text": "Automatic generation of Requirement Traceability Matrix (RTM)",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-002",
+      "text": "Inclusion of coverage status in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-003",
+      "text": "Deriving RTM directly from test plan",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-004",
+      "text": "Non-blocking RTM generation for test plan creation",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-005",
+      "text": "Inclusion of Requirement ID in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-006",
+      "text": "Inclusion of associated test case ID(s) in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-007",
+      "text": "Identification of uncovered requirements",
+      "classification": "informational_only",
+      "testable": false,
+      "coverage_method": "not_independently_testable",
+      "non_testable_reason": "Informational content; not independently testable"
+    },
+    {
+      "item_id": "ATA-36-ITEM-008",
+      "text": "Inclusion of Requirement description in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-009",
+      "text": "Ensuring each requirement appears once in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-010",
+      "text": "Editing of test plans",
+      "classification": "informational_only",
+      "testable": false,
+      "coverage_method": "not_independently_testable",
+      "non_testable_reason": "Informational content; not independently testable"
+    },
+    {
+      "item_id": "ATA-36-ITEM-011",
+      "text": "Manual input of requirements into RTM",
+      "classification": "ui_element",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-012",
+      "text": "Editing test cases against requirements within Jira",
+      "classification": "informational_only",
+      "testable": false,
+      "coverage_method": "not_independently_testable",
+      "non_testable_reason": "Informational content; not independently testable"
+    },
+    {
+      "item_id": "ATA-36-ITEM-013",
+      "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured.",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    },
+    {
+      "item_id": "ATA-36-ITEM-014",
+      "text": "[scope] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
+    }
+  ],
+  "test_plan_by_requirement": [],
+  "audit_metadata": {
+    "run_id": "2bb7ca0f-6adc-426e-9b5e-d766373ca585",
+    "generated_at": "2026-01-17T21:01:40Z",
+    "agent_version": "1.0.0",
+    "model": {
+      "name": "gpt-4o-mini",
+      "temperature": 0.2,
+      "response_format": "json_object"
+    },
+    "environment": "development",
+    "source": {
+      "type": "jira",
+      "ticket_count": 1,
+      "scope_type": "manual",
+      "scope_id": "MANUAL"
+    },
+    "algorithms": {
+      "test_generation": "LLM-based structured generation with deterministic ID assignment",
+      "coverage_analysis": "Requirement-to-test mapping with RTM generation",
+      "quality_scoring": "Heuristic-based clarity and testability scoring",
+      "confidence_calculation": "Risk-weighted coverage confidence with dimension analysis"
+    },
+    "agent_metadata": {
+      "agent": "test-plan-agent",
+      "agent_version": "1.0.0",
+      "logic_version": "testplan-v1+coverage-enforcer-v1",
+      "determinism": "LLM + deterministic post-pass",
+      "change_policy": "idempotent"
+    },
+    "scope_status": null,
+    "scope_reviewed_by": null,
+    "scope_reviewed_at": null,
+    "scope_approved_by": null,
+    "scope_approved_at": null,
+    "scope_id": "MANUAL",
+    "jira_issue_key": null,
+    "jira_created_by": null,
+    "jira_created_at": null
+  }
+}

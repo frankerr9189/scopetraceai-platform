@@ -1,0 +1,160 @@
+"""
+FastAPI entry point for AI Senior Business Requirement Analyst.
+"""
+import os
+import logging
+from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# CRITICAL: Load environment variables BEFORE importing any db/session/models
+# ============================================================================
+# Module-level guard to prevent multiple executions
+_env_loaded = False
+
+if not _env_loaded:
+    # CRITICAL: Load testing agent backend .env FIRST (contains DATABASE_URL and JWT_SECRET)
+    # This must happen BEFORE any imports that use db/session
+    # We ONLY use DATABASE_URL from the testing agent's .env, not from local .env
+    current_file = os.path.abspath(__file__)
+    # Go up: app/main.py -> app -> ai-sr-business-req-analyst -> appscopetraceai -> ai-testing-agent/backend
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+    backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
+    testing_env = os.path.join(backend_path, ".env")
+    
+    if os.path.exists(testing_env):
+        load_dotenv(testing_env, override=True)
+        logger.info("Loaded DATABASE_URL and JWT_SECRET from testing agent backend .env")
+    else:
+        logger.error(f"Testing agent .env not found at {testing_env} - DATABASE_URL and JWT_SECRET will not be available!")
+    
+    # Load local .env file AFTER (for other BA agent-specific config like OPENAI_API_KEY)
+    # But DATABASE_URL and JWT_SECRET are already set from testing agent's .env above
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    try:
+        # Save DATABASE_URL and JWT_SECRET before loading local .env
+        saved_db_url = os.getenv("DATABASE_URL")
+        saved_jwt_secret = os.getenv("JWT_SECRET")
+        
+        # Load local .env (may override other vars, but we'll restore DATABASE_URL and JWT_SECRET)
+        load_dotenv(env_path, override=True)
+        
+        # Restore DATABASE_URL and JWT_SECRET from testing agent (they must come from testing agent only)
+        if saved_db_url:
+            os.environ["DATABASE_URL"] = saved_db_url
+        if saved_jwt_secret:
+            os.environ["JWT_SECRET"] = saved_jwt_secret
+            
+        logger.info("Loaded local .env (DATABASE_URL and JWT_SECRET preserved from testing agent)")
+    except (PermissionError, OSError):
+        # If .env file can't be read due to permissions, continue without it
+        logger.warning("Could not load local .env file")
+        pass
+    
+    # Log DATABASE_URL type (no secrets, just type)
+    db_url = os.getenv("DATABASE_URL", "")
+    if db_url:
+        if db_url.startswith("postgresql://") or db_url.startswith("postgres://"):
+            logger.info("DATABASE_URL: postgresql (PostgreSQL)")
+        elif db_url.startswith("sqlite://"):
+            logger.info("DATABASE_URL: sqlite (SQLite)")
+        else:
+            logger.info("DATABASE_URL: unknown type")
+    else:
+        logger.warning("DATABASE_URL: not set")
+    
+    _env_loaded = True
+
+# Now safe to import modules that may use db/session
+from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from app.api import analyze, overrides, scope_status
+
+app = FastAPI(
+    title="AI Sr Business Requirement Analyst",
+    description="An AI agent that acts as a Senior Business Requirement Analyst",
+    version="0.1.0"
+)
+
+# Add CORS middleware - must be added before exception handlers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5137", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5137"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler to ensure CORS headers are included in error responses.
+    """
+    from fastapi import HTTPException
+    
+    if isinstance(exc, HTTPException):
+        # For HTTPExceptions, include CORS headers
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers={
+                "Access-Control-Allow-Origin": request.headers.get("Origin", "http://localhost:5173"),
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    else:
+        # For other exceptions, return 500 with CORS headers
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal server error: {str(exc)}"},
+            headers={
+                "Access-Control-Allow-Origin": request.headers.get("Origin", "http://localhost:5173"),
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Validation exception handler with CORS headers.
+    """
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "body": exc.body},
+        headers={
+            "Access-Control-Allow-Origin": "http://localhost:5173",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+# Include routers
+app.include_router(analyze.router, prefix="/api/v1", tags=["Analysis"])
+app.include_router(overrides.router, prefix="/api/v1", tags=["Overrides"])
+app.include_router(scope_status.router, prefix="/api/v1", tags=["Scope Status"])
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {"message": "AI Senior Business Requirement Analyst API"}
+
+
+@app.get("/health")
+async def health():
+    """Health check endpoint."""
+    return {"status": "healthy"}
+

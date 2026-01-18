@@ -1,0 +1,28 @@
+# Secrets
+**/.env
+**/.env.*
+.env
+# Allow .env.example files (they should be committed)
+!**/.env.example
+!.env.example
+
+# Python
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+
+# Node / Frontend
+**/node_modules/
+**/dist/
+**/build/
+
+# Databases
+**/*.sqlite
+**/*.db
+
+# OS
+.DS_Store
+
+# Logs
+**/*.log

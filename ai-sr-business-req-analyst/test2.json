@@ -1,0 +1,176 @@
+{
+  "meta": {
+    "package_id": "PKG-524ACA64",
+    "agent_name": "AI Sr Business Requirement Analyst",
+    "agent_version": "0.1.0",
+    "confidence": "medium",
+    "requires_human_review": true,
+    "source": "manual:compound-001",
+    "generated_at": "2025-12-24T16:13:51.714128"
+  },
+  "summary": {
+    "total_requirements": 2,
+    "parent_requirements": 1,
+    "child_requirements": 1,
+    "inferred_requirements": 1,
+    "high_risk_items": 0,
+    "gap_count": 8,
+    "status": "IN_REVIEW"
+  },
+  "package": {
+    "package_id": "PKG-524ACA64",
+    "version": "1.0.0",
+    "requirements": [
+      {
+        "id": "REQ-001",
+        "parent_id": null,
+        "title": "Manager Reporting Support",
+        "description": "The system will provide reporting functionalities specifically designed for managers.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001-01",
+            "given": "Capability 'Manager Reporting Support' is implemented",
+            "when": "The system is in operation",
+            "then": "The system will provide reporting functionalities specifically designed for managers.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "The system should support reporting for managers.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:13:51.713973",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.1",
+        "parent_id": "REQ-001",
+        "title": "Report Generation for Managers",
+        "description": "Actor: Manager\n\nAction: Generate reports\n\nSystem Behavior: The system allows managers to generate reports based on predefined criteria.\n\nExpected Outcome: Managers can access and generate reports relevant to their needs.\n\nObservable Result: Reports are generated successfully and can be viewed by managers.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.1-01",
+            "given": "A manager is logged into the system",
+            "when": "The manager selects the report generation option",
+            "then": "The system displays available reporting options",
+            "inferred": false
+          },
+          {
+            "id": "AC-REQ-001.1-02",
+            "given": "The manager selects a reporting option",
+            "when": "The manager submits the request",
+            "then": "The system generates the report and displays it to the manager",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [
+          "Assumption: The system has predefined reporting templates available for managers."
+        ],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "Specific types of reports needed by managers are not defined.",
+          "Criteria for report generation are not specified."
+        ],
+        "risks": [
+          "[functional] Lack of clarity on report requirements may lead to incomplete or irrelevant reports. (Severity: medium)"
+        ],
+        "ambiguities": [
+          "Specific types of reports needed by managers are not defined.",
+          "Criteria for report generation are not specified."
+        ],
+        "original_intent": "The system should support reporting for managers.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:13:51.714018",
+        "updated_at": null
+      }
+    ],
+    "gap_analysis": {
+      "gaps": [
+        "Criteria for report generation are not specified.",
+        "Specific types of reports needed by managers are not defined."
+      ],
+      "missing_information": [
+        "Criteria for report generation are not specified.",
+        "It is unclear what specific data or metrics should be included in the reports.",
+        "The requirement is vague and does not specify what type of reporting is needed.",
+        "Specific types of reports needed by managers are not defined."
+      ]
+    },
+    "risk_analysis": {
+      "risks": [
+        "[functional] Lack of clarity on report requirements may lead to incomplete or irrelevant reports. (Severity: medium)"
+      ],
+      "risk_level": "medium",
+      "audit_concerns": []
+    },
+    "original_input": "The system should support reporting for managers.",
+    "metadata": {
+      "source": "manual:compound-001",
+      "agent_version": "0.1.0",
+      "confidence": "medium",
+      "requires_human_review": true,
+      "mapped_at": "2025-12-24T16:13:51.714077",
+      "interpretation_notes": [
+        "The requirement is vague and does not specify what type of reporting is needed.",
+        "It is unclear what specific data or metrics should be included in the reports."
+      ]
+    },
+    "created_at": "2025-12-24T16:13:51.714080",
+    "created_by": null
+  },
+  "readable_summary": {
+    "overview": {
+      "original_intent": "The system should support reporting for managers.",
+      "confidence": "medium",
+      "requires_human_review": true
+    },
+    "capabilities": [
+      {
+        "id": "REQ-001",
+        "title": "Manager Reporting Support",
+        "summary": "The system will provide reporting functionalities specifically designed for managers.",
+        "children": [
+          {
+            "id": "REQ-001.1",
+            "title": "Report Generation for Managers",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.1-01",
+                "text": "Given A manager is logged into the system, when The manager selects the report generation option, then The system displays available reporting options"
+              },
+              {
+                "id": "AC-REQ-001.1-02",
+                "text": "Given The manager selects a reporting option, when The manager submits request, then The system generates the report and displays it to the manager"
+              }
+            ],
+            "gaps": [
+              "Specific types of reports needed by managers are not defined.",
+              "Criteria for report generation are not specified."
+            ],
+            "notes": [
+              "Assumed behavior: Assumption: The system has predefined reporting templates available for managers.",
+              "Clarification needed: Specific types of reports needed by managers are not defined.",
+              "Clarification needed: Criteria for report generation are not specified."
+            ]
+          }
+        ]
+      }
+    ],
+    "key_gaps": [
+      "Criteria for report generation are not specified.",
+      "Specific types of reports needed by managers are not defined."
+    ],
+    "reviewer_actions": [
+      "Clarify ambiguous requirements for Report Generation for Managers (REQ-001.1): Specific types of reports needed by managers are not defined.; Criteria for report generation are not specified.",
+      "Confirm that inferred assumptions are acceptable (REQ-001.1): Assumption: The system has predefined reporting templates available for managers.",
+      "Address 2 cross-cutting gaps affecting multiple requirements",
+      "Provide 4 missing pieces of information requiring confirmation",
+      "Define missing details for Report Generation for Managers (REQ-001.1): Specific types of reports needed by managers are not defined.; Criteria for report generation are not specified."
+    ]
+  }
+}

@@ -1,0 +1,422 @@
+{
+  "meta": {
+    "package_id": "PKG-7EAEC1FB",
+    "agent_name": "AI Sr Business Requirement Analyst",
+    "agent_version": "0.1.0",
+    "confidence": "low",
+    "requires_human_review": true,
+    "source": "manual:compound-001",
+    "generated_at": "2025-12-24T16:19:25.389750"
+  },
+  "summary": {
+    "total_requirements": 8,
+    "parent_requirements": 4,
+    "child_requirements": 4,
+    "inferred_requirements": 0,
+    "high_risk_items": 0,
+    "gap_count": 25,
+    "status": "IN_REVIEW"
+  },
+  "package": {
+    "package_id": "PKG-7EAEC1FB",
+    "version": "1.0.0",
+    "requirements": [
+      {
+        "id": "REQ-001",
+        "parent_id": null,
+        "title": "User Registration",
+        "description": "Allow users to create a new account in the system.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001-01",
+            "given": "Capability 'User Registration' is implemented",
+            "when": "The system is in operation",
+            "then": "Allow users to create a new account in the system.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:19:25.389576",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.1",
+        "parent_id": "REQ-001",
+        "title": "User Registration",
+        "description": "Actor: User\n\nAction: Register an account\n\nSystem Behavior: The system accepts user registration details and creates an account.\n\nExpected Outcome: A new user account is created successfully.\n\nObservable Result: The user receives a confirmation message upon successful registration.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.1-01",
+            "given": "A user provides valid registration details",
+            "when": "The user submits the registration form",
+            "then": "The system creates a new user account and displays a confirmation message.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "Specific validation rules for registration details are not defined.",
+          "Required fields for registration are not specified."
+        ],
+        "risks": [],
+        "ambiguities": [
+          "Specific validation rules for registration details are not defined.",
+          "Required fields for registration are not specified."
+        ],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:19:25.389597",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-002",
+        "parent_id": null,
+        "title": "User Login",
+        "description": "Allow users to log into their existing accounts.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-002-01",
+            "given": "Capability 'User Login' is implemented",
+            "when": "The system is in operation",
+            "then": "Allow users to log into their existing accounts.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:19:25.389604",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-002.1",
+        "parent_id": "REQ-002",
+        "title": "User Login",
+        "description": "Actor: User\n\nAction: Log in to the system\n\nSystem Behavior: The system authenticates the user based on provided credentials.\n\nExpected Outcome: The user gains access to their account.\n\nObservable Result: The user is redirected to their dashboard upon successful login.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-002.1-01",
+            "given": "A user provides valid login credentials",
+            "when": "The user submits the login form",
+            "then": "The system authenticates the user and redirects them to their dashboard.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "Specific error messages for failed login attempts are not defined.",
+          "The authentication method (e.g., password, two-factor) is not specified."
+        ],
+        "risks": [],
+        "ambiguities": [
+          "Specific error messages for failed login attempts are not defined.",
+          "The authentication method (e.g., password, two-factor) is not specified."
+        ],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:19:25.389630",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-003",
+        "parent_id": null,
+        "title": "Password Reset",
+        "description": "Allow users to reset their passwords if forgotten.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-003-01",
+            "given": "Capability 'Password Reset' is implemented",
+            "when": "The system is in operation",
+            "then": "Allow users to reset their passwords if forgotten.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:19:25.389635",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-003.1",
+        "parent_id": "REQ-003",
+        "title": "Password Reset",
+        "description": "Actor: User\n\nAction: Request a password reset\n\nSystem Behavior: The system sends a password reset link to the user's registered email.\n\nExpected Outcome: The user receives an email with instructions to reset their password.\n\nObservable Result: The user receives a confirmation message indicating that the reset link has been sent.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-003.1-01",
+            "given": "A user requests a password reset",
+            "when": "The user submits their email address",
+            "then": "The system sends a password reset link to the provided email address.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "The process for verifying the user's identity before sending the reset link is not defined."
+        ],
+        "risks": [],
+        "ambiguities": [
+          "The process for verifying the user's identity before sending the reset link is not defined."
+        ],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:19:25.389640",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-004",
+        "parent_id": null,
+        "title": "Profile Update",
+        "description": "Allow users to update their profile information.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-004-01",
+            "given": "Capability 'Profile Update' is implemented",
+            "when": "The system is in operation",
+            "then": "Allow users to update their profile information.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:19:25.389644",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-004.1",
+        "parent_id": "REQ-004",
+        "title": "Profile Update",
+        "description": "Actor: User\n\nAction: Update profile information\n\nSystem Behavior: The system allows users to modify their profile details.\n\nExpected Outcome: The user's profile information is updated successfully.\n\nObservable Result: The user receives a confirmation message upon successful profile update.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-004.1-01",
+            "given": "A user provides updated profile information",
+            "when": "The user submits the profile update form",
+            "then": "The system updates the user's profile and displays a confirmation message.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "Specific fields that can be updated in the profile are not defined.",
+          "Validation rules for profile updates are not specified."
+        ],
+        "risks": [],
+        "ambiguities": [
+          "Specific fields that can be updated in the profile are not defined.",
+          "Validation rules for profile updates are not specified."
+        ],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:19:25.389650",
+        "updated_at": null
+      }
+    ],
+    "gap_analysis": {
+      "gaps": [
+        "Validation rules for registration, login, and profile update processes are not defined.",
+        "The process for verifying the user's identity before sending the reset link is not defined.",
+        "Validation rules for profile updates are not specified.",
+        "Required fields for registration are not specified.",
+        "Specific fields that can be updated in the profile are not defined.",
+        "The authentication method (e.g., password, two-factor) is not specified.",
+        "Specific fields required for registration and profile updates are not specified.",
+        "Specific error messages for failed login attempts are not defined.",
+        "Specific validation rules for registration details are not defined."
+      ],
+      "missing_information": [
+        "The process for verifying the user's identity before sending the reset link is not defined.",
+        "Validation rules for profile updates are not specified.",
+        "Required fields for registration are not specified.",
+        "Specific fields that can be updated in the profile are not defined.",
+        "The authentication method (e.g., password, two-factor) is not specified.",
+        "Specific error messages for failed login attempts are not defined.",
+        "The input contains multiple distinct functionalities that need to be decomposed into individual requirements.",
+        "Each functionality represents a separate user action that can be tested independently.",
+        "Specific validation rules for registration details are not defined."
+      ]
+    },
+    "risk_analysis": {
+      "risks": [],
+      "risk_level": "low",
+      "audit_concerns": [
+        "Low confidence analysis - requires additional review"
+      ]
+    },
+    "original_input": "Users can register, log in, reset their password, and update their profile.",
+    "metadata": {
+      "source": "manual:compound-001",
+      "agent_version": "0.1.0",
+      "confidence": "low",
+      "requires_human_review": true,
+      "mapped_at": "2025-12-24T16:19:25.389695",
+      "interpretation_notes": [
+        "The input contains multiple distinct functionalities that need to be decomposed into individual requirements.",
+        "Each functionality represents a separate user action that can be tested independently."
+      ]
+    },
+    "created_at": "2025-12-24T16:19:25.389697",
+    "created_by": null
+  },
+  "readable_summary": {
+    "overview": {
+      "original_intent": "Users can register, log in, reset their password, and update their profile.",
+      "confidence": "low",
+      "requires_human_review": true
+    },
+    "capabilities": [
+      {
+        "id": "REQ-001",
+        "title": "User Registration",
+        "summary": "Allow users to create a new account in the system.",
+        "children": [
+          {
+            "id": "REQ-001.1",
+            "title": "User Registration",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.1-01",
+                "text": "Given a user provides valid registration details, when the user submits registration form, then The system creates a new user account and displays a confirmation message."
+              }
+            ],
+            "gaps": [
+              "Specific validation rules for registration details are not defined.",
+              "Required fields for registration are not specified."
+            ],
+            "notes": [
+              "Clarification needed: Specific validation rules for registration details are not defined.",
+              "Clarification needed: Required fields for registration are not specified."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "REQ-002",
+        "title": "User Login",
+        "summary": "Allow users to log into their existing accounts.",
+        "children": [
+          {
+            "id": "REQ-002.1",
+            "title": "User Login",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-002.1-01",
+                "text": "Given a user provides valid login credentials, when the user submits login form, then The system authenticates the user and redirects them to their dashboard."
+              }
+            ],
+            "gaps": [
+              "Specific error messages for failed login attempts are not defined.",
+              "The authentication method (e.g., password, two-factor) is not specified."
+            ],
+            "notes": [
+              "Clarification needed: Specific error messages for failed login attempts are not defined.",
+              "Clarification needed: The authentication method (e.g., password, two-factor) is not specified."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "REQ-003",
+        "title": "Password Reset",
+        "summary": "Allow users to reset their passwords if forgotten.",
+        "children": [
+          {
+            "id": "REQ-003.1",
+            "title": "Password Reset",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-003.1-01",
+                "text": "Given a user requests a password reset, when the user submitsir email address, then The system sends a password reset link to the provided email address."
+              }
+            ],
+            "gaps": [
+              "The process for verifying the user's identity before sending the reset link is not defined."
+            ],
+            "notes": [
+              "Clarification needed: The process for verifying the user's identity before sending the reset link is not defined."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "REQ-004",
+        "title": "Profile Update",
+        "summary": "Allow users to update their profile information.",
+        "children": [
+          {
+            "id": "REQ-004.1",
+            "title": "Profile Update",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-004.1-01",
+                "text": "Given a user provides updated profile information, when the user submits profile update form, then The system updates the user's profile and displays a confirmation message."
+              }
+            ],
+            "gaps": [
+              "Specific fields that can be updated in the profile are not defined.",
+              "Validation rules for profile updates are not specified."
+            ],
+            "notes": [
+              "Clarification needed: Specific fields that can be updated in the profile are not defined.",
+              "Clarification needed: Validation rules for profile updates are not specified."
+            ]
+          }
+        ]
+      }
+    ],
+    "key_gaps": [
+      "Data fields and their definitions are not fully specified",
+      "Required fields for registration are not specified.",
+      "Specific error messages for failed login attempts are not defined.",
+      "Specific fields required for registration and profile updates are not specified.",
+      "The authentication method (e.g., password, two-factor) is not specified.",
+      "The process for verifying the user's identity before sending the reset link is not defined.",
+      "Validation rules and constraints are not specified"
+    ],
+    "reviewer_actions": [
+      "Clarify ambiguous requirements for User Login (REQ-002.1): Specific error messages for failed login attempts are not defined.; The authentication method (e.g., password, two-factor) is not specified.",
+      "Clarify ambiguous requirements for Profile Update (REQ-004.1): Specific fields that can be updated in the profile are not defined.; Validation rules for profile updates are not specified.",
+      "Provide 9 missing pieces of information requiring confirmation",
+      "Clarify ambiguous requirements for User Registration (REQ-001.1): Specific validation rules for registration details are not defined.; Required fields for registration are not specified.",
+      "Resolve 1 audit concern for ISO 27001 and SOC 2 compliance",
+      "Define missing details for User Login (REQ-002.1): Specific error messages for failed login attempts are not defined.; The authentication method (e.g., password, two-factor) is not specified.",
+      "Define missing details for Profile Update (REQ-004.1): Specific fields that can be updated in the profile are not defined.; Validation rules for profile updates are not specified.",
+      "Define missing details for Password Reset (REQ-003.1): The process for verifying the user's identity before sending the reset link is not defined.",
+      "Address 9 cross-cutting gaps affecting multiple requirements",
+      "Define missing details for User Registration (REQ-001.1): Specific validation rules for registration details are not defined.; Required fields for registration are not specified.",
+      "Clarify ambiguous requirements for Password Reset (REQ-003.1): The process for verifying the user's identity before sending the reset link is not defined."
+    ]
+  }
+}

@@ -1,0 +1,395 @@
+{
+  "meta": {
+    "package_id": "PKG-7C61CA10",
+    "agent_name": "AI Sr Business Requirement Analyst",
+    "agent_version": "0.1.0",
+    "confidence": "medium",
+    "requires_human_review": true,
+    "source": "manual:compound-001",
+    "generated_at": "2025-12-24T16:23:48.216796"
+  },
+  "summary": {
+    "total_requirements": 8,
+    "parent_requirements": 4,
+    "child_requirements": 4,
+    "inferred_requirements": 0,
+    "high_risk_items": 0,
+    "gap_count": 15,
+    "status": "IN_REVIEW"
+  },
+  "package": {
+    "package_id": "PKG-7C61CA10",
+    "version": "1.0.0",
+    "requirements": [
+      {
+        "id": "REQ-001",
+        "parent_id": null,
+        "title": "User Registration",
+        "description": "Allow users to create a new account in the system.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001-01",
+            "given": "Capability 'User Registration' is implemented",
+            "when": "The system is in operation",
+            "then": "Allow users to create a new account in the system.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:23:48.216533",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.1",
+        "parent_id": "REQ-001",
+        "title": "User can register",
+        "description": "Actor: User\n\nAction: Register an account\n\nSystem Behavior: The system allows the user to enter registration details and creates a new account.\n\nExpected Outcome: A new user account is created successfully.\n\nObservable Result: User receives a confirmation message upon successful registration.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.1-01",
+            "given": "A user provides valid registration details",
+            "when": "The user submits the registration form",
+            "then": "The system creates a new user account and displays a confirmation message.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "Validation rules for registration fields are not specified."
+        ],
+        "risks": [],
+        "ambiguities": [
+          "Validation rules for registration fields are not specified."
+        ],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:23:48.216576",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-002",
+        "parent_id": null,
+        "title": "User Login",
+        "description": "Allow users to log in to their accounts.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-002-01",
+            "given": "Capability 'User Login' is implemented",
+            "when": "The system is in operation",
+            "then": "Allow users to log in to their accounts.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:23:48.216588",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-002.1",
+        "parent_id": "REQ-002",
+        "title": "User can log in",
+        "description": "Actor: User\n\nAction: Log in to the account\n\nSystem Behavior: The system validates user credentials and grants access.\n\nExpected Outcome: User is logged into their account.\n\nObservable Result: User is redirected to their dashboard upon successful login.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-002.1-01",
+            "given": "A user provides valid login credentials",
+            "when": "The user submits the login form",
+            "then": "The system logs the user in and redirects them to their dashboard.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "Specific validation rules for login credentials are not specified."
+        ],
+        "risks": [],
+        "ambiguities": [
+          "Specific validation rules for login credentials are not specified."
+        ],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:23:48.216601",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-003",
+        "parent_id": null,
+        "title": "Password Reset",
+        "description": "Allow users to reset their password if forgotten.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-003-01",
+            "given": "Capability 'Password Reset' is implemented",
+            "when": "The system is in operation",
+            "then": "Allow users to reset their password if forgotten.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:23:48.216611",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-003.1",
+        "parent_id": "REQ-003",
+        "title": "User can reset password",
+        "description": "Actor: User\n\nAction: Request password reset\n\nSystem Behavior: The system sends a password reset link to the user's registered email.\n\nExpected Outcome: User receives a password reset email.\n\nObservable Result: User receives an email containing a password reset link.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-003.1-01",
+            "given": "A user requests a password reset",
+            "when": "The user submits their registered email address",
+            "then": "The system sends a password reset email to the provided address.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "The process for verifying the user's identity before sending the reset link is not specified."
+        ],
+        "risks": [],
+        "ambiguities": [
+          "The process for verifying the user's identity before sending the reset link is not specified."
+        ],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:23:48.216622",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-004",
+        "parent_id": null,
+        "title": "Profile Update",
+        "description": "Allow users to update their profile information.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-004-01",
+            "given": "Capability 'Profile Update' is implemented",
+            "when": "The system is in operation",
+            "then": "Allow users to update their profile information.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:23:48.216629",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-004.1",
+        "parent_id": "REQ-004",
+        "title": "User can update profile",
+        "description": "Actor: User\n\nAction: Update profile information\n\nSystem Behavior: The system allows users to modify their profile details.\n\nExpected Outcome: User's profile is updated successfully.\n\nObservable Result: User receives a confirmation message upon successful profile update.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-004.1-01",
+            "given": "A user provides valid updated profile information",
+            "when": "The user submits the profile update form",
+            "then": "The system updates the user's profile and displays a confirmation message.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "Validation rules for profile fields are not specified."
+        ],
+        "risks": [],
+        "ambiguities": [
+          "Validation rules for profile fields are not specified."
+        ],
+        "original_intent": "Users can register, log in, reset their password, and update their profile.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:23:48.216639",
+        "updated_at": null
+      }
+    ],
+    "gap_analysis": {
+      "gaps": [
+        "Validation rules for profile fields are not specified.",
+        "Specific validation rules for login credentials are not specified.",
+        "Validation rules for registration fields are not specified.",
+        "Validation rules for registration, login, and profile fields are not specified.",
+        "The process for verifying the user's identity before sending the reset link is not specified."
+      ],
+      "missing_information": [
+        "Validation rules for profile fields are not specified.",
+        "Specific validation rules for login credentials are not specified.",
+        "Validation rules for registration fields are not specified.",
+        "Each action (register, log in, reset password, update profile) represents a distinct user capability.",
+        "The input contains compound requests that need to be decomposed into individual requirements.",
+        "The process for verifying the user's identity before sending the reset link is not specified."
+      ]
+    },
+    "risk_analysis": {
+      "risks": [],
+      "risk_level": "low",
+      "audit_concerns": []
+    },
+    "original_input": "Users can register, log in, reset their password, and update their profile.",
+    "metadata": {
+      "source": "manual:compound-001",
+      "agent_version": "0.1.0",
+      "confidence": "medium",
+      "requires_human_review": true,
+      "mapped_at": "2025-12-24T16:23:48.216707",
+      "interpretation_notes": [
+        "The input contains compound requests that need to be decomposed into individual requirements.",
+        "Each action (register, log in, reset password, update profile) represents a distinct user capability."
+      ]
+    },
+    "created_at": "2025-12-24T16:23:48.216711",
+    "created_by": null
+  },
+  "readable_summary": {
+    "overview": {
+      "original_intent": "Users can register, log in, reset their password, and update their profile.",
+      "confidence": "medium",
+      "requires_human_review": true
+    },
+    "capabilities": [
+      {
+        "id": "REQ-001",
+        "title": "User Registration",
+        "summary": "Allow users to create a new account in the system.",
+        "children": [
+          {
+            "id": "REQ-001.1",
+            "title": "User can register",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.1-01",
+                "text": "Given a user provides valid registration details, when the user submits registration form, then The system creates a new user account and displays a confirmation message."
+              }
+            ],
+            "gaps": [
+              "Validation rules for registration fields are not specified."
+            ],
+            "notes": [
+              "Clarification needed: Validation rules for registration fields are not specified."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "REQ-002",
+        "title": "User Login",
+        "summary": "Allow users to log in to their accounts.",
+        "children": [
+          {
+            "id": "REQ-002.1",
+            "title": "User can log in",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-002.1-01",
+                "text": "Given a user provides valid login credentials, when the user submits login form, then The system logs the user in and redirects them to their dashboard."
+              }
+            ],
+            "gaps": [
+              "Specific validation rules for login credentials are not specified."
+            ],
+            "notes": [
+              "Clarification needed: Specific validation rules for login credentials are not specified."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "REQ-003",
+        "title": "Password Reset",
+        "summary": "Allow users to reset their password if forgotten.",
+        "children": [
+          {
+            "id": "REQ-003.1",
+            "title": "User can reset password",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-003.1-01",
+                "text": "Given a user requests a password reset, when the user submitsir registered email address, then The system sends a password reset email to the provided address."
+              }
+            ],
+            "gaps": [
+              "The process for verifying the user's identity before sending the reset link is not specified."
+            ],
+            "notes": [
+              "Clarification needed: The process for verifying the user's identity before sending the reset link is not specified."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "REQ-004",
+        "title": "Profile Update",
+        "summary": "Allow users to update their profile information.",
+        "children": [
+          {
+            "id": "REQ-004.1",
+            "title": "User can update profile",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-004.1-01",
+                "text": "Given a user provides valid updated profile information, when the user submits profile update form, then The system updates the user's profile and displays a confirmation message."
+              }
+            ],
+            "gaps": [
+              "Validation rules for profile fields are not specified."
+            ],
+            "notes": [
+              "Clarification needed: Validation rules for profile fields are not specified."
+            ]
+          }
+        ]
+      }
+    ],
+    "key_gaps": [
+      "The process for verifying the user's identity before sending the reset link is not specified.",
+      "Validation rules and constraints are not specified"
+    ],
+    "reviewer_actions": [
+      "Clarify ambiguous requirements for User can reset password (REQ-003.1): The process for verifying the user's identity before sending the reset link is not specified.",
+      "Define missing details for User can register (REQ-001.1): Validation rules for registration fields are not specified.",
+      "Clarify ambiguous requirements for User can log in (REQ-002.1): Specific validation rules for login credentials are not specified.",
+      "Define missing details for User can reset password (REQ-003.1): The process for verifying the user's identity before sending the reset link is not specified.",
+      "Define missing details for User can log in (REQ-002.1): Specific validation rules for login credentials are not specified.",
+      "Address 5 cross-cutting gaps affecting multiple requirements",
+      "Define missing details for User can update profile (REQ-004.1): Validation rules for profile fields are not specified.",
+      "Provide 6 missing pieces of information requiring confirmation",
+      "Clarify ambiguous requirements for User can register (REQ-001.1): Validation rules for registration fields are not specified.",
+      "Clarify ambiguous requirements for User can update profile (REQ-004.1): Validation rules for profile fields are not specified."
+    ]
+  }
+}

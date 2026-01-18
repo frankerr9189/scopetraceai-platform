@@ -1,0 +1,321 @@
+{
+  "meta": {
+    "package_id": "PKG-354B410E",
+    "agent_name": "AI Sr Business Requirement Analyst",
+    "agent_version": "0.1.0",
+    "confidence": "high",
+    "requires_human_review": true,
+    "source": "manual:paragraph-test-001",
+    "generated_at": "2025-12-24T16:31:59.816532"
+  },
+  "summary": {
+    "total_requirements": 5,
+    "parent_requirements": 1,
+    "child_requirements": 4,
+    "inferred_requirements": 4,
+    "high_risk_items": 0,
+    "gap_count": 0,
+    "status": "IN_REVIEW"
+  },
+  "package": {
+    "package_id": "PKG-354B410E",
+    "version": "1.0.0",
+    "requirements": [
+      {
+        "id": "REQ-001",
+        "parent_id": null,
+        "title": "User Account Management",
+        "description": "Users can register, log in, reset passwords, and update profile information.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001-01",
+            "given": "Capability 'User Account Management' is implemented",
+            "when": "The system is in operation",
+            "then": "Users can register, log in, reset passwords, and update profile information.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users should be able to register for an account using their email address and password. After registering, users must log in to access their dashboard. If a user forgets their password, they should be able to request a password reset via email. Users should also be able to update their profile information once logged in, but only their name and email address can be changed.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:31:59.816173",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.1",
+        "parent_id": "REQ-001",
+        "title": "User Registration",
+        "description": "Actor: User\n\nAction: Register for an account\n\nSystem Behavior: The system allows users to create an account using their email address and password.\n\nExpected Outcome: User account is created successfully.\n\nObservable Result: User receives a confirmation message upon successful registration.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.1-01",
+            "given": "A user provides a valid email address and password",
+            "when": "The user submits the registration form",
+            "then": "The user account is created and a confirmation message is displayed",
+            "inferred": false
+          },
+          {
+            "id": "AC-REQ-001.1-02",
+            "given": "A user provides an invalid email address or password",
+            "when": "The user submits the registration form",
+            "then": "The system displays an error message indicating the issue",
+            "inferred": true
+          }
+        ],
+        "inferred_logic": [
+          "Acceptance criterion (Given: A user provides an invalid email address or password, When: The user submits the registration form) was inferred",
+          "Assumption: Email address format is validated.",
+          "Assumption: Password meets minimum security requirements."
+        ],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users should be able to register for an account using their email address and password. After registering, users must log in to access their dashboard. If a user forgets their password, they should be able to request a password reset via email. Users should also be able to update their profile information once logged in, but only their name and email address can be changed.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:31:59.816255",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.2",
+        "parent_id": "REQ-001",
+        "title": "User Login",
+        "description": "Actor: User\n\nAction: Log in to the account\n\nSystem Behavior: The system authenticates the user using their email address and password.\n\nExpected Outcome: User is granted access to their dashboard.\n\nObservable Result: User is redirected to the dashboard upon successful login.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.2-01",
+            "given": "A user provides valid credentials",
+            "when": "The user submits the login form",
+            "then": "The user is logged in and redirected to the dashboard",
+            "inferred": false
+          },
+          {
+            "id": "AC-REQ-001.2-02",
+            "given": "A user provides invalid credentials",
+            "when": "The user submits the login form",
+            "then": "The system displays an error message indicating invalid credentials",
+            "inferred": true
+          }
+        ],
+        "inferred_logic": [
+          "Acceptance criterion (Given: A user provides invalid credentials, When: The user submits the login form) was inferred",
+          "Assumption: User accounts are stored securely.",
+          "Assumption: Session management is implemented."
+        ],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users should be able to register for an account using their email address and password. After registering, users must log in to access their dashboard. If a user forgets their password, they should be able to request a password reset via email. Users should also be able to update their profile information once logged in, but only their name and email address can be changed.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:31:59.816279",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.3",
+        "parent_id": "REQ-001",
+        "title": "Password Reset",
+        "description": "Actor: User\n\nAction: Request a password reset\n\nSystem Behavior: The system allows users to request a password reset via email.\n\nExpected Outcome: User receives a password reset email.\n\nObservable Result: User receives an email with instructions to reset their password.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.3-01",
+            "given": "A user requests a password reset with a registered email address",
+            "when": "The user submits the password reset request",
+            "then": "The system sends a password reset email to the user",
+            "inferred": false
+          },
+          {
+            "id": "AC-REQ-001.3-02",
+            "given": "A user requests a password reset with an unregistered email address",
+            "when": "The user submits the password reset request",
+            "then": "The system displays an error message indicating the email is not registered",
+            "inferred": true
+          }
+        ],
+        "inferred_logic": [
+          "Acceptance criterion (Given: A user requests a password reset with an unregistered email address, When: The user submits the password reset request) was inferred",
+          "Assumption: Email service is configured and operational.",
+          "Assumption: Password reset link is secure and expires after a certain period."
+        ],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users should be able to register for an account using their email address and password. After registering, users must log in to access their dashboard. If a user forgets their password, they should be able to request a password reset via email. Users should also be able to update their profile information once logged in, but only their name and email address can be changed.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:31:59.816298",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.4",
+        "parent_id": "REQ-001",
+        "title": "Profile Update",
+        "description": "Actor: User\n\nAction: Update profile information\n\nSystem Behavior: The system allows users to update their name and email address after logging in.\n\nExpected Outcome: User's profile information is updated successfully.\n\nObservable Result: User receives a confirmation message upon successful profile update.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.4-01",
+            "given": "A user is logged in and provides valid name and email address",
+            "when": "The user submits the profile update form",
+            "then": "The user's profile information is updated and a confirmation message is displayed",
+            "inferred": false
+          },
+          {
+            "id": "AC-REQ-001.4-02",
+            "given": "A user is logged in and provides an invalid email address",
+            "when": "The user submits the profile update form",
+            "then": "The system displays an error message indicating the email is invalid",
+            "inferred": true
+          }
+        ],
+        "inferred_logic": [
+          "Acceptance criterion (Given: A user is logged in and provides an invalid email address, When: The user submits the profile update form) was inferred",
+          "Assumption: User is authenticated before updating profile.",
+          "Assumption: Email address format is validated."
+        ],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users should be able to register for an account using their email address and password. After registering, users must log in to access their dashboard. If a user forgets their password, they should be able to request a password reset via email. Users should also be able to update their profile information once logged in, but only their name and email address can be changed.",
+        "metadata": null,
+        "created_at": "2025-12-24T16:31:59.816318",
+        "updated_at": null
+      }
+    ],
+    "gap_analysis": {
+      "gaps": [],
+      "missing_information": []
+    },
+    "risk_analysis": {
+      "risks": [],
+      "risk_level": "low",
+      "audit_concerns": []
+    },
+    "original_input": "Users should be able to register for an account using their email address and password. After registering, users must log in to access their dashboard. If a user forgets their password, they should be able to request a password reset via email. Users should also be able to update their profile information once logged in, but only their name and email address can be changed.",
+    "metadata": {
+      "source": "manual:paragraph-test-001",
+      "agent_version": "0.1.0",
+      "confidence": "high",
+      "requires_human_review": false,
+      "mapped_at": "2025-12-24T16:31:59.816425",
+      "interpretation_notes": [
+        "The requirements have been decomposed into distinct actions related to user registration, login, password reset, and profile updates.",
+        "Inferred standard behaviors for authentication and password reset processes have been documented."
+      ]
+    },
+    "created_at": "2025-12-24T16:31:59.816431",
+    "created_by": null
+  },
+  "readable_summary": {
+    "overview": {
+      "original_intent": "Users should be able to register for an account using their email address and password. After registering, users must log in to access their dashboard. If a user forgets their password, they should be able to request a password reset via email. Users should also be able to update their profile information once logged in, but only their name and email address can be changed.",
+      "confidence": "high",
+      "requires_human_review": true
+    },
+    "capabilities": [
+      {
+        "id": "REQ-001",
+        "title": "User Account Management",
+        "summary": "Users can register, log in, reset passwords, and update profile information.",
+        "children": [
+          {
+            "id": "REQ-001.1",
+            "title": "User Registration",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.1-01",
+                "text": "Given a user provides a valid email address and password, when the user submits registration form, then the user account is created and a confirmation message is displayed"
+              },
+              {
+                "id": "AC-REQ-001.1-02",
+                "text": "Given a user provides an invalid email address or password, when the user submits registration form, then The system displays an error message indicating the issue [inferred]"
+              }
+            ],
+            "gaps": [],
+            "notes": [
+              "Assumed behavior: Acceptance criterion (Given: A user provides an invalid email address or password, When: The user submits registration form) was inferred",
+              "Assumed behavior: Assumption: Email address format is validated.",
+              "Assumed behavior: Assumption: Password meets minimum security requirements."
+            ]
+          },
+          {
+            "id": "REQ-001.2",
+            "title": "User Login",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.2-01",
+                "text": "Given a user provides valid credentials, when the user submits login form, then the user is logged in and redirected to the dashboard"
+              },
+              {
+                "id": "AC-REQ-001.2-02",
+                "text": "Given a user provides invalid credentials, when the user submits login form, then The system displays an error message indicating invalid credentials [inferred]"
+              }
+            ],
+            "gaps": [],
+            "notes": [
+              "Assumed behavior: Acceptance criterion (Given: A user provides invalid credentials, When: The user submits login form) was inferred",
+              "Assumed behavior: Assumption: User accounts are stored securely.",
+              "Assumed behavior: Assumption: Session management is implemented."
+            ]
+          },
+          {
+            "id": "REQ-001.3",
+            "title": "Password Reset",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.3-01",
+                "text": "Given a user requests a password reset with a registered email address, when the user submits password reset request, then The system sends a password reset email to the user"
+              },
+              {
+                "id": "AC-REQ-001.3-02",
+                "text": "Given a user requests a password reset with an unregistered email address, when the user submits password reset request, then The system displays an error message indicating the email is not registered [inferred]"
+              }
+            ],
+            "gaps": [],
+            "notes": [
+              "Assumed behavior: Acceptance criterion (Given: A user requests a password reset with an unregistered email address, When: The user submits password reset request) was inferred",
+              "Assumed behavior: Assumption: Email service is configured and operational.",
+              "Assumed behavior: Assumption: Password reset link is secure and expires after a certain period."
+            ]
+          },
+          {
+            "id": "REQ-001.4",
+            "title": "Profile Update",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.4-01",
+                "text": "Given a user is logged in and provides valid name and email address, when the user submits profile update form, then the user's profile information is updated and a confirmation message is displayed"
+              },
+              {
+                "id": "AC-REQ-001.4-02",
+                "text": "Given a user is logged in and provides an invalid email address, when the user submits profile update form, then The system displays an error message indicating the email is invalid [inferred]"
+              }
+            ],
+            "gaps": [],
+            "notes": [
+              "Assumed behavior: Acceptance criterion (Given: A user is logged in and provides an invalid email address, When: The user submits profile update form) was inferred",
+              "Assumed behavior: Assumption: User is authenticated before updating profile.",
+              "Assumed behavior: Assumption: Email address format is validated."
+            ]
+          }
+        ]
+      }
+    ],
+    "key_gaps": [],
+    "reviewer_actions": [
+      "Confirm that inferred assumptions are acceptable (REQ-001.2): Acceptance criterion (Given: A user provides invalid credentials, When: The user submits the login form) was inferred, Assumption: User accounts are stored securely., etc.",
+      "Confirm that inferred assumptions are acceptable (REQ-001.3): Acceptance criterion (Given: A user requests a password reset with an unregistered email address, When: The user submits the password reset request) was inferred, Assumption: Email service is configured and operational., etc.",
+      "Confirm that inferred assumptions are acceptable (REQ-001.4): Acceptance criterion (Given: A user is logged in and provides an invalid email address, When: The user submits the profile update form) was inferred, Assumption: User is authenticated before updating profile., etc.",
+      "Confirm that inferred assumptions are acceptable (REQ-001.1): Acceptance criterion (Given: A user provides an invalid email address or password, When: The user submits the registration form) was inferred, Assumption: Email address format is validated., etc."
+    ]
+  }
+}

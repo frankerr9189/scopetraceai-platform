@@ -1,0 +1,2555 @@
+{
+  "assumptions": [
+    "Generated 2 inferred happy-path test(s) based on coverage expectations. These tests represent expected success behavior and require validation with concrete execution details."
+  ],
+  "audit_metadata": {
+    "agent_version": "1.0.0",
+    "algorithms": {
+      "confidence_calculation": "Risk-weighted coverage confidence with dimension analysis",
+      "coverage_analysis": "Requirement-to-test mapping with RTM generation",
+      "quality_scoring": "Heuristic-based clarity and testability scoring",
+      "test_generation": "LLM-based structured generation with deterministic ID assignment"
+    },
+    "environment": "development",
+    "generated_at": "2025-12-24T13:46:31Z",
+    "model": {
+      "name": "gpt-4o-mini",
+      "response_format": "json_object",
+      "temperature": 0.2
+    },
+    "run_id": "f3c8265c-66a3-4ab7-8e06-bd54b68d5054",
+    "source": {
+      "scope_id": "MANUAL",
+      "scope_type": "manual",
+      "ticket_count": 2,
+      "type": "jira"
+    }
+  },
+  "business_intent": "To build an input form with various functionalities and UI elements. | To provide functionality for exporting test plans in JSON and PDF formats for documentation and auditing purposes.",
+  "gaps_detected": [],
+  "metadata": {
+    "generated_at": "2025-12-24T13:46:31Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability"
+        ],
+        "score": 0.6
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]. URL Field",
+      "id": "ATA-18-REQ-001",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "_classification": "ui_structure",
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[2]. Have an area for raw text",
+      "id": "ATA-18-REQ-002",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "_classification": "ui_structure",
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[3]. Have a “load from JIRA” button",
+      "id": "ATA-18-REQ-003",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[4]. Have a button to Generate test plan",
+      "id": "ATA-18-REQ-004",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[5]. Have a button to generate RTM",
+      "id": "ATA-18-REQ-005",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "_classification": "ui_structure",
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[6]. Have multiple tabs for ticket, rtm, requirement, test by requirement and test by type",
+      "id": "ATA-18-REQ-006",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "low",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "Expected happy path testing not covered",
+          "Requirement not covered by any tests"
+        ],
+        "score": 0.15
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "expected",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]. Enable exporting the generated test plan for documentation or audits.",
+      "id": "ATA-20-REQ-001",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]. “Download JSON” button",
+      "id": "ATA-20-REQ-002",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[2]. “Download PDF” button",
+      "id": "ATA-20-REQ-003",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "low",
+        "reasons": [
+          "Low requirement testability",
+          "Expected happy path testing not covered",
+          "Expected negative testing not covered",
+          "Requirement not covered by any tests"
+        ],
+        "score": 0.2
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "expected",
+        "negative": "expected",
+        "stateful": "not_applicable"
+      },
+      "description": "[3]. PDF mirrors UI layout",
+      "id": "ATA-20-REQ-004",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.7
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]. Use backend for PDF generation to avoid frontend complexity",
+      "id": "ATA-20-REQ-005",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]. PDF downloads properly",
+      "id": "ATA-20-REQ-006",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.7
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "[2]. Works with long test plans",
+      "id": "ATA-20-REQ-007",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    }
+  ],
+  "rtm": [
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "UI-001",
+        "NEG-001"
+      ],
+      "requirement_description": "[1]. URL Field",
+      "requirement_id": "ATA-18-REQ-001",
+      "rtm_item_trace": [
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-001",
+              "NEG-001"
+            ]
+          },
+          "item_id": "ATA-18-ITEM-001",
+          "item_text": "URL Field",
+          "parent_requirement_id": "ATA-18-REQ-001",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "UI-002",
+        "NEG-002"
+      ],
+      "requirement_description": "[2]. Have an area for raw text",
+      "requirement_id": "ATA-18-REQ-002",
+      "rtm_item_trace": [
+        {
+          "classification": "informational_only",
+          "coverage_reference": {
+            "non_testable_reason": "Informational content; not independently testable"
+          },
+          "item_id": "ATA-18-ITEM-002",
+          "item_text": "Have an area for raw text",
+          "parent_requirement_id": "ATA-18-REQ-002",
+          "testable": false
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "UI-003",
+        "NEG-003"
+      ],
+      "requirement_description": "[3]. Have a “load from JIRA” button",
+      "requirement_id": "ATA-18-REQ-003",
+      "rtm_item_trace": [
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-003",
+              "NEG-003"
+            ]
+          },
+          "item_id": "ATA-18-ITEM-003",
+          "item_text": "Have a “load from JIRA” button",
+          "parent_requirement_id": "ATA-18-REQ-003",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "UI-004",
+        "NEG-004"
+      ],
+      "requirement_description": "[4]. Have a button to Generate test plan",
+      "requirement_id": "ATA-18-REQ-004",
+      "rtm_item_trace": [
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-004",
+              "NEG-004"
+            ]
+          },
+          "item_id": "ATA-18-ITEM-004",
+          "item_text": "Have a button to Generate test plan",
+          "parent_requirement_id": "ATA-18-REQ-004",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "UI-005",
+        "NEG-005"
+      ],
+      "requirement_description": "[5]. Have a button to generate RTM",
+      "requirement_id": "ATA-18-REQ-005",
+      "rtm_item_trace": [
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-005",
+              "NEG-005"
+            ]
+          },
+          "item_id": "ATA-18-ITEM-005",
+          "item_text": "Have a button to generate RTM",
+          "parent_requirement_id": "ATA-18-REQ-005",
+          "testable": true
+        },
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-006",
+              "NEG-006"
+            ]
+          },
+          "item_id": "ATA-18-ITEM-009",
+          "item_text": "rtm",
+          "parent_requirement_id": "ATA-18-REQ-005",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "UI-006",
+        "NEG-006"
+      ],
+      "requirement_description": "[6]. Have multiple tabs for ticket, rtm, requirement, test by requirement and test by type",
+      "requirement_id": "ATA-18-REQ-006",
+      "rtm_item_trace": [
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-006",
+              "NEG-006"
+            ]
+          },
+          "item_id": "ATA-18-ITEM-008",
+          "item_text": "Have multiple tabs for ticket",
+          "parent_requirement_id": "ATA-18-REQ-006",
+          "testable": true
+        },
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-006",
+              "NEG-006"
+            ]
+          },
+          "item_id": "ATA-18-ITEM-010",
+          "item_text": "requirement",
+          "parent_requirement_id": "ATA-18-REQ-006",
+          "testable": true
+        },
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-006",
+              "NEG-006"
+            ]
+          },
+          "item_id": "ATA-18-ITEM-011",
+          "item_text": "test by requirement",
+          "parent_requirement_id": "ATA-18-REQ-006",
+          "testable": true
+        },
+        {
+          "classification": "informational_only",
+          "coverage_reference": {
+            "non_testable_reason": "Informational content; not independently testable"
+          },
+          "item_id": "ATA-18-ITEM-007",
+          "item_text": "test by type",
+          "parent_requirement_id": "ATA-18-REQ-006",
+          "testable": false
+        }
+      ]
+    },
+    {
+      "coverage_status": "NOT COVERED",
+      "covered_by_tests": [],
+      "requirement_description": "[1]. Enable exporting the generated test plan for documentation or audits.",
+      "requirement_id": "ATA-20-REQ-001",
+      "rtm_item_trace": [
+        {
+          "classification": "ui_element",
+          "coverage_reference": {
+            "parent_requirement_id": "ATA-20-REQ-001"
+          },
+          "item_id": "ATA-20-ITEM-001",
+          "item_text": "Enable exporting the generated test plan for documentation or audits.",
+          "parent_requirement_id": "ATA-20-REQ-001",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "HAPPY-001",
+        "NEG-007"
+      ],
+      "requirement_description": "[1]. “Download JSON” button",
+      "requirement_id": "ATA-20-REQ-002",
+      "rtm_item_trace": [
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "HAPPY-001",
+              "NEG-007"
+            ]
+          },
+          "item_id": "ATA-20-ITEM-002",
+          "item_text": "“Download JSON” button",
+          "parent_requirement_id": "ATA-20-REQ-002",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "HAPPY-002",
+        "NEG-008"
+      ],
+      "requirement_description": "[2]. “Download PDF” button",
+      "requirement_id": "ATA-20-REQ-003",
+      "rtm_item_trace": [
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "HAPPY-002",
+              "NEG-008"
+            ]
+          },
+          "item_id": "ATA-20-ITEM-003",
+          "item_text": "“Download PDF” button",
+          "parent_requirement_id": "ATA-20-REQ-003",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "coverage_status": "NOT COVERED",
+      "covered_by_tests": [],
+      "requirement_description": "[3]. PDF mirrors UI layout",
+      "requirement_id": "ATA-20-REQ-004",
+      "rtm_item_trace": [
+        {
+          "classification": "informational_only",
+          "coverage_reference": {
+            "non_testable_reason": "Informational content; not independently testable"
+          },
+          "item_id": "ATA-20-ITEM-004",
+          "item_text": "PDF mirrors UI layout",
+          "parent_requirement_id": "ATA-20-REQ-004",
+          "testable": false
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "UI-007",
+        "NEG-009"
+      ],
+      "requirement_description": "[1]. Use backend for PDF generation to avoid frontend complexity",
+      "requirement_id": "ATA-20-REQ-005",
+      "rtm_item_trace": [
+        {
+          "classification": "not_independently_testable",
+          "coverage_reference": {
+            "non_testable_reason": "Implementation guidance or technical constraint; not independently testable"
+          },
+          "item_id": "ATA-20-ITEM-005",
+          "item_text": "Use backend for PDF generation to avoid frontend complexity",
+          "parent_requirement_id": "ATA-20-REQ-005",
+          "testable": false
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "UI-008",
+        "EC-001",
+        "NEG-010"
+      ],
+      "requirement_description": "[1]. PDF downloads properly",
+      "requirement_id": "ATA-20-REQ-006",
+      "rtm_item_trace": [
+        {
+          "classification": "system_behavior",
+          "coverage_reference": {
+            "test_ids": [
+              "UI-008",
+              "NEG-010",
+              "EC-001"
+            ]
+          },
+          "item_id": "ATA-20-ITEM-006",
+          "item_text": "PDF downloads properly",
+          "parent_requirement_id": "ATA-20-REQ-006",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "API-001",
+        "NEG-011"
+      ],
+      "requirement_description": "[2]. Works with long test plans",
+      "requirement_id": "ATA-20-REQ-007",
+      "rtm_item_trace": [
+        {
+          "classification": "informational_only",
+          "coverage_reference": {
+            "non_testable_reason": "Informational content; not independently testable"
+          },
+          "item_id": "ATA-20-ITEM-007",
+          "item_text": "Works with long test plans",
+          "parent_requirement_id": "ATA-20-REQ-007",
+          "testable": false
+        }
+      ]
+    }
+  ],
+  "schema_version": "1.0",
+  "scope_summary": {
+    "failed_tickets": null,
+    "requirements_covered": 11,
+    "requirements_total": 13,
+    "requirements_uncovered": 2,
+    "scope_id": "MANUAL",
+    "scope_type": "manual",
+    "ticket_details": [
+      {
+        "description": "1. URL Field\n2. Have an area for raw text\n3. Have a “load from JIRA” button\n4. Have a button to Generate test plan \n5. Have a button to generate RTM\n6. Have multiple tabs for ticket, rtm, requirement,...",
+        "explanation": null,
+        "has_acceptance_criteria": true,
+        "has_explicit_requirements": true,
+        "requirements_count": 6,
+        "status": "processed",
+        "summary": "Story 3.1 — Build Input Form",
+        "ticket_id": "ATA-18"
+      },
+      {
+        "description": "1. Enable exporting the generated test plan for documentation or audits.\nAcceptance Criteria\n1.  “Download JSON” button\n2. “Download PDF” button\n3. PDF mirrors UI layout\nTechnical Notes\n1. Use backend...",
+        "explanation": null,
+        "has_acceptance_criteria": true,
+        "has_explicit_requirements": true,
+        "requirements_count": 7,
+        "status": "processed",
+        "summary": "Story 3.3 — Add Export Buttons",
+        "ticket_id": "ATA-20"
+      }
+    ],
+    "tickets_analyzed": 2,
+    "tickets_failed": 0,
+    "tickets_requested": 2
+  },
+  "summary": "Test plan generated for UI elements of the input form, covering happy path scenarios. No negative tests generated due to absence of error-handling keywords. | Test cases generated for exporting functionality including happy path and boundary tests. No gaps detected.",
+  "test_plan": {
+    "api_tests": [
+      {
+        "confidence": "inferred",
+        "expected_result": "Happy Path behavior validated",
+        "id": "API-001",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-007"
+        ],
+        "source_requirement_id": "ATA-20-REQ-007",
+        "steps": [
+          "Prepare a valid request with all required fields as specified in the requirement",
+          "Send the request to the system",
+          "Observe the response and verify it contains the expected data and status"
+        ],
+        "steps_origin": "inferred",
+        "title": "Happy Path: [2]. Works with long test plans"
+      },
+      {
+        "confidence": "inferred",
+        "dimension": "happy_path",
+        "expected_result": "Requirement-specific behavior validated",
+        "id": "HAPPY-001",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-002"
+        ],
+        "steps": [
+          "Prepare a valid request with all required fields as specified in the requirement",
+          "Send the request to the system",
+          "Observe the response and verify it contains the expected data and status"
+        ],
+        "steps_origin": "inferred",
+        "title": "Inferred happy-path test for ATA-20-REQ-002"
+      },
+      {
+        "confidence": "inferred",
+        "dimension": "happy_path",
+        "expected_result": "Requirement-specific behavior validated",
+        "id": "HAPPY-002",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-003"
+        ],
+        "steps": [
+          "Prepare a valid request with all required fields as specified in the requirement",
+          "Send the request to the system",
+          "Observe the response and verify it contains the expected data and status"
+        ],
+        "steps_origin": "inferred",
+        "title": "Inferred happy-path test for ATA-20-REQ-003"
+      }
+    ],
+    "data_validation_tests": [],
+    "edge_cases": [
+      {
+        "confidence": "explicit",
+        "expected_result": "The PDF downloads successfully without truncation.",
+        "id": "EC-001",
+        "intent_type": "boundary",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-006"
+        ],
+        "source_requirement_id": "ATA-20-REQ-006",
+        "steps": [
+          "Create a test plan with the maximum allowed length.",
+          "Navigate to the test plan page.",
+          "Click the 'Download PDF' button.",
+          "Observe how the system handles the download of the long test plan."
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Boundary: Long test plans"
+      }
+    ],
+    "negative_tests": [
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-001",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-001"
+        ],
+        "source_requirement_id": "ATA-18-REQ-001",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [1]. URL Field"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-002",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-002"
+        ],
+        "source_requirement_id": "ATA-18-REQ-002",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [2]. Have an area for raw text"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-003",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-003"
+        ],
+        "source_requirement_id": "ATA-18-REQ-003",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [3]. Have a “load from JIRA” button"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-004",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-004"
+        ],
+        "source_requirement_id": "ATA-18-REQ-004",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [4]. Have a button to Generate test plan"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-005",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-005"
+        ],
+        "source_requirement_id": "ATA-18-REQ-005",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [5]. Have a button to generate RTM"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-006",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-006"
+        ],
+        "source_requirement_id": "ATA-18-REQ-006",
+        "steps": [
+          "Navigate to the application",
+          "Check if the 'Have multiple tabs for ticket' is missing, not visible, disabled when it should be enabled, or displays incorrect/empty content",
+          "Check if the 'rtm tab' is missing, not visible, disabled when it should be enabled, or displays incorrect/empty content"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [6]. Have multiple tabs for ticket, rtm, requirement, test by requirement and test by type"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-007",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-002"
+        ],
+        "source_requirement_id": "ATA-20-REQ-002",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [1]. “Download JSON” button"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-008",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-003"
+        ],
+        "source_requirement_id": "ATA-20-REQ-003",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [2]. “Download PDF” button"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-009",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-005"
+        ],
+        "source_requirement_id": "ATA-20-REQ-005",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [1]. Use backend for PDF generation to avoid frontend complexity"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-010",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-006"
+        ],
+        "source_requirement_id": "ATA-20-REQ-006",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [1]. PDF downloads properly"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-011",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-007"
+        ],
+        "source_requirement_id": "ATA-20-REQ-007",
+        "steps": [
+          "Navigate to the application or access the system component",
+          "Attempt to trigger the action with invalid conditions",
+          "Observe the system response and verify appropriate error handling"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: [2]. Works with long test plans"
+      }
+    ],
+    "ui_tests": [
+      {
+        "confidence": "explicit",
+        "expected_result": "The area for raw text is visible and accessible.",
+        "id": "UI-001",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-001"
+        ],
+        "source_requirement_id": "ATA-18-REQ-001",
+        "steps": [
+          "Navigate to the application",
+          "Verify that the area for raw text is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Happy path: Area for raw text"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "The 'load from JIRA' button is visible and accessible.",
+        "id": "UI-002",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-002"
+        ],
+        "source_requirement_id": "ATA-18-REQ-002",
+        "steps": [
+          "Navigate to the application",
+          "Verify that the 'load from JIRA' button is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Happy path: Load from JIRA button"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "The button to Generate test plan is visible and accessible.",
+        "id": "UI-003",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-003"
+        ],
+        "source_requirement_id": "ATA-18-REQ-003",
+        "steps": [
+          "Navigate to the application",
+          "Verify that the button to Generate test plan is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Happy path: Generate test plan button"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "The button to generate RTM is visible and accessible.",
+        "id": "UI-004",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-004"
+        ],
+        "source_requirement_id": "ATA-18-REQ-004",
+        "steps": [
+          "Navigate to the application",
+          "Verify that the button to generate RTM is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Happy path: Generate RTM button"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "All specified tabs are visible and accessible.",
+        "id": "UI-005",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-005"
+        ],
+        "source_requirement_id": "ATA-18-REQ-005",
+        "steps": [
+          "Navigate to the application",
+          "Verify that the 'ticket tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+          "Verify that the 'rtm tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+          "Verify that the 'requirement tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+          "Verify that the 'test by requirement tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+          "Verify that the 'test by type tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Happy path: Multiple tabs"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Happy Path behavior validated",
+        "id": "UI-006",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-18-REQ-006"
+        ],
+        "source_requirement_id": "ATA-18-REQ-006",
+        "steps": [
+          "Navigate to the application",
+          "Verify that the 'Have multiple tabs for ticket' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+          "Verify that the 'rtm tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+        ],
+        "steps_origin": "inferred",
+        "title": "Happy Path: [6]. Have multiple tabs for ticket, rtm, requirement, test by requirement and test by type"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Happy Path behavior validated",
+        "id": "UI-007",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-005"
+        ],
+        "source_requirement_id": "ATA-20-REQ-005",
+        "steps": [
+          "Navigate to the application",
+          "Trigger the action described in the requirement",
+          "Observe the system response and verify it matches the expected outcome"
+        ],
+        "steps_origin": "inferred",
+        "title": "Happy Path: [1]. Use backend for PDF generation to avoid frontend complexity"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Happy Path behavior validated",
+        "id": "UI-008",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-20-REQ-006"
+        ],
+        "source_requirement_id": "ATA-20-REQ-006",
+        "steps": [
+          "Navigate to the application",
+          "Locate and interact with the download mentioned in the requirement",
+          "Observe the system response and verify it matches the expected outcome"
+        ],
+        "steps_origin": "inferred",
+        "title": "Happy Path: [1]. PDF downloads properly"
+      }
+    ]
+  },
+  "test_plan_by_requirement": [
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability"
+        ],
+        "score": 0.6
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-18-REQ-001",
+      "requirement_source": "jira",
+      "requirement_text": "[1]. URL Field",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The area for raw text is visible and accessible.",
+            "id": "UI-001",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-001"
+            ],
+            "source_requirement_id": "ATA-18-REQ-001",
+            "steps": [
+              "Navigate to the application",
+              "Verify that the area for raw text is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Happy path: Area for raw text"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-001",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-001"
+            ],
+            "source_requirement_id": "ATA-18-REQ-001",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [1]. URL Field"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-18-REQ-002",
+      "requirement_source": "jira",
+      "requirement_text": "[2]. Have an area for raw text",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The 'load from JIRA' button is visible and accessible.",
+            "id": "UI-002",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-002"
+            ],
+            "source_requirement_id": "ATA-18-REQ-002",
+            "steps": [
+              "Navigate to the application",
+              "Verify that the 'load from JIRA' button is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Happy path: Load from JIRA button"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-002",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-002"
+            ],
+            "source_requirement_id": "ATA-18-REQ-002",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [2]. Have an area for raw text"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-18-REQ-003",
+      "requirement_source": "jira",
+      "requirement_text": "[3]. Have a “load from JIRA” button",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The button to Generate test plan is visible and accessible.",
+            "id": "UI-003",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-003"
+            ],
+            "source_requirement_id": "ATA-18-REQ-003",
+            "steps": [
+              "Navigate to the application",
+              "Verify that the button to Generate test plan is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Happy path: Generate test plan button"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-003",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-003"
+            ],
+            "source_requirement_id": "ATA-18-REQ-003",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [3]. Have a “load from JIRA” button"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-18-REQ-004",
+      "requirement_source": "jira",
+      "requirement_text": "[4]. Have a button to Generate test plan",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The button to generate RTM is visible and accessible.",
+            "id": "UI-004",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-004"
+            ],
+            "source_requirement_id": "ATA-18-REQ-004",
+            "steps": [
+              "Navigate to the application",
+              "Verify that the button to generate RTM is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Happy path: Generate RTM button"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-004",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-004"
+            ],
+            "source_requirement_id": "ATA-18-REQ-004",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [4]. Have a button to Generate test plan"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-18-REQ-005",
+      "requirement_source": "jira",
+      "requirement_text": "[5]. Have a button to generate RTM",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "All specified tabs are visible and accessible.",
+            "id": "UI-005",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-005"
+            ],
+            "source_requirement_id": "ATA-18-REQ-005",
+            "steps": [
+              "Navigate to the application",
+              "Verify that the 'ticket tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+              "Verify that the 'rtm tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+              "Verify that the 'requirement tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+              "Verify that the 'test by requirement tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+              "Verify that the 'test by type tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Happy path: Multiple tabs"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-005",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-005"
+            ],
+            "source_requirement_id": "ATA-18-REQ-005",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [5]. Have a button to generate RTM"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-18-REQ-006",
+      "requirement_source": "jira",
+      "requirement_text": "[6]. Have multiple tabs for ticket, rtm, requirement, test by requirement and test by type",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Happy Path behavior validated",
+            "id": "UI-006",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-006"
+            ],
+            "source_requirement_id": "ATA-18-REQ-006",
+            "steps": [
+              "Navigate to the application",
+              "Verify that the 'Have multiple tabs for ticket' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)",
+              "Verify that the 'rtm tab' is present on the screen, visible to the user, and accessible (enabled and ready for interaction)"
+            ],
+            "steps_origin": "inferred",
+            "title": "Happy Path: [6]. Have multiple tabs for ticket, rtm, requirement, test by requirement and test by type"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-006",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-18-REQ-006"
+            ],
+            "source_requirement_id": "ATA-18-REQ-006",
+            "steps": [
+              "Navigate to the application",
+              "Check if the 'Have multiple tabs for ticket' is missing, not visible, disabled when it should be enabled, or displays incorrect/empty content",
+              "Check if the 'rtm tab' is missing, not visible, disabled when it should be enabled, or displays incorrect/empty content"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [6]. Have multiple tabs for ticket, rtm, requirement, test by requirement and test by type"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "low",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "Expected happy path testing not covered",
+          "Requirement not covered by any tests"
+        ],
+        "score": 0.15
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "expected",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-20-REQ-001",
+      "requirement_source": "jira",
+      "requirement_text": "[1]. Enable exporting the generated test plan for documentation or audits.",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [],
+        "negative": [],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-20-REQ-002",
+      "requirement_source": "jira",
+      "requirement_text": "[1]. “Download JSON” button",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-007",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-002"
+            ],
+            "source_requirement_id": "ATA-20-REQ-002",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [1]. “Download JSON” button"
+          }
+        ],
+        "other": [
+          {
+            "confidence": "inferred",
+            "dimension": "happy_path",
+            "expected_result": "Requirement-specific behavior validated",
+            "id": "HAPPY-001",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-002"
+            ],
+            "steps": [
+              "Prepare a valid request with all required fields as specified in the requirement",
+              "Send the request to the system",
+              "Observe the response and verify it contains the expected data and status"
+            ],
+            "steps_origin": "inferred",
+            "title": "Inferred happy-path test for ATA-20-REQ-002"
+          }
+        ]
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-20-REQ-003",
+      "requirement_source": "jira",
+      "requirement_text": "[2]. “Download PDF” button",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-008",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-003"
+            ],
+            "source_requirement_id": "ATA-20-REQ-003",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [2]. “Download PDF” button"
+          }
+        ],
+        "other": [
+          {
+            "confidence": "inferred",
+            "dimension": "happy_path",
+            "expected_result": "Requirement-specific behavior validated",
+            "id": "HAPPY-002",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-003"
+            ],
+            "steps": [
+              "Prepare a valid request with all required fields as specified in the requirement",
+              "Send the request to the system",
+              "Observe the response and verify it contains the expected data and status"
+            ],
+            "steps_origin": "inferred",
+            "title": "Inferred happy-path test for ATA-20-REQ-003"
+          }
+        ]
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "low",
+        "reasons": [
+          "Low requirement testability",
+          "Expected happy path testing not covered",
+          "Expected negative testing not covered",
+          "Requirement not covered by any tests"
+        ],
+        "score": 0.2
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "expected",
+        "negative": "expected",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-20-REQ-004",
+      "requirement_source": "jira",
+      "requirement_text": "[3]. PDF mirrors UI layout",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [],
+        "negative": [],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.7
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-20-REQ-005",
+      "requirement_source": "jira",
+      "requirement_text": "[1]. Use backend for PDF generation to avoid frontend complexity",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Happy Path behavior validated",
+            "id": "UI-007",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-005"
+            ],
+            "source_requirement_id": "ATA-20-REQ-005",
+            "steps": [
+              "Navigate to the application",
+              "Trigger the action described in the requirement",
+              "Observe the system response and verify it matches the expected outcome"
+            ],
+            "steps_origin": "inferred",
+            "title": "Happy Path: [1]. Use backend for PDF generation to avoid frontend complexity"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-009",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-005"
+            ],
+            "source_requirement_id": "ATA-20-REQ-005",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [1]. Use backend for PDF generation to avoid frontend complexity"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-20-REQ-006",
+      "requirement_source": "jira",
+      "requirement_text": "[1]. PDF downloads properly",
+      "tests": {
+        "authorization": [],
+        "boundary": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The PDF downloads successfully without truncation.",
+            "id": "EC-001",
+            "intent_type": "boundary",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-006"
+            ],
+            "source_requirement_id": "ATA-20-REQ-006",
+            "steps": [
+              "Create a test plan with the maximum allowed length.",
+              "Navigate to the test plan page.",
+              "Click the 'Download PDF' button.",
+              "Observe how the system handles the download of the long test plan."
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Boundary: Long test plans"
+          }
+        ],
+        "happy_path": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Happy Path behavior validated",
+            "id": "UI-008",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-006"
+            ],
+            "source_requirement_id": "ATA-20-REQ-006",
+            "steps": [
+              "Navigate to the application",
+              "Locate and interact with the download mentioned in the requirement",
+              "Observe the system response and verify it matches the expected outcome"
+            ],
+            "steps_origin": "inferred",
+            "title": "Happy Path: [1]. PDF downloads properly"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-010",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-006"
+            ],
+            "source_requirement_id": "ATA-20-REQ-006",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [1]. PDF downloads properly"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.7
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-20-REQ-007",
+      "requirement_source": "jira",
+      "requirement_text": "[2]. Works with long test plans",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Happy Path behavior validated",
+            "id": "API-001",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-007"
+            ],
+            "source_requirement_id": "ATA-20-REQ-007",
+            "steps": [
+              "Prepare a valid request with all required fields as specified in the requirement",
+              "Send the request to the system",
+              "Observe the response and verify it contains the expected data and status"
+            ],
+            "steps_origin": "inferred",
+            "title": "Happy Path: [2]. Works with long test plans"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-011",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-20-REQ-007"
+            ],
+            "source_requirement_id": "ATA-20-REQ-007",
+            "steps": [
+              "Navigate to the application or access the system component",
+              "Attempt to trigger the action with invalid conditions",
+              "Observe the system response and verify appropriate error handling"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: [2]. Works with long test plans"
+          }
+        ],
+        "other": []
+      }
+    }
+  ],
+  "ticket_item_coverage": [
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-18-ITEM-001",
+      "test_ids": [
+        "UI-001",
+        "NEG-001"
+      ],
+      "testable": true,
+      "text": "URL Field"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-18-ITEM-002",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Have an area for raw text"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-18-ITEM-003",
+      "test_ids": [
+        "UI-003",
+        "NEG-003"
+      ],
+      "testable": true,
+      "text": "Have a “load from JIRA” button"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-18-ITEM-004",
+      "test_ids": [
+        "UI-004",
+        "NEG-004"
+      ],
+      "testable": true,
+      "text": "Have a button to Generate test plan"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-18-ITEM-005",
+      "test_ids": [
+        "UI-005",
+        "NEG-005"
+      ],
+      "testable": true,
+      "text": "Have a button to generate RTM"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-18-ITEM-008",
+      "test_ids": [
+        "UI-006",
+        "NEG-006"
+      ],
+      "testable": true,
+      "text": "Have multiple tabs for ticket"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-18-ITEM-009",
+      "test_ids": [
+        "UI-006",
+        "NEG-006"
+      ],
+      "testable": true,
+      "text": "rtm"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-18-ITEM-010",
+      "test_ids": [
+        "UI-006",
+        "NEG-006"
+      ],
+      "testable": true,
+      "text": "requirement"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-18-ITEM-011",
+      "test_ids": [
+        "UI-006",
+        "NEG-006"
+      ],
+      "testable": true,
+      "text": "test by requirement"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-18-ITEM-007",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "test by type"
+    },
+    {
+      "classification": "ui_element",
+      "coverage_method": "inherited_via_parent_requirement",
+      "item_id": "ATA-20-ITEM-001",
+      "parent_requirement_id": "ATA-20-REQ-001",
+      "testable": true,
+      "text": "Enable exporting the generated test plan for documentation or audits."
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-20-ITEM-002",
+      "test_ids": [
+        "HAPPY-001",
+        "NEG-007"
+      ],
+      "testable": true,
+      "text": "“Download JSON” button"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-20-ITEM-003",
+      "test_ids": [
+        "HAPPY-002",
+        "NEG-008"
+      ],
+      "testable": true,
+      "text": "“Download PDF” button"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-20-ITEM-004",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "PDF mirrors UI layout"
+    },
+    {
+      "classification": "not_independently_testable",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-20-ITEM-005",
+      "non_testable_reason": "Implementation guidance or technical constraint; not independently testable",
+      "testable": false,
+      "text": "Use backend for PDF generation to avoid frontend complexity"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-20-ITEM-006",
+      "test_ids": [
+        "UI-008",
+        "NEG-010",
+        "EC-001"
+      ],
+      "testable": true,
+      "text": "PDF downloads properly"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-20-ITEM-007",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Works with long test plans"
+    }
+  ],
+  "ticket_traceability": [
+    {
+      "items": [
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-18-ITEM-001",
+          "mapped_requirement_id": "ATA-18-REQ-001",
+          "source_section": "description",
+          "testable": true,
+          "text": "URL Field",
+          "validated_by_tests": [
+            "UI-001",
+            "NEG-001"
+          ]
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-18-ITEM-002",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Have an area for raw text"
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-18-ITEM-003",
+          "mapped_requirement_id": "ATA-18-REQ-003",
+          "source_section": "description",
+          "testable": true,
+          "text": "Have a “load from JIRA” button",
+          "validated_by_tests": [
+            "UI-003",
+            "NEG-003"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-18-ITEM-004",
+          "mapped_requirement_id": "ATA-18-REQ-004",
+          "source_section": "description",
+          "testable": true,
+          "text": "Have a button to Generate test plan",
+          "validated_by_tests": [
+            "UI-004",
+            "NEG-004"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-18-ITEM-005",
+          "mapped_requirement_id": "ATA-18-REQ-005",
+          "source_section": "description",
+          "testable": true,
+          "text": "Have a button to generate RTM",
+          "validated_by_tests": [
+            "UI-005",
+            "NEG-005"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-18-ITEM-008",
+          "mapped_requirement_id": "ATA-18-REQ-006",
+          "source_section": "description",
+          "testable": true,
+          "text": "Have multiple tabs for ticket",
+          "validated_by_tests": [
+            "UI-006",
+            "NEG-006"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-18-ITEM-009",
+          "mapped_requirement_id": "ATA-18-REQ-006",
+          "source_section": "description",
+          "testable": true,
+          "text": "rtm",
+          "validated_by_tests": [
+            "UI-006",
+            "NEG-006"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-18-ITEM-010",
+          "mapped_requirement_id": "ATA-18-REQ-006",
+          "source_section": "description",
+          "testable": true,
+          "text": "requirement",
+          "validated_by_tests": [
+            "UI-006",
+            "NEG-006"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-18-ITEM-011",
+          "mapped_requirement_id": "ATA-18-REQ-006",
+          "source_section": "description",
+          "testable": true,
+          "text": "test by requirement",
+          "validated_by_tests": [
+            "UI-006",
+            "NEG-006"
+          ]
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-18-ITEM-007",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "test by type"
+        }
+      ],
+      "ticket_id": "ATA-18"
+    },
+    {
+      "items": [
+        {
+          "classification": "ui_element",
+          "item_id": "ATA-20-ITEM-001",
+          "mapped_requirement_id": "ATA-20-REQ-001",
+          "source_section": "description",
+          "testable": true,
+          "text": "Enable exporting the generated test plan for documentation or audits.",
+          "validated_by_tests": []
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-20-ITEM-002",
+          "mapped_requirement_id": "ATA-20-REQ-002",
+          "source_section": "description",
+          "testable": true,
+          "text": "“Download JSON” button",
+          "validated_by_tests": [
+            "HAPPY-001",
+            "NEG-007"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-20-ITEM-003",
+          "mapped_requirement_id": "ATA-20-REQ-003",
+          "source_section": "description",
+          "testable": true,
+          "text": "“Download PDF” button",
+          "validated_by_tests": [
+            "HAPPY-002",
+            "NEG-008"
+          ]
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-20-ITEM-004",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "PDF mirrors UI layout"
+        },
+        {
+          "classification": "not_independently_testable",
+          "item_id": "ATA-20-ITEM-005",
+          "note": "Implementation guidance or technical constraint; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Use backend for PDF generation to avoid frontend complexity"
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-20-ITEM-006",
+          "mapped_requirement_id": "ATA-20-REQ-006",
+          "source_section": "description",
+          "testable": true,
+          "text": "PDF downloads properly",
+          "validated_by_tests": [
+            "UI-008",
+            "NEG-010",
+            "EC-001"
+          ]
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-20-ITEM-007",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Works with long test plans"
+        }
+      ],
+      "ticket_id": "ATA-20"
+    }
+  ]
+}

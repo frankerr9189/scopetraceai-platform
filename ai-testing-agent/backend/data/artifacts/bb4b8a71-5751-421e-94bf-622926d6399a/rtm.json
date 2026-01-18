@@ -1,0 +1,165 @@
+[
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-001",
+      "UI-003",
+      "UI-004"
+    ],
+    "requirement_description": "[1]. The system generates an RTM after a test plan is created.",
+    "requirement_id": "ATA-36-REQ-001",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-002"
+    ],
+    "requirement_description": "[2]. Each RTM entry includes:",
+    "requirement_id": "ATA-36-REQ-002",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "API-001"
+    ],
+    "requirement_description": "[3]. Requirement ID",
+    "requirement_id": "ATA-36-REQ-003",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "API-002"
+    ],
+    "requirement_description": "[4]. Requirement description",
+    "requirement_id": "ATA-36-REQ-004",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "API-003"
+    ],
+    "requirement_description": "[5]. Associated test case ID(s)",
+    "requirement_id": "ATA-36-REQ-005",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "API-004"
+    ],
+    "requirement_description": "[6]. Coverage status (Covered / Not Covered)",
+    "requirement_id": "ATA-36-REQ-006",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "SYS-001"
+    ],
+    "requirement_description": "[7]. Every requirement appears exactly once in the RTM.",
+    "requirement_id": "ATA-36-REQ-007",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "SYS-002"
+    ],
+    "requirement_description": "[8]. The RTM is derived directly from the test plan",
+    "requirement_id": "ATA-36-REQ-008-001",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-006",
+      "DATA-VAL-001"
+    ],
+    "requirement_description": "does not require additional user input.",
+    "requirement_id": "ATA-36-REQ-008-002",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "SYS-003"
+    ],
+    "requirement_description": "[9]. If a requirement is not covered by any test, this condition is clearly identified.",
+    "requirement_id": "ATA-36-REQ-009",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "SYS-004"
+    ],
+    "requirement_description": "[10]. RTM generation does not block test plan creation.",
+    "requirement_id": "ATA-36-REQ-010",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Item text is unclear or incomplete; needs clarification",
+    "requirement_description": "Requirement ID",
+    "requirement_id": "ATA-36-ITEM-003",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Item text is unclear or incomplete; needs clarification",
+    "requirement_description": "Requirement description",
+    "requirement_id": "ATA-36-ITEM-004",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Associated test case ID(s)",
+    "requirement_id": "ATA-36-ITEM-005",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Coverage status (Covered / Not Covered)",
+    "requirement_id": "ATA-36-ITEM-006",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "This capability is required to support ISO audit evidence and future automated test execution.",
+    "requirement_id": "ATA-36-ITEM-013",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  }
+]

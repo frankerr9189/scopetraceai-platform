@@ -1,0 +1,145 @@
+[
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "API-001"
+    ],
+    "requirement_description": "[1]) Secure storage of base_url",
+    "requirement_id": "ATA-41-REQ-001",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "API-005",
+      "API-006"
+    ],
+    "requirement_description": "[2]) Service-to-service access for GET endpoint",
+    "requirement_id": "ATA-41-REQ-002",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "API-007",
+      "AUTH-002"
+    ],
+    "requirement_description": "[3]) Masking or omitting api_token in responses",
+    "requirement_id": "ATA-41-REQ-003",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "API-003",
+      "API-009"
+    ],
+    "requirement_description": "[4]) Admin-only access for POST endpoint",
+    "requirement_id": "ATA-41-REQ-004",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Secure storage of base_url",
+    "requirement_id": "ATA-41-ITEM-001",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Service-to-service access for GET endpoint",
+    "requirement_id": "ATA-41-ITEM-002",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Masking or omitting api_token in responses",
+    "requirement_id": "ATA-41-ITEM-003",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Admin-only access for POST endpoint",
+    "requirement_id": "ATA-41-ITEM-004",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Secure storage of api_token",
+    "requirement_id": "ATA-41-ITEM-005",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Secure storage of client_id",
+    "requirement_id": "ATA-41-ITEM-006",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Credential validation against the third-party service",
+    "requirement_id": "ATA-41-ITEM-007",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Rotation of credentials",
+    "requirement_id": "ATA-41-ITEM-008",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Potential exposure of sensitive credentials if not properly secured.",
+    "requirement_id": "ATA-41-ITEM-009",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "[security] Potential exposure of sensitive credentials if not properly secured. (Severity: high)",
+    "requirement_id": "ATA-41-ITEM-010",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  }
+]

@@ -1,0 +1,12 @@
+[
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "No numbered or bulleted items found in ticket content",
+    "requirement_id": "ATA-37-ITEM-000",
+    "source_section": "ticket_analysis",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  }
+]

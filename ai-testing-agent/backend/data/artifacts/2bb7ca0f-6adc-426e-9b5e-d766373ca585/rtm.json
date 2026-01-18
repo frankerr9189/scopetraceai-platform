@@ -1,0 +1,32 @@
+[
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Identification of uncovered requirements",
+    "requirement_id": "ATA-36-ITEM-007",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Editing of test plans",
+    "requirement_id": "ATA-36-ITEM-010",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Editing test cases against requirements within Jira",
+    "requirement_id": "ATA-36-ITEM-012",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  }
+]

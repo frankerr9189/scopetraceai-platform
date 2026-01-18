@@ -1,0 +1,207 @@
+{
+  "meta": {
+    "package_id": "PKG-C5321F30",
+    "agent_name": "AI Sr Business Requirement Analyst",
+    "agent_version": "0.1.0",
+    "confidence": "medium",
+    "requires_human_review": true,
+    "source": "manual:smoke-test-001",
+    "generated_at": "2025-12-24T13:20:53.299027"
+  },
+  "summary": {
+    "total_requirements": 3,
+    "parent_requirements": 1,
+    "child_requirements": 2,
+    "inferred_requirements": 0,
+    "high_risk_items": 0,
+    "gap_count": 9,
+    "status": "IN_REVIEW"
+  },
+  "package": {
+    "package_id": "PKG-C5321F30",
+    "version": "1.0.0",
+    "requirements": [
+      {
+        "id": "REQ-001",
+        "parent_id": null,
+        "title": "Profile Management",
+        "description": "Users should be able to manage their profile information, including updating personal details.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001-01",
+            "given": "Capability 'Profile Management' is implemented",
+            "when": "The system is in operation",
+            "then": "Users should be able to manage their profile information, including updating personal details.",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [],
+        "risks": [],
+        "ambiguities": [],
+        "original_intent": "Users can manage their profile information.",
+        "metadata": null,
+        "created_at": "2025-12-24T13:20:53.298769",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.1",
+        "parent_id": "REQ-001",
+        "title": "View Profile Information",
+        "description": "Actor: User\n\nAction: View their profile information\n\nSystem Behavior: The system displays the user's current profile information.\n\nExpected Outcome: Users can see their profile details.\n\nObservable Result: The profile information is displayed correctly on the user interface.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.1-01",
+            "given": "The user is logged in",
+            "when": "The user navigates to the profile section",
+            "then": "The system displays the user's profile information",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "Specific fields of profile information to be managed are not defined."
+        ],
+        "risks": [
+          "[ambiguity] The lack of clarity on what constitutes 'profile information' may lead to incomplete implementation. (Severity: medium)"
+        ],
+        "ambiguities": [
+          "Specific fields of profile information to be managed are not defined."
+        ],
+        "original_intent": "Users can manage their profile information.",
+        "metadata": null,
+        "created_at": "2025-12-24T13:20:53.298837",
+        "updated_at": null
+      },
+      {
+        "id": "REQ-001.2",
+        "parent_id": "REQ-001",
+        "title": "Update Profile Information",
+        "description": "Actor: User\n\nAction: Update their profile information\n\nSystem Behavior: The system allows users to modify their profile details and save changes.\n\nExpected Outcome: Users can successfully update their profile.\n\nObservable Result: The updated profile information is reflected in the system.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-REQ-001.2-01",
+            "given": "The user is logged in and viewing their profile information",
+            "when": "The user makes changes and submits the update",
+            "then": "The system saves the changes and displays the updated profile information",
+            "inferred": false
+          }
+        ],
+        "inferred_logic": [],
+        "status": "in_review",
+        "priority": null,
+        "gaps": [
+          "The specific fields that can be updated are not defined."
+        ],
+        "risks": [
+          "[ambiguity] Without clear definitions of editable fields, users may be confused about what can be changed. (Severity: medium)"
+        ],
+        "ambiguities": [
+          "The specific fields that can be updated are not defined."
+        ],
+        "original_intent": "Users can manage their profile information.",
+        "metadata": null,
+        "created_at": "2025-12-24T13:20:53.298857",
+        "updated_at": null
+      }
+    ],
+    "gap_analysis": {
+      "gaps": [
+        "The specific fields that can be updated are not defined.",
+        "Definition of profile information fields that can be managed is missing.",
+        "Specific fields of profile information to be managed are not defined."
+      ],
+      "missing_information": [
+        "The specific fields that can be updated are not defined.",
+        "The requirement does not clarify the types of users or the specific actions they can perform.",
+        "The requirement is vague and does not specify what aspects of profile information can be managed.",
+        "Specific fields of profile information to be managed are not defined."
+      ]
+    },
+    "risk_analysis": {
+      "risks": [
+        "[ambiguity] The lack of clarity on what constitutes 'profile information' may lead to incomplete implementation. (Severity: medium)",
+        "[ambiguity] Without clear definitions of editable fields, users may be confused about what can be changed. (Severity: medium)"
+      ],
+      "risk_level": "medium",
+      "audit_concerns": []
+    },
+    "original_input": "Users can manage their profile information.",
+    "metadata": {
+      "source": "manual:smoke-test-001",
+      "agent_version": "0.1.0",
+      "confidence": "medium",
+      "requires_human_review": true,
+      "mapped_at": "2025-12-24T13:20:53.298934",
+      "interpretation_notes": [
+        "The requirement is vague and does not specify what aspects of profile information can be managed.",
+        "The requirement does not clarify the types of users or the specific actions they can perform."
+      ]
+    },
+    "created_at": "2025-12-24T13:20:53.298937",
+    "created_by": null
+  },
+  "readable_summary": {
+    "overview": {
+      "original_intent": "Users can manage their profile information.",
+      "confidence": "medium",
+      "requires_human_review": true
+    },
+    "capabilities": [
+      {
+        "id": "REQ-001",
+        "title": "Profile Management",
+        "summary": "Users can view, and update their profile management",
+        "children": [
+          {
+            "id": "REQ-001.1",
+            "title": "View Profile Information",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.1-01",
+                "text": "Given the user is logged in, when the user navigates the profile section, then The system displays the user's profile information"
+              }
+            ],
+            "gaps": [
+              "Specific fields of profile information to be managed are not defined."
+            ],
+            "notes": [
+              "Clarification needed: Specific fields of profile information to be managed are not defined."
+            ]
+          },
+          {
+            "id": "REQ-001.2",
+            "title": "Update Profile Information",
+            "acceptance_criteria": [
+              {
+                "id": "AC-REQ-001.2-01",
+                "text": "Given the user is logged in and viewing their profile information, when the user makes changes and submits update, then The system saves the changes and displays the updated profile information"
+              }
+            ],
+            "gaps": [
+              "The specific fields that can be updated are not defined."
+            ],
+            "notes": [
+              "Clarification needed: The specific fields that can be updated are not defined."
+            ]
+          }
+        ]
+      }
+    ],
+    "key_gaps": [
+      "Data fields and their definitions are not fully specified"
+    ],
+    "reviewer_actions": [
+      "Clarify ambiguous requirements for Update Profile Information (REQ-001.2): The specific fields that can be updated are not defined.",
+      "Address 3 cross-cutting gaps affecting multiple requirements",
+      "Define missing details for Update Profile Information (REQ-001.2): The specific fields that can be updated are not defined.",
+      "Define missing details for View Profile Information (REQ-001.1): Specific fields of profile information to be managed are not defined.",
+      "Clarify ambiguous requirements for View Profile Information (REQ-001.1): Specific fields of profile information to be managed are not defined.",
+      "Provide 4 missing pieces of information requiring confirmation"
+    ]
+  }
+}

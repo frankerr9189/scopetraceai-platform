@@ -1,0 +1,10 @@
+Ticket ID,Requirement ID,Requirement Description,Covered By Tests,Coverage Status
+ATA-36,REQ-001,The system generates an RTM after a test plan is created.,,NOT COVERED
+ATA-36,REQ-002,Each RTM entry includes Requirement ID.,,NOT COVERED
+ATA-36,REQ-003,Each RTM entry includes Requirement description.,,NOT COVERED
+ATA-36,REQ-004,Each RTM entry includes Associated test case ID(s).,,NOT COVERED
+ATA-36,REQ-005,Each RTM entry includes Coverage status (Covered / Not Covered).,,NOT COVERED
+ATA-36,REQ-006,Every requirement appears exactly once in the RTM.,,NOT COVERED
+ATA-36,REQ-007,The RTM is derived directly from the test plan and does not require additional user input.,,NOT COVERED
+ATA-36,REQ-008,"If a requirement is not covered by any test, this condition is clearly identified.",,NOT COVERED
+ATA-36,REQ-009,RTM generation does not block test plan creation.,,NOT COVERED
