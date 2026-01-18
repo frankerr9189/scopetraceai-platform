@@ -1142,20 +1142,23 @@ export interface CreateExecuteResponse {
   checksum: string
 }
 
-// Get Jira Writeback API base URL (different from BA agent)
-// In production, require env var; in development, allow localhost fallback
+// Get Jira Writeback API base URL
+// Service runs on port 8001 in development
+// Primary: VITE_API_BASE (shared base URL for all services)
+// Fallback: VITE_JIRA_WB_API_BASE_URL (if separate service deployment needed)
 const getJiraWritebackAPIBase = (): string => {
   // In production, require env var
   if (import.meta.env.MODE === 'production') {
-    const base = import.meta.env.VITE_JIRA_WB_API_BASE_URL
+    // Use VITE_API_BASE first (shared base), then fallback to VITE_JIRA_WB_API_BASE_URL
+    const base = import.meta.env.VITE_API_BASE || import.meta.env.VITE_JIRA_WB_API_BASE_URL
     if (!base) {
-      throw new Error('VITE_JIRA_WB_API_BASE_URL must be set in production')
+      throw new Error('VITE_API_BASE must be set in production')
     }
     return base
   }
   // In development, allow localhost fallback
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (import.meta as any).env?.VITE_JIRA_WB_API_BASE_URL || 'http://localhost:8001'
+  return import.meta.env.VITE_API_BASE || (import.meta as any).env?.VITE_JIRA_WB_API_BASE_URL || 'http://localhost:8001'
 }
 
 const JIRA_WB_API_BASE_URL = getJiraWritebackAPIBase()
