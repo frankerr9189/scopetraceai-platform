@@ -110,6 +110,11 @@ def check_auth():
     g.tenant_id = payload.get("tenant_id")
     g.role = payload.get("role")
     
+    # Guardrail: Ensure tenant_id is present (required for tenant isolation)
+    if not g.tenant_id:
+        logger.error("JWT token missing tenant_id claim - rejecting request")
+        return jsonify({"detail": "Invalid token: missing tenant_id"}), 401
+    
     return None
 
 # Initialize OpenAI client
