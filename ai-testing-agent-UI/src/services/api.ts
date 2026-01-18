@@ -1143,8 +1143,22 @@ export interface CreateExecuteResponse {
 }
 
 // Get Jira Writeback API base URL (different from BA agent)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const JIRA_WB_API_BASE_URL = (import.meta as any).env?.VITE_JIRA_WB_API_BASE_URL || 'http://localhost:8001'
+// In production, require env var; in development, allow localhost fallback
+const getJiraWritebackAPIBase = (): string => {
+  // In production, require env var
+  if (import.meta.env.MODE === 'production') {
+    const base = import.meta.env.VITE_JIRA_WB_API_BASE_URL
+    if (!base) {
+      throw new Error('VITE_JIRA_WB_API_BASE_URL must be set in production')
+    }
+    return base
+  }
+  // In development, allow localhost fallback
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (import.meta as any).env?.VITE_JIRA_WB_API_BASE_URL || 'http://localhost:8001'
+}
+
+const JIRA_WB_API_BASE_URL = getJiraWritebackAPIBase()
 
 export async function getJiraProjects(): Promise<JiraProject[]> {
   const response = await fetch(`${JIRA_WB_API_BASE_URL}/api/v1/jira/meta/projects`, {

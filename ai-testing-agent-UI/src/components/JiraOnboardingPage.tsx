@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Settings } from 'lucide-react'
 import { refreshTenantStatus } from '../services/api'
 import { useTenantStatus } from '../contexts/TenantStatusContext'
+import { TEST_PLAN_API_BASE_URL } from '../config'
 
 export function JiraOnboardingPage() {
   const [jiraBaseUrl, setJiraBaseUrl] = useState('')
@@ -28,11 +29,9 @@ export function JiraOnboardingPage() {
     setIsLoading(true)
 
     try {
-      const apiBase = import.meta.env.VITE_API_BASE || import.meta.env.VITE_TEST_PLAN_API_BASE_URL || 'http://localhost:5050'
-      
       let response: Response
       try {
-        response = await fetch(`${apiBase}/api/v1/integrations/jira`, {
+        response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/integrations/jira`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -47,7 +46,7 @@ export function JiraOnboardingPage() {
       } catch (fetchError) {
         // Network error
         if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
-          setError(`Cannot connect to backend at ${apiBase}. Please ensure the backend server is running.`)
+          setError(`Cannot connect to backend at ${TEST_PLAN_API_BASE_URL}. Please ensure the backend server is running.`)
         } else {
           setError(fetchError instanceof Error ? fetchError.message : 'Network error: Failed to connect to server')
         }

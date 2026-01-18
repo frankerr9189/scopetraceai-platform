@@ -4,6 +4,7 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { UserPlus } from 'lucide-react'
 import { useTenantStatus } from '../contexts/TenantStatusContext'
+import { TEST_PLAN_API_BASE_URL } from '../config'
 
 export function RegisterPage() {
   const [tenantName, setTenantName] = useState('')
@@ -36,11 +37,9 @@ export function RegisterPage() {
     setIsLoading(true)
 
     try {
-      const apiBase = import.meta.env.VITE_API_BASE || import.meta.env.VITE_TEST_PLAN_API_BASE_URL || 'http://localhost:5050'
-      
       let response: Response
       try {
-        response = await fetch(`${apiBase}/auth/register`, {
+        response = await fetch(`${TEST_PLAN_API_BASE_URL}/auth/register`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -57,7 +56,7 @@ export function RegisterPage() {
       } catch (fetchError) {
         // Network error (backend not running, CORS, etc.)
         if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
-          setError(`Cannot connect to backend at ${apiBase}. Please ensure the backend server is running.`)
+          setError(`Cannot connect to backend at ${TEST_PLAN_API_BASE_URL}. Please ensure the backend server is running.`)
         } else {
           setError(fetchError instanceof Error ? fetchError.message : 'Network error: Failed to connect to server')
         }
