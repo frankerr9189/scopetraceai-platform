@@ -12,7 +12,7 @@ export function JiraNotConfiguredBanner() {
   const shouldShow = bootstrapStatus?.jira && bootstrapStatus.jira.configured === false
 
   // Debug logging (remove in production if needed)
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.NODE_ENV === 'development') {
     console.log('[JiraNotConfiguredBanner] bootstrapStatus:', bootstrapStatus)
     console.log('[JiraNotConfiguredBanner] jira configured:', bootstrapStatus?.jira?.configured)
     console.log('[JiraNotConfiguredBanner] shouldShow:', shouldShow)

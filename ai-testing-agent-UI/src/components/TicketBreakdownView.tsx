@@ -73,7 +73,7 @@ export function TicketBreakdownView({ ticketTraceability = [] }: TicketBreakdown
 
   return (
     <div className="space-y-6">
-      {ticketTraceability.map((traceability, ticketIndex) => (
+      {ticketTraceability.map((traceability) => (
         <div key={traceability.ticket_id} className="space-y-4">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold text-foreground/90">
@@ -85,7 +85,7 @@ export function TicketBreakdownView({ ticketTraceability = [] }: TicketBreakdown
           </div>
 
           <div className="space-y-3">
-            {traceability.items.map((item, itemIndex) => (
+            {traceability.items.map((item) => (
               <div
                 key={item.item_id}
                 className="border border-border/50 rounded-lg p-4 bg-card"
@@ -133,7 +133,7 @@ export function TicketBreakdownView({ ticketTraceability = [] }: TicketBreakdown
                       <div>
                         <span className="text-xs text-muted-foreground mb-2 block">Covered by tests:</span>
                         <div className="flex flex-wrap gap-2">
-                          {item.validated_by_tests.map((testId, idx) => (
+                          {item.validated_by_tests.map((testId) => (
                             <button
                               key={testId}
                               onClick={() => {

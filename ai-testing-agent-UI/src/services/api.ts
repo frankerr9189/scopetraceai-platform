@@ -82,14 +82,13 @@ export function refreshTenantStatus(): void {
  * Returns Authorization header from localStorage access_token.
  */
 function getAuthHeaders(): HeadersInit {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  }
+  const headers = new Headers()
+  headers.set('Content-Type', 'application/json')
   
   const accessToken = localStorage.getItem('access_token')
   
   if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`
+    headers.set('Authorization', `Bearer ${accessToken}`)
   }
   
   // Get user info for X-Actor header (backward compatibility)
@@ -105,12 +104,12 @@ function getAuthHeaders(): HeadersInit {
       } else if (user.email) {
         actorName = user.email
       }
-      headers['X-Actor'] = actorName
+      headers.set('X-Actor', actorName)
     } catch {
-      headers['X-Actor'] = 'anonymous'
+      headers.set('X-Actor', 'anonymous')
     }
   } else {
-    headers['X-Actor'] = 'anonymous'
+    headers.set('X-Actor', 'anonymous')
   }
   
   return headers
@@ -327,11 +326,13 @@ export interface RTMEntry {
 }
 
 export async function generateTestPlan(tickets: TicketInput[], createdBy?: string): Promise<TestPlanResponse> {
-  const headers = getAuthHeaders()
+  const baseHeaders = getAuthHeaders()
+  // Convert to Headers instance for safe modification
+  const headers = baseHeaders instanceof Headers ? baseHeaders : new Headers(baseHeaders)
   
   // Override X-Actor if createdBy is explicitly provided
   if (createdBy) {
-    headers['X-Actor'] = createdBy
+    headers.set('X-Actor', createdBy)
   }
   
   const body: any = { tickets }
@@ -648,8 +649,10 @@ export async function downloadTestPlan(): Promise<Blob> {
 }
 
 export async function downloadExecutionReport(runId: string): Promise<Blob> {
-  const headers = getAuthHeaders()
-  headers['Content-Type'] = 'text/csv'
+  const baseHeaders = getAuthHeaders()
+  // Convert to Headers instance for safe modification
+  const headers = baseHeaders instanceof Headers ? baseHeaders : new Headers(baseHeaders)
+  headers.set('Content-Type', 'text/csv')
   
   const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/test-plan/${runId}/execution-report.csv`, {
     method: 'GET',
@@ -854,10 +857,10 @@ export async function analyzeRequirements(
     
     // Get auth headers but don't set Content-Type for FormData (browser will set it with boundary)
     const accessToken = localStorage.getItem('access_token')
-    const headers: HeadersInit = {}
+    const headers = new Headers()
     
     if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`
+      headers.set('Authorization', `Bearer ${accessToken}`)
     }
     
     // Get user info for X-Actor header (backward compatibility)
@@ -873,12 +876,12 @@ export async function analyzeRequirements(
         } else if (user.email) {
           actorName = user.email
         }
-        headers['X-Actor'] = actorName
+        headers.set('X-Actor', actorName)
       } catch {
-        headers['X-Actor'] = 'anonymous'
+        headers.set('X-Actor', 'anonymous')
       }
     } else {
-      headers['X-Actor'] = 'anonymous'
+      headers.set('X-Actor', 'anonymous')
     }
     
     const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {

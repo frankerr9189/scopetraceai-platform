@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { UserPlus } from 'lucide-react'
-import { refreshTenantStatus } from '../services/api'
 import { useTenantStatus } from '../contexts/TenantStatusContext'
 
 export function RegisterPage() {

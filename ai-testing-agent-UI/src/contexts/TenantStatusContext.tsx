@@ -75,7 +75,7 @@ export function TenantStatusProvider({ children }: { children: ReactNode }) {
       const newTenantId = data.tenant_id
       if (currentTenantIdRef.current !== null && currentTenantIdRef.current !== newTenantId) {
         // Tenant changed! Reset and refetch
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.NODE_ENV === 'development') {
           console.warn('[TenantStatusContext] Tenant ID changed, resetting context', {
             old: currentTenantIdRef.current,
             new: newTenantId

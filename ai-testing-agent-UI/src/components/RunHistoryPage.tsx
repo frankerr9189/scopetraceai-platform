@@ -249,7 +249,17 @@ export function RunHistoryPage() {
 
   if (runId) {
     // Run detail view
-    const displayRun = selectedRun || (runId ? { run_id: runId, created_at: '', created_by: 'unknown', status: 'unknown', source_type: 'unknown', ticket_count: null, environment: null } : null)
+    const displayRun: Run | null = selectedRun || (runId ? { 
+      run_id: runId, 
+      created_at: '', 
+      created_by: 'unknown', 
+      status: 'unknown', 
+      source_type: 'unknown', 
+      ticket_count: null, 
+      environment: null,
+      logic_version: null,
+      model_name: null
+    } as unknown as Run : null)
     
     if (!displayRun) {
       return (
@@ -302,7 +312,7 @@ export function RunHistoryPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">Review Status:</span>
-                <div className="mt-1">{getReviewStatusBadge(displayRun.review_status)}</div>
+                <div className="mt-1">{getReviewStatusBadge(displayRun.review_status || 'generated')}</div>
               </div>
               <div>
                 <span className="text-muted-foreground">Source Type:</span>
@@ -310,7 +320,7 @@ export function RunHistoryPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">Agent:</span>
-                <p className="font-medium">{getAgentDisplayName(displayRun.agent)}</p>
+                <p className="font-medium">{getAgentDisplayName(displayRun.agent || undefined)}</p>
               </div>
               {displayRun.ticket_count !== null && (
                 <div>
@@ -351,7 +361,7 @@ export function RunHistoryPage() {
             </div>
             
             {/* Review/Approval Actions */}
-            {displayRun.review_status === 'generated' && (
+            {(displayRun.review_status === 'generated' || !displayRun.review_status) && (
               <div className="mt-4 pt-4 border-t border-border/50">
                 <Button
                   onClick={handleMarkReviewed}
@@ -410,11 +420,11 @@ export function RunHistoryPage() {
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       </div>
-                      {displayRun.jira_created_by && (
+                      {displayRun.created_by && (
                         <p className="text-xs text-muted-foreground">
-                          Created by {displayRun.jira_created_by} on{' '}
-                          {displayRun.jira_created_at
-                            ? new Date(displayRun.jira_created_at).toLocaleString()
+                          Created by {displayRun.created_by} on{' '}
+                          {(displayRun as any).jira_created_at || displayRun.created_at
+                            ? new Date((displayRun as any).jira_created_at || displayRun.created_at).toLocaleString()
                             : 'N/A'}
                         </p>
                       )}

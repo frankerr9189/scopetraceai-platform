@@ -38,7 +38,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('tickets')
   const [sidebarPadding, setSidebarPadding] = useState(256)
   const location = useLocation()
-  const { isTenantContextReady, isLoading: isTenantLoading } = useTenantStatus()
+  const { isTenantContextReady } = useTenantStatus()
   
   // Check if user is authenticated
   const accessToken = localStorage.getItem('access_token')

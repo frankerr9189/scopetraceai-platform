@@ -95,7 +95,7 @@ function ReadableSummaryView({ requirements, readableSummary, packageData, onReq
   const [isSaving, setIsSaving] = useState(false)
   
   // Get display value (with manual override if present)
-  const getDisplayValue = (req: Requirement, field: 'summary' | 'description' | 'scope_boundaries' | 'open_questions' | 'business_requirements') => {
+  const getDisplayValue = (req: Requirement, field: 'summary' | 'description' | 'scope_boundaries' | 'open_questions' | 'business_requirements'): string | string[] | { in_scope: string[]; out_of_scope: string[] } | null => {
     if (req.manual_override) {
       if (field === 'summary' && req.manual_override.summary) return req.manual_override.summary
       if (field === 'description' && req.manual_override.description) return req.manual_override.description
@@ -110,12 +110,23 @@ function ReadableSummaryView({ requirements, readableSummary, packageData, onReq
     // Fall back to original
     if (field === 'summary') return req.summary
     if (field === 'description') return req.description
-    if (field === 'scope_boundaries') return req.scope_boundaries || { in_scope: [], out_of_scope: [] }
+    if (field === 'scope_boundaries') {
+      const scope = req.scope_boundaries
+      if (!scope) return { in_scope: [], out_of_scope: [] }
+      // Normalize to object format
+      if (typeof scope === 'string') {
+        return { in_scope: [scope], out_of_scope: [] }
+      }
+      if (Array.isArray(scope)) {
+        return { in_scope: scope, out_of_scope: [] }
+      }
+      return scope
+    }
     if (field === 'open_questions') return req.open_questions || []
     return null
   }
   
-  const getBRDisplayValue = (br: Requirement['business_requirements'][0]) => {
+  const getBRDisplayValue = (br: NonNullable<Requirement['business_requirements']>[0]) => {
     if (br.manual_override && br.manual_override.statement) {
       return br.manual_override.statement
     }
@@ -126,7 +137,7 @@ function ReadableSummaryView({ requirements, readableSummary, packageData, onReq
     return req.manual_override !== null && req.manual_override !== undefined
   }
   
-  const isBRManuallyEdited = (br: Requirement['business_requirements'][0]) => {
+  const isBRManuallyEdited = (br: NonNullable<Requirement['business_requirements']>[0]) => {
     return br.manual_override !== null && br.manual_override !== undefined && br.manual_override.statement !== null
   }
   
@@ -218,10 +229,23 @@ function ReadableSummaryView({ requirements, readableSummary, packageData, onReq
     const ticketTypeLabel = req.ticket_type === 'story' ? 'Story' : 'Sub-task'
     const isEditing = editingRequirementId === req.id
     const hasManualEdits = isManuallyEdited(req)
-    const displaySummary = isEditing ? editState.summary : getDisplayValue(req, 'summary')
-    const displayDescription = isEditing ? editState.description : getDisplayValue(req, 'description')
-    const displayScope = isEditing ? editState.scope_boundaries : getDisplayValue(req, 'scope_boundaries')
-    const displayOpenQuestions = isEditing ? editState.open_questions : getDisplayValue(req, 'open_questions')
+    const displaySummary = isEditing ? editState.summary : (getDisplayValue(req, 'summary') as string | null)
+    const displayDescription = isEditing ? editState.description : (getDisplayValue(req, 'description') as string | null)
+    const scopeValue = isEditing ? editState.scope_boundaries : getDisplayValue(req, 'scope_boundaries')
+    // Normalize scope to object format
+    const displayScope: { in_scope: string[]; out_of_scope: string[] } = (() => {
+      if (!scopeValue) return { in_scope: [], out_of_scope: [] }
+      if (typeof scopeValue === 'string') return { in_scope: [scopeValue], out_of_scope: [] }
+      if (Array.isArray(scopeValue)) return { in_scope: scopeValue, out_of_scope: [] }
+      return scopeValue
+    })()
+    const openQuestionsValue = isEditing ? editState.open_questions : getDisplayValue(req, 'open_questions')
+    const displayOpenQuestions: string[] = (() => {
+      if (!openQuestionsValue) return []
+      if (Array.isArray(openQuestionsValue)) return openQuestionsValue
+      if (typeof openQuestionsValue === 'string') return [openQuestionsValue]
+      return []
+    })()
     
     return (
       <Card 
@@ -600,13 +624,13 @@ export function RequirementsPage() {
     : false
   
   // Check if Jira writeback is disabled
-  const isWritebackDisabled = tenantStatus
+  const isWritebackDisabled: boolean = tenantStatus
     ? (tenantStatus.subscription_status === 'Paywalled' ||
        (tenantStatus.subscription_status === 'Trial' && tenantStatus.trial_writeback_runs_remaining <= 0))
     : false
   
   // Also disable if Jira is not configured
-  const isJiraNotConfigured = bootstrapStatus && (!bootstrapStatus.jira.configured || !bootstrapStatus.jira.is_active)
+  const isJiraNotConfigured: boolean = !!(bootstrapStatus && (!bootstrapStatus.jira.configured || !bootstrapStatus.jira.is_active))
   
   // Helper: Check if package is Jira-origin
   const isJiraOriginPackage = (): boolean => {
@@ -651,7 +675,7 @@ export function RequirementsPage() {
         approved_at: new Date().toISOString()
       }
       
-      const executeResponse = await rewriteExecute(executeRequest)
+      await rewriteExecute(executeRequest)
       setError(null)
       refreshTenantStatus()
     } catch (err) {

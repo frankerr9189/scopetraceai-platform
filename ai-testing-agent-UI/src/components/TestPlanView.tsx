@@ -26,7 +26,7 @@ function TestCard({ test }: TestCardProps) {
   const getDimensionBadge = (dimension?: string) => {
     if (!dimension) return null
     
-    const dimensionMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' }> = {
+    const dimensionMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive' }> = {
       happy_path: { label: 'Happy Path', variant: 'success' },
       data_validation: { label: 'Data Validation', variant: 'default' },
       authorization: { label: 'Authorization', variant: 'warning' },

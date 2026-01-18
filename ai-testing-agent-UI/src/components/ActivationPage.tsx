@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Key } from 'lucide-react'
@@ -8,7 +8,6 @@ export function ActivationPage() {
   const [activationCode, setActivationCode] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
 
   const handleApplyCode = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,9 +21,6 @@ export function ActivationPage() {
     }, 500)
   }
 
-  const handleStartTrial = () => {
-    navigate('/onboarding/plan', { replace: true })
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
