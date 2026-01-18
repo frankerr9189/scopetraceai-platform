@@ -37,11 +37,12 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 # Enable CORS for all routes with Authorization header support
+# Allow all origins for Render deployment (can be restricted later via environment variable)
 CORS(
     app, 
-    origins=["http://localhost:5173", "http://localhost:5137", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5137"],
+    origins="*",  # Allow all origins for Render deployment
     allow_headers=["Content-Type", "Authorization", "X-Actor"],
-    expose_headers=["Content-Type"],
+    expose_headers=["Content-Type", "Content-Disposition"],
     supports_credentials=True
 )
 
@@ -64,7 +65,7 @@ def check_auth():
         return None
     
     # Allow health check endpoints and auth endpoints
-    if request.path == "/health" or request.path == "/health/db" or request.path == "/" or request.path == "/auth/login" or request.path == "/auth/register":
+    if request.path in ["/health", "/health/db", "/", "/auth/login", "/auth/register"]:
         return None
     
     # Check Authorization header
@@ -3698,6 +3699,12 @@ def export_rtm_csv_simple(rtm: list, audit_metadata: dict = None) -> bytes:
 def health_check():
     """Health check endpoint."""
     return {'status': 'ok'}, 200
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Lightweight health check endpoint for Render deployment."""
+    return jsonify({"ok": True}), 200
 
 
 @app.route("/health/db", methods=["GET"])
