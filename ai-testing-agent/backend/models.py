@@ -212,3 +212,44 @@ class UsageEvent(Base):
         Index('idx_usage_events_agent', 'agent'),
         Index('idx_usage_events_created_at', 'created_at'),
     )
+
+
+class Lead(Base):
+    """
+    Model for storing marketing leads from the public website.
+    Leads are not tenant-scoped (public marketing data).
+    Table: public.leads (schema specified in database connection)
+    """
+    __tablename__ = "leads"
+    __table_args__ = (
+        Index('idx_leads_email', 'email'),
+        Index('idx_leads_status', 'status'),
+        Index('idx_leads_created_at', 'created_at'),
+    )
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, server_default=text('now()'))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False, server_default=text('now()'))
+    
+    # Lead information
+    name = Column(String(200), nullable=True)
+    email = Column(String(254), nullable=False)  # RFC 5321 max email length
+    company = Column(String(200), nullable=True)
+    role = Column(String(200), nullable=True)
+    message = Column(Text, nullable=True)  # Max 2000 chars enforced in application
+    
+    # Status tracking
+    status = Column(String(50), nullable=False, server_default=text("'new'"))  # 'new', 'contacted', 'qualified', 'closed', 'junk'
+    notes = Column(Text, nullable=True)
+    last_contacted_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Source tracking
+    source = Column(String(500), nullable=True)
+    source_page = Column(String(500), nullable=True)
+    
+    # UTM parameters
+    utm_source = Column(String(200), nullable=True)
+    utm_medium = Column(String(200), nullable=True)
+    utm_campaign = Column(String(200), nullable=True)
+    utm_term = Column(String(200), nullable=True)
+    utm_content = Column(String(200), nullable=True)

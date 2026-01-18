@@ -42,12 +42,16 @@ app = Flask(__name__)
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5137",
-    "http://localhost:3000",
+    "http://localhost:3000",  # Marketing site (Next.js) local development
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5137",
+    "http://127.0.0.1:3000",  # Marketing site alternative localhost
     # Production frontend domains
     "https://app.scopetraceai.com",
     "https://scopetraceai-platform.vercel.app",
+    # Marketing site domains
+    "https://scopetraceai.com",
+    "https://www.scopetraceai.com",
 ]
 
 # Add additional production domains from environment variable if set
@@ -84,12 +88,14 @@ def check_auth():
     Requires Authorization: Bearer <jwt> header.
     Extracts user_id, tenant_id, and role from JWT and stores on flask.g.
     """
-    # Skip auth for OPTIONS requests (CORS preflight) - return empty 204 response
+    # Skip auth for OPTIONS requests (CORS preflight) - let Flask-CORS handle it
     if request.method == "OPTIONS":
-        return Response(status=204)
+        # Don't return early - let Flask-CORS add headers, then return
+        # Flask-CORS will handle the OPTIONS response automatically
+        return None
     
-    # Allow health check endpoints and auth endpoints
-    if request.path in ["/health", "/health/db", "/", "/auth/login", "/auth/register"]:
+    # Allow health check endpoints, auth endpoints, and public lead submission
+    if request.path in ["/health", "/health/db", "/", "/auth/login", "/auth/register", "/api/v1/leads"]:
         return None
     
     # Check Authorization header
@@ -10509,6 +10515,287 @@ def get_jira_issue_types():
     except Exception as e:
         logger.error(f"Failed to get Jira issue types: {str(e)}")
         return jsonify({"detail": f"Failed to get Jira issue types: {str(e)}"}), 500
+
+
+@app.route("/api/v1/leads", methods=["POST"])
+def create_lead():
+    """
+    Public endpoint for lead submission from marketing site.
+    No authentication required.
+    
+    Upserts lead by email (case-insensitive). Preserves existing status on re-submit.
+    
+    Request Body:
+        - email (required): Valid email format, max 254 chars
+        - name (optional): Max 200 chars
+        - company (optional): Max 200 chars
+        - role (optional): Max 200 chars
+        - message (optional): Max 2000 chars
+        - source (optional): Max 500 chars
+        - source_page (optional): Max 500 chars
+        - utm_* fields (optional): Max 200 chars each
+    
+    Returns:
+        {id, status} - Lead ID and current status
+    """
+    try:
+        from db import get_db
+        from models import Lead
+        from sqlalchemy import func
+        import re
+        
+        # Get request data
+        data = request.get_json() or {}
+        
+        # Validate and sanitize email (required)
+        email = data.get("email", "").strip()
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+        
+        # Validate email format
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, email) or len(email) > 254:
+            return jsonify({"error": "Invalid email format"}), 400
+        
+        # Sanitize and trim all string fields
+        name = (data.get("name") or "").strip()[:200] if data.get("name") else None
+        company = (data.get("company") or "").strip()[:200] if data.get("company") else None
+        role = (data.get("role") or "").strip()[:200] if data.get("role") else None
+        message = (data.get("message") or "").strip()[:2000] if data.get("message") else None
+        source = (data.get("source") or "").strip()[:500] if data.get("source") else None
+        source_page = (data.get("source_page") or "").strip()[:500] if data.get("source_page") else None
+        utm_source = (data.get("utm_source") or "").strip()[:200] if data.get("utm_source") else None
+        utm_medium = (data.get("utm_medium") or "").strip()[:200] if data.get("utm_medium") else None
+        utm_campaign = (data.get("utm_campaign") or "").strip()[:200] if data.get("utm_campaign") else None
+        utm_term = (data.get("utm_term") or "").strip()[:200] if data.get("utm_term") else None
+        utm_content = (data.get("utm_content") or "").strip()[:200] if data.get("utm_content") else None
+        
+        db = next(get_db())
+        try:
+            # Case-insensitive email lookup
+            email_lower = email.lower()
+            existing_lead = db.query(Lead).filter(
+                func.lower(Lead.email) == email_lower
+            ).first()
+            
+            if existing_lead:
+                # Update existing lead (preserve status)
+                existing_lead.name = name
+                existing_lead.company = company
+                existing_lead.role = role
+                existing_lead.message = message
+                existing_lead.source = source
+                existing_lead.source_page = source_page
+                existing_lead.utm_source = utm_source
+                existing_lead.utm_medium = utm_medium
+                existing_lead.utm_campaign = utm_campaign
+                existing_lead.utm_term = utm_term
+                existing_lead.utm_content = utm_content
+                existing_lead.updated_at = datetime.now(timezone.utc)
+                # Status is NOT reset - preserve existing status
+                
+                db.commit()
+                db.refresh(existing_lead)
+                
+                return jsonify({
+                    "id": str(existing_lead.id),
+                    "status": existing_lead.status
+                }), 200
+            else:
+                # Create new lead
+                new_lead = Lead(
+                    email=email,
+                    name=name,
+                    company=company,
+                    role=role,
+                    message=message,
+                    source=source,
+                    source_page=source_page,
+                    utm_source=utm_source,
+                    utm_medium=utm_medium,
+                    utm_campaign=utm_campaign,
+                    utm_term=utm_term,
+                    utm_content=utm_content,
+                    status="new"
+                )
+                
+                db.add(new_lead)
+                db.commit()
+                db.refresh(new_lead)
+                
+                return jsonify({
+                    "id": str(new_lead.id),
+                    "status": new_lead.status
+                }), 200
+                
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error creating/updating lead: {str(e)}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/leads", methods=["GET"])
+def list_leads():
+    """
+    Admin endpoint for listing leads.
+    Requires owner or superAdmin role.
+    
+    Query Parameters:
+        - status (optional): Filter by status
+        - limit (optional): Number of results (default: 50, max: 200)
+    
+    Returns:
+        {leads: [...], total: N}
+    """
+    try:
+        from db import get_db
+        from models import Lead
+        
+        # Check admin access
+        user, error_response = check_admin_access()
+        if error_response:
+            return error_response
+        
+        # Get query parameters
+        status_filter = request.args.get("status")
+        limit = min(int(request.args.get("limit", 50)), 200)  # Default 50, max 200
+        
+        db = next(get_db())
+        try:
+            # Build query
+            query = db.query(Lead)
+            
+            if status_filter:
+                query = query.filter(Lead.status == status_filter)
+            
+            # Order by created_at descending
+            query = query.order_by(Lead.created_at.desc())
+            
+            # Apply limit
+            leads = query.limit(limit).all()
+            
+            # Format response
+            leads_list = []
+            for lead in leads:
+                leads_list.append({
+                    "id": str(lead.id),
+                    "created_at": lead.created_at.isoformat() + "Z" if lead.created_at else None,
+                    "updated_at": lead.updated_at.isoformat() + "Z" if lead.updated_at else None,
+                    "name": lead.name,
+                    "email": lead.email,
+                    "company": lead.company,
+                    "role": lead.role,
+                    "status": lead.status,
+                    "source": lead.source,
+                    "source_page": lead.source_page
+                })
+            
+            # Get total count (for pagination info)
+            total_query = db.query(Lead)
+            if status_filter:
+                total_query = total_query.filter(Lead.status == status_filter)
+            total = total_query.count()
+            
+            return jsonify({
+                "leads": leads_list,
+                "total": total
+            }), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error listing leads: {str(e)}", exc_info=True)
+        return jsonify({"error": "INTERNAL_ERROR", "message": f"Failed to list leads: {str(e)}"}), 500
+
+
+@app.route("/api/v1/admin/leads/<lead_id>", methods=["PATCH"])
+def update_lead(lead_id: str):
+    """
+    Admin endpoint for updating lead status and notes.
+    Requires owner or superAdmin role.
+    
+    Request Body:
+        - status (optional): Must be one of: new, contacted, qualified, closed, junk
+        - notes (optional): Text field
+        - last_contacted_at (optional): ISO 8601 timestamp
+    
+    Returns:
+        Updated lead object
+    """
+    try:
+        from db import get_db
+        from models import Lead
+        import uuid as uuid_module
+        
+        # Check admin access
+        user, error_response = check_admin_access()
+        if error_response:
+            return error_response
+        
+        # Get request data
+        data = request.get_json() or {}
+        
+        # Validate status if provided
+        valid_statuses = ["new", "contacted", "qualified", "closed", "junk"]
+        if "status" in data and data["status"] not in valid_statuses:
+            return jsonify({"error": "INVALID_STATUS", "message": f"Status must be one of: {', '.join(valid_statuses)}"}), 400
+        
+        # Parse last_contacted_at if provided
+        last_contacted_at = None
+        if "last_contacted_at" in data and data["last_contacted_at"]:
+            try:
+                # Parse ISO 8601 timestamp
+                last_contacted_at_str = data["last_contacted_at"].replace("Z", "+00:00")
+                last_contacted_at = datetime.fromisoformat(last_contacted_at_str)
+                if last_contacted_at.tzinfo is None:
+                    # If no timezone, assume UTC
+                    last_contacted_at = last_contacted_at.replace(tzinfo=timezone.utc)
+            except (ValueError, TypeError, AttributeError) as e:
+                return jsonify({"error": "INVALID_DATE", "message": f"Invalid last_contacted_at format: {str(e)}"}), 400
+        
+        # Convert lead_id to UUID
+        try:
+            lead_id_uuid = uuid_module.UUID(lead_id)
+        except ValueError:
+            return jsonify({"error": "INVALID_LEAD_ID", "message": f"Invalid lead_id: {lead_id}"}), 400
+        
+        db = next(get_db())
+        try:
+            # Get lead
+            lead = db.query(Lead).filter(Lead.id == lead_id_uuid).first()
+            if not lead:
+                return jsonify({"error": "LEAD_NOT_FOUND", "message": "Lead not found"}), 404
+            
+            # Update fields
+            if "status" in data:
+                lead.status = data["status"]
+            if "notes" in data:
+                lead.notes = data["notes"]
+            if last_contacted_at is not None:
+                lead.last_contacted_at = last_contacted_at
+            
+            lead.updated_at = datetime.now(timezone.utc)
+            
+            db.commit()
+            db.refresh(lead)
+            
+            return jsonify({
+                "id": str(lead.id),
+                "status": lead.status,
+                "notes": lead.notes,
+                "last_contacted_at": lead.last_contacted_at.isoformat() + "Z" if lead.last_contacted_at else None,
+                "updated_at": lead.updated_at.isoformat() + "Z" if lead.updated_at else None
+            }), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error updating lead: {str(e)}", exc_info=True)
+        return jsonify({"error": "INTERNAL_ERROR", "message": f"Failed to update lead: {str(e)}"}), 500
 
 
 @app.route("/api/v1/runs/<run_id>/jira", methods=["POST"])
