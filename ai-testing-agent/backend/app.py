@@ -10430,6 +10430,82 @@ def _generate_audit_summary_comment(
     return "\n".join(comment_parts)
 
 
+@app.route("/api/v1/jira/meta/projects", methods=["GET"])
+def get_jira_projects():
+    """
+    Get list of Jira projects visible to the tenant's credentials.
+    
+    Returns:
+        JSON array of project dictionaries with 'key' and 'name'
+    """
+    try:
+        from services.integrations import get_jira_integration_for_current_tenant
+        from services.jira_client import JiraClient, JiraClientError
+        
+        # Get Jira integration credentials for current tenant
+        jira_creds = get_jira_integration_for_current_tenant()
+        
+        # Initialize Jira client
+        jira_client = JiraClient(
+            base_url=jira_creds["base_url"],
+            username=jira_creds["email"],
+            api_token=jira_creds["api_token"]
+        )
+        
+        # Get projects
+        projects = jira_client.get_projects()
+        return jsonify(projects), 200
+        
+    except ValueError as e:
+        logger.warning(f"Jira configuration error: {str(e)}")
+        return jsonify({"detail": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Failed to get Jira projects: {str(e)}")
+        return jsonify({"detail": f"Failed to get Jira projects: {str(e)}"}), 500
+
+
+@app.route("/api/v1/jira/meta/issue-types", methods=["GET"])
+def get_jira_issue_types():
+    """
+    Get issue types valid for a Jira project.
+    
+    Query Parameters:
+        project_key: Jira project key (required)
+        
+    Returns:
+        JSON array of issue type dictionaries with 'id' and 'name'
+    """
+    try:
+        from services.integrations import get_jira_integration_for_current_tenant
+        from services.jira_client import JiraClient, JiraClientError
+        
+        # Get project_key from query parameters
+        project_key = request.args.get("project_key")
+        if not project_key:
+            return jsonify({"detail": "project_key query parameter is required"}), 400
+        
+        # Get Jira integration credentials for current tenant
+        jira_creds = get_jira_integration_for_current_tenant()
+        
+        # Initialize Jira client
+        jira_client = JiraClient(
+            base_url=jira_creds["base_url"],
+            username=jira_creds["email"],
+            api_token=jira_creds["api_token"]
+        )
+        
+        # Get issue types
+        issue_types = jira_client.get_issue_types(project_key)
+        return jsonify(issue_types), 200
+        
+    except ValueError as e:
+        logger.warning(f"Jira configuration error: {str(e)}")
+        return jsonify({"detail": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Failed to get Jira issue types: {str(e)}")
+        return jsonify({"detail": f"Failed to get Jira issue types: {str(e)}"}), 500
+
+
 @app.route("/api/v1/runs/<run_id>/jira", methods=["POST"])
 def create_jira_ticket(run_id: str):
     """

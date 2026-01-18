@@ -290,3 +290,53 @@ class JiraClient:
             raise
         except Exception as e:
             raise JiraClientError(f"Failed to add comment to issue {issue_key}: {str(e)}")
+    
+    def get_projects(self) -> List[Dict[str, str]]:
+        """
+        Get list of Jira projects visible to the credentials.
+        
+        Returns:
+            List of project dictionaries with 'key' and 'name'
+        """
+        try:
+            response = self._make_request("/rest/api/3/project")
+            
+            projects = []
+            for project in response:
+                projects.append({
+                    "key": project.get("key", ""),
+                    "name": project.get("name", "")
+                })
+            
+            return projects
+        except JiraClientError:
+            raise
+        except Exception as e:
+            raise JiraClientError(f"Failed to get projects: {str(e)}")
+    
+    def get_issue_types(self, project_key: str) -> List[Dict[str, Any]]:
+        """
+        Get issue types valid for a project.
+        
+        Args:
+            project_key: Jira project key
+            
+        Returns:
+            List of issue type dictionaries with 'id' and 'name'
+        """
+        try:
+            # Get project metadata which includes issue types
+            project = self._make_request(f"/rest/api/3/project/{project_key}")
+            
+            issue_types = []
+            for issue_type in project.get("issueTypes", []):
+                issue_types.append({
+                    "id": issue_type.get("id", ""),
+                    "name": issue_type.get("name", "")
+                })
+            
+            return issue_types
+        except JiraClientError:
+            raise
+        except Exception as e:
+            raise JiraClientError(f"Failed to get issue types for project {project_key}: {str(e)}")
