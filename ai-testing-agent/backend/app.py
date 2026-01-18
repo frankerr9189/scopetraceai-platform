@@ -45,10 +45,13 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5137",
+    # Production frontend domains
+    "https://app.scopetraceai.com",
+    "https://scopetraceai-platform.vercel.app",
 ]
 
-# Add production domain from environment variable if set
-# Supports comma-separated list of origins (e.g., "https://app.example.com,https://staging.example.com")
+# Add additional production domains from environment variable if set
+# Supports comma-separated list of origins (e.g., "https://staging.example.com,https://dev.example.com")
 production_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
 if production_origins:
     # Split by comma and add to allowed origins
@@ -58,12 +61,13 @@ if production_origins:
             ALLOWED_ORIGINS.append(origin)
 
 # Enable CORS for all routes with Authorization header support
+# Note: supports_credentials=False because authentication uses JWT tokens in Authorization headers, not cookies
 CORS(
     app,
     origins=ALLOWED_ORIGINS,
     allow_headers=["Content-Type", "Authorization", "X-Actor"],
     expose_headers=["Content-Type", "Content-Disposition"],
-    supports_credentials=True
+    supports_credentials=False
 )
 
 # Import JWT utilities (will fail fast if JWT_SECRET is not set)
