@@ -84,9 +84,9 @@ def check_auth():
     Requires Authorization: Bearer <jwt> header.
     Extracts user_id, tenant_id, and role from JWT and stores on flask.g.
     """
-    # Skip auth for OPTIONS requests (CORS preflight)
+    # Skip auth for OPTIONS requests (CORS preflight) - return empty 204 response
     if request.method == "OPTIONS":
-        return None
+        return Response(status=204)
     
     # Allow health check endpoints and auth endpoints
     if request.path in ["/health", "/health/db", "/", "/auth/login", "/auth/register"]:
