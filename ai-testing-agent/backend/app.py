@@ -36,11 +36,31 @@ logger = logging.getLogger(__name__)
 
 
 app = Flask(__name__)
+
+# CORS configuration with explicit allowlist
+# Base allowed origins for local development
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5137",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5137",
+]
+
+# Add production domain from environment variable if set
+# Supports comma-separated list of origins (e.g., "https://app.example.com,https://staging.example.com")
+production_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+if production_origins:
+    # Split by comma and add to allowed origins
+    for origin in production_origins.split(","):
+        origin = origin.strip()
+        if origin and origin not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(origin)
+
 # Enable CORS for all routes with Authorization header support
-# Allow all origins for Render deployment (can be restricted later via environment variable)
 CORS(
-    app, 
-    origins="*",  # Allow all origins for Render deployment
+    app,
+    origins=ALLOWED_ORIGINS,
     allow_headers=["Content-Type", "Authorization", "X-Actor"],
     expose_headers=["Content-Type", "Content-Disposition"],
     supports_credentials=True
