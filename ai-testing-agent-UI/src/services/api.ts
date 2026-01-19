@@ -1,4 +1,4 @@
-import { API_BASE_URL, TEST_PLAN_API_BASE_URL } from '../config'
+import { TEST_PLAN_API_BASE_URL } from '../config'
 
 // ---------------------------------------------------------------------------
 // Tenant status (Account Status in sidebar)
@@ -1222,8 +1222,6 @@ const getJiraWritebackAPIBase = (): string => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return import.meta.env.VITE_API_BASE || (import.meta as any).env?.VITE_JIRA_WB_API_BASE_URL || 'http://localhost:8001'
 }
-
-const JIRA_WB_API_BASE_URL = getJiraWritebackAPIBase()
 
 export async function getJiraProjects(): Promise<JiraProject[]> {
   // Call Flask gateway instead of jira-writeback-agent directly

@@ -42,7 +42,7 @@ export function FirstRunOnboardingPage() {
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-foreground">Plan:</span>
               <span className={`px-2 py-1 rounded text-xs font-medium ${
-                subscriptionStatus === 'Active' 
+                subscriptionStatus === 'individual' || subscriptionStatus === 'team'
                   ? 'bg-green-500/20 text-green-400' 
                   : subscriptionStatus === 'paywalled'
                   ? 'bg-destructive/20 text-destructive'
@@ -51,7 +51,7 @@ export function FirstRunOnboardingPage() {
                 {subscriptionStatus}
               </span>
             </div>
-            {subscriptionStatus === 'Trial' && (
+            {subscriptionStatus === 'trial' && (
               <div className="text-sm text-foreground/70">
                 <p>Trial remaining:</p>
                 <ul className="list-disc list-inside ml-2 space-y-1">
