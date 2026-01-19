@@ -206,179 +206,38 @@ async def analyze_requirements(
     # Capture start time for usage tracking
     start_time_ms = int(time.time() * 1000)
     
-    # Extract tenant_id and user_id from Authorization header (JWT) - REQUIRED for all requests
-    tenant_id = None
-    user_id = None
+    # ============================================================================
+    # TRUST BOUNDARY: This agent is a trusted internal executor.
+    # All policy enforcement (subscription, plan tiers, trials) happens in Flask app.
+    # This agent ONLY validates the internal service key.
+    # ============================================================================
+    # Import internal auth middleware
+    try:
+        from app.middleware.internal_auth import verify_internal_service_key, extract_tenant_context_for_logging
+    except ImportError:
+        # Fallback if middleware not found
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("Internal auth middleware not found - agent will reject requests")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal service authentication not configured"
+        )
     import logging
     logger = logging.getLogger(__name__)
     
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header:
-        logger.error("Authorization header is missing - rejecting request")
-        raise HTTPException(
-            status_code=401,
-            detail="Authorization header is required"
-        )
+    # Verify internal service key (required - this is the ONLY auth enforcement)
+    await verify_internal_service_key(request)
     
-    if not auth_header.startswith("Bearer "):
-        logger.error("Authorization header does not contain Bearer token - rejecting request")
-        raise HTTPException(
-            status_code=401,
-            detail="Authorization header must contain Bearer token"
-        )
+    # Extract tenant/user context for logging only (optional, not for enforcement)
+    tenant_id, user_id = extract_tenant_context_for_logging(request)
+    if tenant_id:
+        logger.info(f"Processing request (tenant={tenant_id}, user={user_id})")
     
-    try:
-        import jwt
-        import os
-        from dotenv import load_dotenv
-        
-        # Load JWT_SECRET from testing agent's .env if not already set
-        if not os.getenv("JWT_SECRET"):
-            current_file = os.path.abspath(__file__)
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
-            backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
-            testing_env = os.path.join(backend_path, ".env")
-            if os.path.exists(testing_env):
-                load_dotenv(testing_env, override=True)
-        
-        token = auth_header.replace("Bearer ", "").strip()
-        if not token:
-            logger.error("JWT token is empty - rejecting request")
-            raise HTTPException(
-                status_code=401,
-                detail="JWT token is required"
-            )
-        
-        jwt_secret = os.getenv("JWT_SECRET")
-        if not jwt_secret:
-            logger.error("JWT_SECRET not set, cannot authenticate")
-            raise HTTPException(
-                status_code=401,
-                detail="JWT authentication not configured"
-            )
-        
-        try:
-            payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
-            tenant_id = payload.get("tenant_id")
-            user_id = payload.get("sub")  # user_id is in 'sub' claim
-            
-            if not tenant_id:
-                logger.error("JWT token missing tenant_id claim - rejecting request")
-                raise HTTPException(
-                    status_code=401,
-                    detail="JWT token missing tenant_id claim"
-                )
-            
-            logger.info(f"Extracted tenant_id={tenant_id}, user_id={user_id} from JWT")
-        except jwt.ExpiredSignatureError:
-            logger.error("JWT token expired - rejecting request")
-            raise HTTPException(
-                status_code=401,
-                detail="JWT token expired"
-            )
-        except jwt.InvalidTokenError as e:
-            logger.error(f"Invalid JWT token: {str(e)} - rejecting request")
-            raise HTTPException(
-                status_code=401,
-                detail=f"Invalid JWT token: {str(e)}"
-            )
-    except HTTPException:
-        # Re-raise HTTP exceptions (401 from auth failures)
-        raise
-    except Exception as e:
-        logger.error(f"JWT authentication failed: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=401,
-            detail="JWT authentication failed"
-        )
-    
-    # Entitlement check: verify tenant can run requirements generation
-    # ALWAYS run - tenant_id is now guaranteed to be present (required by auth above)
-    # This check runs for BOTH jira and free_text sources
-    try:
-        import sys
-        import os
-        
-        # Import local BA agent entitlements FIRST (before changing directory)
-        from app.services.entitlements import check_entitlement
-        
-        # Calculate absolute path to testing agent backend
-        current_file = os.path.abspath(__file__)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
-        backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
-        
-        if os.path.exists(backend_path):
-            # Verify DATABASE_URL is PostgreSQL
-            db_url = os.getenv("DATABASE_URL")
-            if db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
-                logger.info(f"Starting entitlement check for tenant_id={tenant_id} (source will be determined from request)")
-                
-                # Save current directory and change to backend for reliable imports
-                original_cwd = os.getcwd()
-                try:
-                    if backend_path not in sys.path:
-                        sys.path.insert(0, backend_path)
-                    os.chdir(backend_path)
-                    
-                    # Clear cached modules to force re-import from new location (but NOT services.entitlements - we use local)
-                    modules_to_clear = [k for k in sys.modules.keys() if k.startswith(('db', 'models'))]
-                    for mod in modules_to_clear:
-                        del sys.modules[mod]
-                    
-                    from db import get_db
-                    
-                    db = next(get_db())
-                    try:
-                        # Verify DB session is valid
-                        if db is None:
-                            raise ValueError("Database session is None")
-                        
-                        allowed, reason, subscription_status, remaining = check_entitlement(db, str(tenant_id))
-                        logger.info(f"Entitlement check completed: allowed={allowed}, reason={reason}, status={subscription_status}, remaining={remaining}")
-                        
-                        if not allowed:
-                            # Build response with status and remaining
-                            response_detail = {
-                                "error": "PAYWALLED",
-                                "message": "Trial limit reached. Activate subscription to continue."
-                            }
-                            if subscription_status is not None:
-                                response_detail["subscription_status"] = subscription_status
-                            if remaining is not None:
-                                response_detail["remaining"] = remaining
-                            
-                            raise HTTPException(
-                                status_code=403,
-                                detail=response_detail
-                            )
-                    finally:
-                        db.close()
-                finally:
-                    os.chdir(original_cwd)
-            else:
-                logger.warning(f"DATABASE_URL is not PostgreSQL or not set - skipping entitlement check (db_url type: {type(db_url)})")
-        else:
-            logger.warning(f"Testing agent backend not found at {backend_path} - skipping entitlement check")
-    except HTTPException:
-        # Re-raise HTTP exceptions (403 from entitlement check)
-        raise
-    except Exception as e:
-        # Fail closed: return 503 on entitlement check errors (unless ENTITLEMENT_FAIL_OPEN=true)
-        fail_open = os.getenv("ENTITLEMENT_FAIL_OPEN", "false").lower() == "true"
-        
-        if fail_open:
-            logger.warning(f"ENTITLEMENT_FAIL_OPEN=true: Allowing request despite entitlement check error: {str(e)}", exc_info=True)
-            # Continue with request (fail open)
-        else:
-            # Fail closed: return 503
-            logger.error(f"Entitlement check failed for tenant {tenant_id}: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "error": "ENTITLEMENT_UNAVAILABLE",
-                    "message": "Unable to verify subscription status. Please try again."
-                }
-            )
+    # ============================================================================
+    # NOTE: Entitlement checks (subscription, plan tiers, trials) are REMOVED.
+    # Flask app enforces all policy before calling this agent.
+    # ============================================================================
     
     # Determine if request is JSON or FormData
     content_type = request.headers.get("content-type", "").lower()
@@ -852,61 +711,10 @@ async def analyze_requirements(
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to record usage event: {str(usage_error)}", exc_info=True)
         
-        # Consume trial run after successful package creation
-        # This runs for BOTH jira and free_text sources on success
-        # tenant_id is guaranteed to be present (required by auth above)
-        logger.info(f"Consuming trial run for successful package creation: tenant_id={tenant_id}, source={usage_source}")
-        try:
-            import sys
-            import os
-            
-            # Import local BA agent entitlements FIRST (before changing directory)
-            from app.services.entitlements import consume_trial_run
-            
-            # Calculate absolute path to testing agent backend
-            current_file = os.path.abspath(__file__)
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
-            backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
-            
-            if os.path.exists(backend_path):
-                # Verify DATABASE_URL is PostgreSQL
-                db_url = os.getenv("DATABASE_URL")
-                if db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
-                    # Save current directory and change to backend for reliable imports
-                    original_cwd = os.getcwd()
-                    try:
-                        if backend_path not in sys.path:
-                            sys.path.insert(0, backend_path)
-                        os.chdir(backend_path)
-                        
-                        # Clear cached modules to force re-import from new location (but NOT services.entitlements - we use local)
-                        modules_to_clear = [k for k in sys.modules.keys() if k.startswith(('db', 'models'))]
-                        for mod in modules_to_clear:
-                            del sys.modules[mod]
-                        
-                        from db import get_db
-                        
-                        db = next(get_db())
-                        try:
-                            # Verify DB session is valid
-                            if db is None:
-                                raise ValueError("Database session is None")
-                            
-                            logger.info(f"Calling consume_trial_run for tenant_id={tenant_id}, source={usage_source}")
-                            consume_trial_run(db, str(tenant_id))
-                            logger.info(f"Successfully consumed trial run for tenant_id={tenant_id}, source={usage_source}")
-                        finally:
-                            db.close()
-                    finally:
-                        os.chdir(original_cwd)
-                else:
-                    logger.warning(f"DATABASE_URL is not PostgreSQL or not set - cannot consume trial run (db_url type: {type(db_url)})")
-            else:
-                logger.warning(f"Testing agent backend not found at {backend_path} - cannot consume trial run")
-        except Exception as consume_error:
-            # Log but don't fail the request if consumption fails
-            logger.error(f"Failed to consume trial run for tenant {tenant_id}, source={usage_source}: {str(consume_error)}", exc_info=True)
-            # Continue - the run succeeded, consumption failure is non-fatal
+        # ============================================================================
+        # NOTE: Trial consumption REMOVED - Flask app handles trial consumption
+        # after successful agent execution. This agent is execution-only.
+        # ============================================================================
         
         return AnalyzeResponse(
             meta=meta,

@@ -22,8 +22,8 @@ def check_entitlement(db: Session, tenant_id: str) -> Tuple[bool, Optional[str],
         Tuple of (allowed: bool, reason: Optional[str], subscription_status: Optional[str], remaining: Optional[int])
         - allowed: True if run is allowed, False if blocked
         - reason: Error reason if blocked (e.g., "PAYWALLED", "TRIAL_EXHAUSTED")
-        - subscription_status: Current subscription status ("Trial", "Active", "Paywalled")
-        - remaining: Number of trial testplan runs remaining (None if not Trial or Active)
+        - subscription_status: Current subscription status ("trial", "individual", "team", "paywalled", "canceled", "unselected")
+        - remaining: Number of trial testplan runs remaining (None if not trial)
         
     Raises:
         Exception: If database error, UUID conversion error, or tenant not found (fail-closed by default).
@@ -45,14 +45,25 @@ def check_entitlement(db: Session, tenant_id: str) -> Tuple[bool, Optional[str],
                 return True, None, None, None
             raise ValueError(error_msg)
         
-        subscription_status = getattr(tenant, "subscription_status", "Trial")
-        trial_remaining = getattr(tenant, "trial_testplan_runs_remaining", 3)
+        subscription_status = getattr(tenant, "subscription_status", "unselected")
+        trial_remaining = getattr(tenant, "trial_testplan_runs_remaining", 0)
         
-        if subscription_status == "Paywalled":
-            logger.info(f"Tenant {tenant_id} blocked: subscription_status=Paywalled, remaining={trial_remaining}")
+        # Block paywalled and canceled
+        if subscription_status == "paywalled":
+            logger.info(f"Tenant {tenant_id} blocked: subscription_status=paywalled, remaining={trial_remaining}")
             return False, "PAYWALLED", subscription_status, trial_remaining
         
-        if subscription_status == "Trial":
+        if subscription_status == "canceled":
+            logger.info(f"Tenant {tenant_id} blocked: subscription_status=canceled")
+            return False, "SUBSCRIPTION_CANCELED", subscription_status, None
+        
+        # Block unselected (should be caught by middleware, but check here too)
+        if subscription_status == "unselected":
+            logger.info(f"Tenant {tenant_id} blocked: subscription_status=unselected")
+            return False, "SUBSCRIPTION_UNSELECTED", subscription_status, None
+        
+        # Trial: check counters
+        if subscription_status == "trial":
             if trial_remaining <= 0:
                 logger.info(f"Tenant {tenant_id} blocked: Trial exhausted (remaining={trial_remaining})")
                 return False, "TRIAL_EXHAUSTED", subscription_status, 0
@@ -60,8 +71,9 @@ def check_entitlement(db: Session, tenant_id: str) -> Tuple[bool, Optional[str],
                 logger.info(f"Tenant {tenant_id} allowed: Trial (remaining={trial_remaining})")
                 return True, None, subscription_status, trial_remaining
         
-        if subscription_status == "Active":
-            logger.info(f"Tenant {tenant_id} allowed: Active subscription")
+        # Individual and team: always allowed (no counter checks)
+        if subscription_status in ["individual", "team"]:
+            logger.info(f"Tenant {tenant_id} allowed: {subscription_status} subscription")
             return True, None, subscription_status, None
         
         # Unknown status - default to allow but log warning
@@ -79,17 +91,21 @@ def check_entitlement(db: Session, tenant_id: str) -> Tuple[bool, Optional[str],
         raise
 
 
-def consume_trial_run(db: Session, tenant_id: str) -> None:
+def consume_trial_run(db: Session, tenant_id: str, agent: str = "test_plan") -> None:
     """
-    Consume one trial testplan run for the tenant.
-    Decrements trial_testplan_runs_remaining by 1.
-    If all three counters (requirements, testplan, writeback) reach 0, sets subscription_status='Paywalled'.
+    Consume one trial run for the tenant for the specified agent.
+    
+    This function preserves existing trial counter behavior:
+    - Decrements the appropriate trial counter (requirements/testplan/writeback)
+    - If all three counters reach 0, sets subscription_status='paywalled'
     
     Uses a database transaction to ensure atomicity.
     
     Args:
         db: SQLAlchemy database session
         tenant_id: Tenant UUID string
+        agent: Agent name ('requirements_ba', 'test_plan', 'jira_writeback')
+               Defaults to 'test_plan' for backward compatibility
         
     Raises:
         Exception: If tenant not found or database error occurs
@@ -104,39 +120,56 @@ def consume_trial_run(db: Session, tenant_id: str) -> None:
         if not tenant:
             raise ValueError(f"Tenant not found: {tenant_id}")
         
-        subscription_status = getattr(tenant, "subscription_status", "Trial")
-        trial_requirements = getattr(tenant, "trial_requirements_runs_remaining", 3)
-        trial_testplan = getattr(tenant, "trial_testplan_runs_remaining", 3)
-        trial_writeback = getattr(tenant, "trial_writeback_runs_remaining", 3)
+        subscription_status = getattr(tenant, "subscription_status", "unselected")
+        trial_requirements = getattr(tenant, "trial_requirements_runs_remaining", 0)
+        trial_testplan = getattr(tenant, "trial_testplan_runs_remaining", 0)
+        trial_writeback = getattr(tenant, "trial_writeback_runs_remaining", 0)
         
-        # Only decrement if in Trial status
-        if subscription_status == "Trial":
-            if trial_testplan > 0:
-                new_testplan = trial_testplan - 1
-                tenant.trial_testplan_runs_remaining = new_testplan
+        # Only decrement if in trial status
+        if subscription_status == "trial":
+            # Map agent name to counter field
+            counter_map = {
+                "requirements_ba": ("trial_requirements_runs_remaining", trial_requirements),
+                "test_plan": ("trial_testplan_runs_remaining", trial_testplan),
+                "jira_writeback": ("trial_writeback_runs_remaining", trial_writeback)
+            }
+            
+            counter_field, current_value = counter_map.get(agent, ("trial_testplan_runs_remaining", trial_testplan))
+            
+            if current_value > 0:
+                new_value = current_value - 1
+                setattr(tenant, counter_field, new_value)
+                
+                # Update other counters for the check
+                if agent == "requirements_ba":
+                    trial_requirements = new_value
+                elif agent == "test_plan":
+                    trial_testplan = new_value
+                else:  # jira_writeback
+                    trial_writeback = new_value
                 
                 # Check if all three counters are now 0
-                if trial_requirements == 0 and new_testplan == 0 and trial_writeback == 0:
-                    tenant.subscription_status = "Paywalled"
+                if trial_requirements == 0 and trial_testplan == 0 and trial_writeback == 0:
+                    tenant.subscription_status = "paywalled"
                     logger.info(
                         f"Tenant {tenant_id}: All trial counters exhausted. "
-                        f"Set subscription_status=Paywalled. "
-                        f"Remaining: requirements={trial_requirements}, testplan={new_testplan}, writeback={trial_writeback}"
+                        f"Set subscription_status=paywalled. "
+                        f"Remaining: requirements={trial_requirements}, testplan={trial_testplan}, writeback={trial_writeback}"
                     )
                 else:
                     logger.info(
-                        f"Tenant {tenant_id}: Decremented trial_testplan_runs_remaining "
-                        f"({trial_testplan} -> {new_testplan}). "
-                        f"Remaining: requirements={trial_requirements}, testplan={new_testplan}, writeback={trial_writeback}"
+                        f"Tenant {tenant_id}: Decremented {counter_field} "
+                        f"({current_value} -> {new_value}) for agent={agent}. "
+                        f"Remaining: requirements={trial_requirements}, testplan={trial_testplan}, writeback={trial_writeback}"
                     )
                 
                 db.commit()
             else:
-                logger.warning(f"Tenant {tenant_id}: Attempted to consume trial run but remaining={trial_testplan}")
+                logger.warning(f"Tenant {tenant_id}: Attempted to consume trial run for agent={agent} but remaining={current_value}")
         else:
-            logger.info(f"Tenant {tenant_id}: Not in Trial status (status={subscription_status}), skipping decrement")
+            logger.info(f"Tenant {tenant_id}: Not in trial status (status={subscription_status}), skipping decrement for agent={agent}")
             
     except Exception as e:
         db.rollback()
-        logger.error(f"Error consuming trial run for tenant {tenant_id}: {str(e)}", exc_info=True)
+        logger.error(f"Error consuming trial run for tenant {tenant_id}, agent {agent}: {str(e)}", exc_info=True)
         raise

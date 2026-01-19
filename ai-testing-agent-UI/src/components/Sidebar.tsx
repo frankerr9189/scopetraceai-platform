@@ -303,7 +303,7 @@ export function Sidebar({
                     <p className="text-xs text-blue-300/50 font-normal">
                       Plan: <span className="text-blue-200/70">{tenantStatus.subscription_status}</span>
                     </p>
-                    {tenantStatus.subscription_status === 'Trial' && (
+                    {tenantStatus.subscription_status === 'trial' && (
                       <div className="text-xs text-blue-300/50 font-normal space-y-0.5">
                         <div>Requirements: {tenantStatus.trial_requirements_runs_remaining}</div>
                         <div>Test Plan: {tenantStatus.trial_testplan_runs_remaining}</div>

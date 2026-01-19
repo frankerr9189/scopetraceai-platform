@@ -20,13 +20,13 @@ if not JWT_SECRET:
     )
 
 
-def create_access_token(user_id: str, tenant_id: str, role: str, expires_minutes: Optional[int] = None) -> str:
+def create_access_token(user_id: str, tenant_id: Optional[str], role: str, expires_minutes: Optional[int] = None) -> str:
     """
     Create a JWT access token for a user.
     
     Args:
         user_id: UUID string of the user
-        tenant_id: UUID string of the tenant
+        tenant_id: UUID string of the tenant (optional, None if onboarding incomplete)
         role: User role (e.g., "owner", "admin", "member")
         expires_minutes: Optional expiration time in minutes (defaults to JWT_EXPIRES_MINUTES)
         
@@ -42,11 +42,14 @@ def create_access_token(user_id: str, tenant_id: str, role: str, expires_minutes
     # Create payload
     payload = {
         "sub": str(user_id),  # Subject (user ID)
-        "tenant_id": str(tenant_id),
         "role": role,
         "exp": exp,  # Expiration time
         "iat": datetime.now(timezone.utc),  # Issued at
     }
+    
+    # Add tenant_id only if provided (allows onboarding flow)
+    if tenant_id:
+        payload["tenant_id"] = str(tenant_id)
     
     # Encode and return token
     token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)

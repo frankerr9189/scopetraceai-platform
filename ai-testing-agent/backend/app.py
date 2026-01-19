@@ -23,16 +23,25 @@ from dotenv import load_dotenv
 import bcrypt
 
 # Try to load .env file, but don't fail if there's a permission error
+# Load from current directory explicitly to ensure it's found
 try:
-    load_dotenv()
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    load_dotenv(env_path, override=True)
+    # Also try loading from current working directory as fallback
+    load_dotenv(override=False)
 except (PermissionError, OSError) as e:
     # If .env file can't be read due to permissions, continue without it
     # Environment variables can still be set via system environment
     pass  # Logger not yet initialized, so just continue
 
-# Configure logging
-logging.basicConfig(level=logging.WARNING)
+# Configure logging - set to INFO if DEBUG_REQUIREMENTS is enabled
+log_level = logging.INFO if os.getenv("DEBUG_REQUIREMENTS", "0") == "1" else logging.WARNING
+logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
+
+# DEBUG: Log if DEBUG_REQUIREMENTS is enabled at startup
+if os.getenv("DEBUG_REQUIREMENTS", "0") == "1":
+    logger.info(f"[DEBUG_REQUIREMENTS] Server startup: DEBUG_REQUIREMENTS=1 is enabled, log level set to INFO")
 
 
 app = Flask(__name__)
@@ -95,7 +104,13 @@ def check_auth():
         return None
     
     # Allow health check endpoints, auth endpoints, and public lead submission
-    if request.path in ["/health", "/health/db", "/", "/auth/login", "/auth/register", "/api/v1/leads"]:
+    # Also allow check-slug (public) and tenant-first onboarding routes (no auth required)
+    public_routes = [
+        "/health", "/health/db", "/", "/auth/login", 
+        "/api/v1/leads", "/api/v1/tenants/check-slug",
+        "/api/v1/onboarding/tenant"  # Tenant creation is public (no auth required)
+    ]
+    if request.path in public_routes or request.path.startswith("/api/v1/onboarding/tenant/"):
         return None
     
     # Check Authorization header
@@ -116,17 +131,116 @@ def check_auth():
     g.tenant_id = payload.get("tenant_id")
     g.role = payload.get("role")
     
-    # Guardrail: Ensure tenant_id is present (required for tenant isolation)
+    # Tenant-first model: tenant_id is ALWAYS required for authenticated requests
     if not g.tenant_id:
-        logger.error("JWT token missing tenant_id claim - rejecting request")
+        logger.error("JWT token missing tenant_id claim - rejecting request (tenant-first model)")
         return jsonify({"detail": "Invalid token: missing tenant_id"}), 401
+    
+    # ACTIVE/INACTIVE ENFORCEMENT: Check tenant and user active status
+    # This must happen BEFORE subscription gating or other logic
+    try:
+        from db import get_db
+        from models import Tenant, TenantUser
+        import uuid as uuid_module
+        
+        db = next(get_db())
+        try:
+            # Convert tenant_id and user_id to UUID if needed
+            tenant_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            user_uuid = g.user_id if isinstance(g.user_id, uuid_module.UUID) else uuid_module.UUID(g.user_id)
+            
+            # Load tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
+            if not tenant:
+                logger.error(f"Tenant {g.tenant_id} not found for authenticated request")
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Check if tenant is active
+            if not tenant.is_active:
+                return jsonify({
+                    "code": "TENANT_INACTIVE",
+                    "detail": "Workspace is inactive. Contact hello@scopetraceai.com"
+                }), 403
+            
+            # Load user
+            user = db.query(TenantUser).filter(
+                TenantUser.id == user_uuid,
+                TenantUser.tenant_id == tenant_uuid
+            ).first()
+            if not user:
+                logger.error(f"User {g.user_id} not found for tenant {g.tenant_id}")
+                return jsonify({"detail": "User not found"}), 404
+            
+            # Check if user is active
+            if not user.is_active:
+                return jsonify({
+                    "code": "USER_INACTIVE",
+                    "detail": "Your account is inactive. Contact hello@scopetraceai.com"
+                }), 403
+            
+        finally:
+            db.close()
+    except Exception as e:
+        # If we can't check (DB unavailable / query error), return 503 Service Unavailable
+        logger.error(f"Error checking tenant/user active status: {e}", exc_info=True)
+        return jsonify({
+            "code": "AUTH_UNAVAILABLE",
+            "detail": "Authentication temporarily unavailable. Please try again."
+        }), 503
+    
+    # PLAN SELECTION GATE: Check if tenant has selected a subscription plan
+    # Allow access to specific routes even if plan is unselected
+    # /api/v1/analyze is allowed to restore 1/14 behavior (requirements extraction always works)
+    allowed_unselected_routes = [
+        "/auth/me",
+        "/api/v1/analyze",  # Requirements extraction - no subscription gating (matches 1/14 behavior)
+    ]
+    # Also allow subscription update endpoint
+    subscription_update_path = f"/api/v1/tenants/{g.tenant_id}/subscription"
+    is_allowed_unselected_route = (
+        request.path in allowed_unselected_routes or 
+        request.path == subscription_update_path
+    )
+    
+    if not is_allowed_unselected_route:
+        # Check tenant subscription status
+        try:
+            from db import get_db
+            from models import Tenant
+            
+            db = next(get_db())
+            try:
+                tenant = db.query(Tenant).filter(Tenant.id == g.tenant_id).first()
+                if tenant:
+                    # Refresh the tenant object to ensure we have the latest subscription_status from the database
+                    db.refresh(tenant)
+                    # Read subscription_status directly from the database column
+                    status = tenant.subscription_status if hasattr(tenant, "subscription_status") else None
+                    # Block if unselected or canceled
+                    if status == "unselected":
+                        return jsonify({"detail": "Subscription plan not selected."}), 403
+                    if status == "canceled":
+                        return jsonify({"detail": "Subscription canceled."}), 403
+            finally:
+                db.close()
+        except Exception as e:
+            # If we can't check, allow the request (fail open for availability)
+            logger.warning(f"Could not check subscription status: {e}")
     
     return None
 
 # Initialize OpenAI client
 openai_client = None
-if os.getenv('OPENAI_API_KEY'):
-    openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+openai_api_key = os.getenv('OPENAI_API_KEY')
+if openai_api_key:
+    try:
+        openai_client = OpenAI(api_key=openai_api_key)
+        logger.info("OpenAI client initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenAI client: {e}")
+        openai_client = None
+else:
+    logger.warning("OPENAI_API_KEY not found in environment variables. LLM features will be disabled.")
 
 # Persistence path for most recently generated test plan
 PERSIST_PATH = "./.latest_test_plan.json"
@@ -142,6 +256,77 @@ MAX_DOC_UPLOAD_MB = 15
 
 # Agent version for audit metadata
 AGENT_VERSION = "1.0.0"
+
+# ============================================================================
+# Rate Limiting for Public Onboarding Endpoints (In-Memory)
+# ============================================================================
+# TODO: Replace with distributed rate limiting (Redis) for production
+# Simple in-memory rate limiting keyed by (ip, route) with timestamps
+_rate_limit_store = {}
+_rate_limit_cleanup_interval = 3600  # Clean up old entries every hour
+
+def _cleanup_rate_limit_store():
+    """Remove entries older than 1 hour from rate limit store."""
+    current_time = time.time()
+    keys_to_remove = [
+        key for key, timestamps in _rate_limit_store.items()
+        if all(current_time - ts > 3600 for ts in timestamps)
+    ]
+    for key in keys_to_remove:
+        del _rate_limit_store[key]
+
+def _check_rate_limit(ip: str, route: str, max_requests: int, window_seconds: int = 3600) -> tuple[bool, int]:
+    """
+    Check if IP has exceeded rate limit for route.
+    
+    Args:
+        ip: Client IP address
+        route: Route identifier (e.g., "/api/v1/onboarding/tenant")
+        max_requests: Maximum requests allowed in window
+        window_seconds: Time window in seconds (default 1 hour)
+    
+    Returns:
+        tuple: (allowed: bool, remaining: int)
+    """
+    current_time = time.time()
+    key = (ip, route)
+    
+    # Clean up old entries periodically
+    if len(_rate_limit_store) > 10000:  # Prevent unbounded growth
+        _cleanup_rate_limit_store()
+    
+    # Get existing timestamps for this key
+    timestamps = _rate_limit_store.get(key, [])
+    
+    # Filter out timestamps outside the window
+    recent_timestamps = [ts for ts in timestamps if current_time - ts < window_seconds]
+    
+    # Check if limit exceeded
+    if len(recent_timestamps) >= max_requests:
+        return False, 0
+    
+    # Add current request timestamp
+    recent_timestamps.append(current_time)
+    _rate_limit_store[key] = recent_timestamps
+    
+    remaining = max_requests - len(recent_timestamps)
+    return True, remaining
+
+def _get_client_ip() -> str:
+    """Get client IP address from request headers."""
+    # Check for forwarded IP (from proxy/load balancer)
+    forwarded_for = request.headers.get('X-Forwarded-For')
+    if forwarded_for:
+        # X-Forwarded-For can contain multiple IPs, take the first one
+        return forwarded_for.split(',')[0].strip()
+    
+    # Check for real IP header
+    real_ip = request.headers.get('X-Real-IP')
+    if real_ip:
+        return real_ip.strip()
+    
+    # Fall back to remote address
+    return request.remote_addr or 'unknown'
 
 # Model configuration
 LLM_MODEL = "gpt-4o-mini"
@@ -848,10 +1033,26 @@ def generate_test_plan_with_llm(compiled_ticket: dict) -> dict:
         dict: A test plan dictionary matching the schema structure.
         Returns empty schema if LLM call fails.
     """
-    if not openai_client:
-        return get_empty_test_plan()
+    debug_requirements = os.getenv("DEBUG_REQUIREMENTS", "0") == "1"
+    ticket_id = compiled_ticket.get("ticket_id", "")
+    
+    # Log function entry immediately
+    if debug_requirements:
+        logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: FUNCTION_ENTRY generate_test_plan_with_llm called")
+    
+    try:
+        if not openai_client:
+            if debug_requirements:
+                logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: EARLY_RETURN openai_client is None")
+            return get_empty_test_plan()
+        
+        # STEP1: Before LLM call
+        if debug_requirements:
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP1_BEFORE_LLM before LLM call")
+        
+        t0 = time.time()
 
-    system_prompt = """
+        system_prompt = """
 You are an AI Testing Agent operating in a regulated, ISO-audited environment.
 
 Your task is to generate a TEST PLAN in STRICT JSON format that conforms to the following rules.
@@ -1061,34 +1262,33 @@ You must return ONLY valid JSON that exactly matches this schema:
 Do not include markdown. Do not include explanations. JSON only.
 """
 
-
-    # Generate step skeletons for each intent type
-    execution_mechanisms = compiled_ticket.get("execution_mechanisms", {})
-    step_skeletons = {
-        "happy_path": generate_step_skeleton("happy_path", execution_mechanisms),
-        "negative": generate_step_skeleton("negative", execution_mechanisms),
-        "authorization": generate_step_skeleton("authorization", execution_mechanisms),
-        "boundary": generate_step_skeleton("boundary", execution_mechanisms)
-    }
-    
-    # Check if ticket/requirements name UI elements or output artifacts
-    # This allows test generation even without explicit execution mechanisms
-    ticket_text = (
-        compiled_ticket.get("summary", "") + " " +
-        compiled_ticket.get("description", "") + " " +
-        compiled_ticket.get("acceptance_criteria", "")
-    )
-    has_ui_elements = names_ui_element(ticket_text)
-    has_output_artifacts = names_output_artifact(ticket_text)
-    can_generate_tests = (
-        bool(execution_mechanisms.get("api_endpoints")) or
-        bool(execution_mechanisms.get("ui_components")) or
-        bool(execution_mechanisms.get("file_paths")) or
-        has_ui_elements or
-        has_output_artifacts
-    )
-    
-    user_prompt = f"""
+        # Generate step skeletons for each intent type
+        execution_mechanisms = compiled_ticket.get("execution_mechanisms", {})
+        step_skeletons = {
+            "happy_path": generate_step_skeleton("happy_path", execution_mechanisms),
+            "negative": generate_step_skeleton("negative", execution_mechanisms),
+            "authorization": generate_step_skeleton("authorization", execution_mechanisms),
+            "boundary": generate_step_skeleton("boundary", execution_mechanisms)
+        }
+        
+        # Check if ticket/requirements name UI elements or output artifacts
+        # This allows test generation even without explicit execution mechanisms
+        ticket_text = (
+            compiled_ticket.get("summary", "") + " " +
+            compiled_ticket.get("description", "") + " " +
+            compiled_ticket.get("acceptance_criteria", "")
+        )
+        has_ui_elements = names_ui_element(ticket_text)
+        has_output_artifacts = names_output_artifact(ticket_text)
+        can_generate_tests = (
+            bool(execution_mechanisms.get("api_endpoints")) or
+            bool(execution_mechanisms.get("ui_components")) or
+            bool(execution_mechanisms.get("file_paths")) or
+            has_ui_elements or
+            has_output_artifacts
+        )
+        
+        user_prompt = f"""
 You are given a compiled Jira ticket.
 
 This ticket has already been analyzed for execution feasibility.
@@ -1238,7 +1438,6 @@ TEST CASE ENUMERATION REQUIREMENTS:
 Return valid JSON only. No markdown. No explanations.
 """
 
-    try:
         response = openai_client.chat.completions.create(
             model=LLM_MODEL,
             messages=[
@@ -1251,6 +1450,31 @@ Return valid JSON only. No markdown. No explanations.
 
         # Parse the JSON response
         llm_response = json.loads(response.choices[0].message.content)
+        
+        # STEP2: After LLM call
+        elapsed_ms = int((time.time() - t0) * 1000)
+        if debug_requirements:
+            llm_keys = list(llm_response.keys())
+            req_info = ""
+            if "requirements" in llm_response and isinstance(llm_response.get("requirements"), list):
+                req_info = f", requirements_len={len(llm_response.get('requirements', []))}"
+            summary_preview = str(llm_response.get("summary", ""))[:80] if llm_response.get("summary") else ""
+            desc_preview = str(llm_response.get("description", ""))[:80] if llm_response.get("description") else ""
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP2_AFTER_LLM after LLM call; elapsed_ms={elapsed_ms}, llm_keys={llm_keys}{req_info}")
+            if summary_preview:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP2 llm_response['summary'] first 80 chars: {summary_preview}")
+            if desc_preview:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP2 llm_response['description'] first 80 chars: {desc_preview}")
+        
+        # DEBUG: Log LLM response info (keep existing logs)
+        if debug_requirements:
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: LLM response keys={list(llm_response.keys())}")
+            if "requirements" in llm_response:
+                req_type = type(llm_response.get("requirements"))
+                req_length = len(llm_response.get("requirements", [])) if isinstance(llm_response.get("requirements"), list) else "N/A"
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: LLM requirements key present: True, type={req_type}, length={req_length}")
+            else:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: LLM requirements key present: False")
         
         # Debug: Log if requirements are missing
         if "requirements" not in llm_response or not isinstance(llm_response.get("requirements"), list):
@@ -1430,11 +1654,36 @@ Return valid JSON only. No markdown. No explanations.
         # Requirements are scoped to a single ticket and must never be merged,
         # deduplicated, or normalized across tickets, even if the text is identical.
         # Normalization here is only for source field consistency within a single ticket.
-        if "requirements" in llm_response and isinstance(llm_response["requirements"], list):
+        
+        # DEBUG: Track requirements extraction pipeline
+        debug_requirements = os.getenv("DEBUG_REQUIREMENTS", "0") == "1"
+        extracted_items_total = len(all_numbered_items) + len(acceptance_criteria_items)
+        extracted_items_testable = sum(1 for item in (all_numbered_items + acceptance_criteria_items) 
+                                      if isinstance(item, dict) and item.get("text"))
+        
+        if debug_requirements:
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Starting requirements extraction")
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: extracted_items_total={extracted_items_total}, extracted_items_testable={extracted_items_testable}")
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: has_numbered_acceptance_criteria={has_numbered_acceptance_criteria}")
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: LLM response has 'requirements' key: {'requirements' in llm_response}")
+            if "requirements" in llm_response:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: LLM requirements type: {type(llm_response.get('requirements'))}, count: {len(llm_response.get('requirements', []))}")
+                # Log if requirements key exists but is empty
+                if isinstance(llm_response.get("requirements"), list) and len(llm_response.get("requirements", [])) == 0:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: requirements key present but empty -> routing to Path B/C")
+        
+        if "requirements" in llm_response and isinstance(llm_response["requirements"], list) and len(llm_response["requirements"]) > 0:
+            # STEP3: Path A enter
+            if debug_requirements:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP3_PATH_A_ENTER")
+            
             llm_req_count = len(llm_response["requirements"])
             normalized_requirements = []
             seen_ids_in_ticket = set()  # Track IDs only within this ticket to prevent duplicates
             skipped_count = 0
+            
+            if debug_requirements:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: EXTRACTION PATH: Path A (use LLM requirements), llm_req_count={llm_req_count}")
             
             # Separate acceptance-criteria-derived requirements from inferred requirements
             acceptance_criteria_requirements = []
@@ -1658,65 +1907,195 @@ Return valid JSON only. No markdown. No explanations.
             # This must occur during ticket extraction, before any multi-ticket aggregation
             # ============================================================================
             atomic_requirements = split_compound_requirements(normalized_requirements)
-            test_plan["requirements"] = atomic_requirements
+            parsed_requirements_count = len(atomic_requirements)
+            
+            if debug_requirements:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path A - After split_compound_requirements: parsed_requirements_count={parsed_requirements_count}")
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path A - normalized_requirements count before split: {len(normalized_requirements)}")
+                if parsed_requirements_count == 0:
+                    logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path A - parsed_requirements_count is 0 - requirements array will be empty")
+                    logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path A - Reason: llm_req_count={llm_req_count}, numbered_requirements={len(numbered_requirements) if 'numbered_requirements' in locals() else 0}, filtered_llm={len(filtered_llm_requirements) if 'filtered_llm_requirements' in locals() else 0}")
             
             # ============================================================================
-            # REQUIREMENT CLASSIFICATION REFINEMENT: Classify UI structure requirements
-            # This ensures UI presence/availability requirements are correctly categorized
-            # before negative test generation (for logical failure-mode inference)
+            # ZERO-OUTPUT CHECK: If Path A produced 0 requirements, fall back to Path B/C
             # ============================================================================
-            classify_requirement_ui_structure(test_plan["requirements"])
-            
-            # ============================================================================
-            # POST-EXTRACTION GROUPING: Create ticket items from numbered requirements with comma-separated lists
-            # This creates child ITEMs under parent requirements that contain comma-separated phrases
-            # ============================================================================
-            create_items_from_numbered_requirements(test_plan, ticket_id)
-            
-            # ============================================================================
-            # REQUIREMENT → ITEM CLASSIFICATION INHERITANCE: Inherit structural classifications
-            # This ensures child items inherit parent requirement classifications (e.g., ui_structure)
-            # before test generation, enabling correct negative test generation
-            # ============================================================================
-            inherit_requirement_classification_to_items(test_plan)
-            
-            # ============================================================================
-            # VALIDATION: Ensure numbering tokens are preserved (AUDIT TRACEABILITY)
-            # If numbering tokens were detected but lost during extraction, raise warning
-            # ============================================================================
-            if detected_numbering_tokens:
-                # Check if any requirements contain the numbering tokens
-                preserved_count = 0
-                for req in atomic_requirements:
-                    if isinstance(req, dict):
-                        req_desc = req.get("description", "")
-                        # Check if any numbering token appears in requirement description
-                        for token in detected_numbering_tokens:
-                            # Extract just the number from token (e.g., "1." -> "1")
-                            number_only = re.sub(r'[^\d]', '', token)
-                            if number_only and (f"[{number_only}]" in req_desc or token in req_desc):
-                                preserved_count += 1
-                                break
+            path_a_zero_output = False
+            if len(atomic_requirements) == 0:
+                if debug_requirements:
+                    logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path A produced 0 atomic_requirements, falling back to Path B/C extraction")
+                # Set flag to trigger Path B/C extraction (will be handled below)
+                path_a_zero_output = True
+            else:
+                test_plan["requirements"] = atomic_requirements
                 
-                if preserved_count < len(detected_numbering_tokens):
-                    missing_tokens = len(detected_numbering_tokens) - preserved_count
-                    logger.warning(
-                        f"EXTRACTION WARNING (Ticket {ticket_id}): {missing_tokens} numbering token(s) detected in Jira description "
-                        f"but may not be preserved in extracted requirements. This may impact audit traceability. "
-                        f"Detected tokens: {detected_numbering_tokens}"
-                    )
-            
+                # ============================================================================
+                # REQUIREMENT CLASSIFICATION REFINEMENT: Classify UI structure requirements
+                # This ensures UI presence/availability requirements are correctly categorized
+                # before negative test generation (for logical failure-mode inference)
+                # ============================================================================
+                classify_requirement_ui_structure(test_plan["requirements"])
+                
+                # ============================================================================
+                # POST-EXTRACTION GROUPING: Create ticket items from numbered requirements with comma-separated lists
+                # This creates child ITEMs under parent requirements that contain comma-separated phrases
+                # ============================================================================
+                create_items_from_numbered_requirements(test_plan, ticket_id)
+                
+                # ============================================================================
+                # REQUIREMENT → ITEM CLASSIFICATION INHERITANCE: Inherit structural classifications
+                # This ensures child items inherit parent requirement classifications (e.g., ui_structure)
+                # before test generation, enabling correct negative test generation
+                # ============================================================================
+                inherit_requirement_classification_to_items(test_plan)
+                
+                # ============================================================================
+                # VALIDATION: Ensure numbering tokens are preserved (AUDIT TRACEABILITY)
+                # If numbering tokens were detected but lost during extraction, raise warning
+                # ============================================================================
+                if detected_numbering_tokens:
+                    # Check if any requirements contain the numbering tokens
+                    preserved_count = 0
+                    for req in atomic_requirements:
+                        if isinstance(req, dict):
+                            req_desc = req.get("description", "")
+                            # Check if any numbering token appears in requirement description
+                            for token in detected_numbering_tokens:
+                                # Extract just the number from token (e.g., "1." -> "1")
+                                number_only = re.sub(r'[^\d]', '', token)
+                                if number_only and (f"[{number_only}]" in req_desc or token in req_desc):
+                                    preserved_count += 1
+                                    break
+                    
+                    if preserved_count < len(detected_numbering_tokens):
+                        missing_tokens = len(detected_numbering_tokens) - preserved_count
+                        logger.warning(
+                            f"EXTRACTION WARNING (Ticket {ticket_id}): {missing_tokens} numbering token(s) detected in Jira description "
+                            f"but may not be preserved in extracted requirements. This may impact audit traceability. "
+                            f"Detected tokens: {detected_numbering_tokens}"
+                        )
+                
             # Store flag indicating numbered acceptance criteria were detected
             if has_numbered_acceptance_criteria:
                 test_plan["_has_numbered_acceptance_criteria"] = True
-        else:
-            # If LLM didn't return requirements, enforce acceptance-criteria precedence
+        
+        # ============================================================================
+        # PATH B/C: Extract requirements from normalized text or raw Jira fields
+        # This path executes when:
+        # 1. LLM didn't return requirements (original Path B/C)
+        # 2. Path A produced 0 requirements after post-processing (zero-output fallback)
+        # Priority: compiled_ticket description > LLM response description > LLM response summary > raw Jira fields
+        # ============================================================================
+        # Check if we should execute Path B/C
+        path_a_had_requirements = ("requirements" in llm_response and isinstance(llm_response["requirements"], list) and len(llm_response["requirements"]) > 0)
+        # Check if Path A produced zero requirements (path_a_zero_output is set in Path A block)
+        path_a_produced_zero = locals().get("path_a_zero_output", False)
+        should_execute_path_bc = not path_a_had_requirements or path_a_produced_zero
+        
+        if should_execute_path_bc:
+            # STEP4: Path B enter
+            if debug_requirements:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP4_PATH_B_ENTER")
+                if path_a_produced_zero:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: EXTRACTION PATH: Path B/C (Path A zero-output fallback)")
+                else:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: EXTRACTION PATH: Path B/C (No LLM requirements)")
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: has_numbered_acceptance_criteria={has_numbered_acceptance_criteria}")
+            
+            acceptance_criteria_requirements = []
+            normalized_text_source = None
+            normalized_text = None
+            
+            # First preference: Check compiled_ticket description (this is where normalized text actually lives)
+            # This is the normalized Jira ticket description that contains "Normalized Requirements:" and "Scope (In):"
+            compiled_description = compiled_ticket.get("description", "")
+            if compiled_description and isinstance(compiled_description, str) and compiled_description.strip():
+                normalized_text = compiled_description
+                normalized_text_source = "normalized_from_compiled_ticket_description"
+            # Second preference: Check LLM response description
+            elif "description" in llm_response and isinstance(llm_response["description"], str) and llm_response["description"].strip():
+                normalized_text = llm_response["description"]
+                normalized_text_source = "normalized_from_llm_description"
+            # Third preference: Check LLM response summary
+            elif "summary" in llm_response and isinstance(llm_response["summary"], str) and llm_response["summary"].strip():
+                normalized_text = llm_response["summary"]
+                normalized_text_source = "normalized_from_llm_summary"
+            
+            if debug_requirements:
+                if normalized_text:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Found normalized text source: {normalized_text_source}")
+                else:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: No normalized text found, will use raw Jira fields")
+                    normalized_text_source = "raw_jira"
+            
+            # Extract from normalized requirements text if available
+            normalized_numbered_items = []
+            normalized_scope_in_items = []
+            
+            if normalized_text:
+                # Extract numbered items from "Normalized Requirements:" section
+                normalized_req_pattern = re.compile(
+                    r'Normalized Requirements:\s*\n(.*?)(?=\n\s*(?:Scope \(In\):|$))',
+                    re.DOTALL | re.IGNORECASE
+                )
+                normalized_req_match = normalized_req_pattern.search(normalized_text)
+                if normalized_req_match:
+                    normalized_req_section = normalized_req_match.group(1)
+                    # Match numbered items: ^\s*\d+\)\s+(.+)$ (multiline)
+                    numbered_pattern_normalized = re.compile(
+                        r'^\s*(\d+)\)\s+(.+)$',
+                        re.MULTILINE
+                    )
+                    for match in numbered_pattern_normalized.finditer(normalized_req_section):
+                        number_token = match.group(1)
+                        text = match.group(2).strip()
+                        if text and len(text) > 3:
+                            normalized_numbered_items.append({
+                                "text": text,
+                                "number_token": number_token,
+                                "source": "normalized"
+                            })
+                    
+                    if debug_requirements:
+                        logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: extracted_numbered_items={len(normalized_numbered_items)} from 'Normalized Requirements:' section")
+                
+                # Extract bullet items from "Scope (In):" section
+                scope_in_pattern = re.compile(
+                    r'Scope \(In\):\s*\n(.*?)(?=\n\s*(?:Scope \(Out\):|$))',
+                    re.DOTALL | re.IGNORECASE
+                )
+                scope_in_match = scope_in_pattern.search(normalized_text)
+                if scope_in_match:
+                    scope_in_section = scope_in_match.group(1)
+                    # Match bullet lines starting with "-" until blank line or "Scope (Out):"
+                    bullet_pattern = re.compile(
+                        r'^\s*-\s+(.+)$',
+                        re.MULTILINE
+                    )
+                    for match in bullet_pattern.finditer(scope_in_section):
+                        text = match.group(1).strip()
+                        if text and len(text) > 3:
+                            normalized_scope_in_items.append({
+                                "text": text,
+                                "source": "normalized"
+                            })
+                    
+                    if debug_requirements:
+                        logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: extracted_scope_in_bullets={len(normalized_scope_in_items)} from 'Scope (In):' section")
+            
+            # Combine normalized items (numbered first, then scope-in bullets)
+            all_normalized_items = normalized_numbered_items + normalized_scope_in_items
+            
+            # Path B: Create requirements from numbered/bulleted items if they exist
+            # This is the 1/14 behavior: if LLM requirements are missing/empty but numbered items exist,
+            # create one requirement per item from raw Jira fields
             if has_numbered_acceptance_criteria:
                 # Create one requirement per numbered/bulleted item
                 # Use all_numbered_items which contains preserved numbering tokens
                 logger.warning(f"No requirements in LLM response for ticket {ticket_id}, but numbered items detected. Creating requirements from numbered items.")
-                acceptance_criteria_requirements = []
                 items_to_process = all_numbered_items if all_numbered_items else acceptance_criteria_items
+                
+                if debug_requirements:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path B - Using raw Jira fields, items_to_process count: {len(items_to_process)}")
                 
                 for idx, item in enumerate(items_to_process, 1):
                     item_text = item.get("text", "")
@@ -1733,32 +2112,79 @@ Return valid JSON only. No markdown. No explanations.
                     # Evaluate testability per requirement after splitting
                     req["testable"] = is_requirement_testable(req)
                     acceptance_criteria_requirements.append(req)
-                test_plan["requirements"] = acceptance_criteria_requirements
+            elif all_normalized_items:
+                # Create requirements from normalized text items
+                if debug_requirements:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path B - Creating requirements from normalized text, items count: {len(all_normalized_items)}")
                 
-                # Validation: Check if numbering tokens are preserved
-                if detected_numbering_tokens:
-                    preserved_count = 0
-                    for req in acceptance_criteria_requirements:
-                        if isinstance(req, dict):
-                            req_desc = req.get("description", "")
-                            for token in detected_numbering_tokens:
-                                number_only = re.sub(r'[^\d]', '', token)
-                                if number_only and (f"[{number_only}]" in req_desc or token in req_desc):
-                                    preserved_count += 1
-                                    break
+                for idx, item in enumerate(all_normalized_items, 1):
+                    item_text = item.get("text", "")
+                    if not item_text:
+                        continue
                     
-                    if preserved_count < len(detected_numbering_tokens):
-                        missing_tokens = len(detected_numbering_tokens) - preserved_count
-                        logger.warning(
-                            f"EXTRACTION WARNING (Ticket {ticket_id}): {missing_tokens} numbering token(s) detected in Jira description "
-                            f"but may not be preserved in extracted requirements. This may impact audit traceability. "
-                            f"Detected tokens: {detected_numbering_tokens}"
-                        )
-                # Store flag indicating numbered acceptance criteria were detected
+                    # Use ticket-scoped ID for deterministic ordering
+                    req_id = f"{ticket_id}-REQ-{idx:03d}" if ticket_id else f"REQ-{idx:03d}"
+                    req = {
+                        "id": req_id,
+                        "source": "normalized",
+                        "description": item_text,
+                        "inferred": False
+                    }
+                    req["quality"] = score_requirement_quality(req)
+                    req["coverage_expectations"] = compute_coverage_expectations(req)
+                    req["testable"] = is_requirement_testable(req)
+                    acceptance_criteria_requirements.append(req)
+            
+            parsed_requirements_count = len(acceptance_criteria_requirements)
+            if debug_requirements:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path B/C - extracted_numbered_items={len(normalized_numbered_items)}, extracted_scope_in_bullets={len(normalized_scope_in_items)}")
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path B/C - Text source used: {normalized_text_source}")
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path B/C - parsed_requirements_count={parsed_requirements_count}")
+            
+            test_plan["requirements"] = acceptance_criteria_requirements
+            
+            # DEBUG: Log final requirements count after Path B
+            if debug_requirements:
+                logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path B produced requirements_count={len(test_plan['requirements'])}")
+            
+            # Validation: Check if numbering tokens are preserved (only for raw Jira items)
+            if detected_numbering_tokens and not all_normalized_items:
+                preserved_count = 0
+                for req in acceptance_criteria_requirements:
+                    if isinstance(req, dict):
+                        req_desc = req.get("description", "")
+                        for token in detected_numbering_tokens:
+                            number_only = re.sub(r'[^\d]', '', token)
+                            if number_only and (f"[{number_only}]" in req_desc or token in req_desc):
+                                preserved_count += 1
+                                break
+                
+                if preserved_count < len(detected_numbering_tokens):
+                    missing_tokens = len(detected_numbering_tokens) - preserved_count
+                    logger.warning(
+                        f"EXTRACTION WARNING (Ticket {ticket_id}): {missing_tokens} numbering token(s) detected in Jira description "
+                        f"but may not be preserved in extracted requirements. This may impact audit traceability. "
+                        f"Detected tokens: {detected_numbering_tokens}"
+                    )
+            
+            # Store flag indicating numbered acceptance criteria were detected
+            if has_numbered_acceptance_criteria or all_normalized_items:
                 test_plan["_has_numbered_acceptance_criteria"] = True
-            else:
-                # No numbered acceptance criteria - infer from ticket content
+            
+            # Path C: Only create single inferred requirement if requirements[] is still empty
+            if len(acceptance_criteria_requirements) == 0:
+                # STEP5: Path C enter
+                if debug_requirements:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP5_PATH_C_ENTER")
+                
+                # No numbered acceptance criteria AND no normalized items - infer from ticket content
                 logger.warning(f"No requirements in LLM response for ticket {ticket_id}. Attempting to infer requirement from ticket content.")
+                
+                if debug_requirements:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: EXTRACTION PATH: Path C (single inferred requirement)")
+                    logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path C - No numbered items and no normalized items, creating single inferred requirement")
+                    logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Reason: LLM returned empty requirements AND no numbered acceptance criteria detected AND no normalized text items found")
+                
                 # Create at least one inferred requirement from ticket summary/description
                 summary = compiled_ticket.get("summary", "")
                 description = compiled_ticket.get("description", "")
@@ -1771,6 +2197,26 @@ Return valid JSON only. No markdown. No explanations.
                     inferred_req["quality"] = score_requirement_quality(inferred_req)
                     inferred_req["coverage_expectations"] = compute_coverage_expectations(inferred_req)
                     test_plan["requirements"] = [inferred_req]
+                    
+                    if debug_requirements:
+                        logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path C - parsed_requirements_count=1 (single inferred requirement)")
+                else:
+                    if debug_requirements:
+                        logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Path C - No summary or description, requirements will be empty")
+                    test_plan["requirements"] = []
+        
+        # Final requirements count logging
+        if debug_requirements:
+            final_requirements = test_plan.get("requirements", [])
+            final_count = len(final_requirements)
+            final_ids = [req.get("id", "NO_ID") for req in final_requirements if isinstance(req, dict)]
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: FINAL requirements count={final_count}")
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: FINAL requirement IDs={final_ids}")
+            if final_count == 0:
+                logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: FINAL REQUIREMENTS COUNT IS 0")
+                logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: extracted_items_total={extracted_items_total if 'extracted_items_total' in locals() else 'N/A'}, extracted_items_testable={extracted_items_testable if 'extracted_items_testable' in locals() else 'N/A'}")
+                logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: has_numbered_acceptance_criteria={has_numbered_acceptance_criteria if 'has_numbered_acceptance_criteria' in locals() else 'N/A'}")
+                logger.warning(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: LLM requirements count: {llm_req_count if 'llm_req_count' in locals() else 'N/A'}")
 
         # Merge business_intent
         if "business_intent" in llm_response:
@@ -1888,10 +2334,17 @@ Return valid JSON only. No markdown. No explanations.
                             normalized_tests.append(test)
                     test_plan["test_plan"][category] = normalized_tests
 
+        # STEP6: Final counts before return
+        if debug_requirements:
+            final_count = len(test_plan.get("requirements", []))
+            logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP6_FINAL_COUNTS final requirements_count={final_count}")
+
         return test_plan
 
     except Exception as e:
         # Fall back to empty schema on any error
+        if debug_requirements:
+            logger.exception(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: EXCEPTION in generation")
         logger.error(f"LLM generation failed for ticket {compiled_ticket.get('ticket_id', 'UNKNOWN')}: {str(e)}", exc_info=True)
         # Try to create at least one requirement from ticket content even on error
         error_plan = get_empty_test_plan(ticket_id=compiled_ticket.get("ticket_id", ""))
@@ -3775,184 +4228,47 @@ ALLOWED_ROLES_ADMIN_API = {"user", "admin", "owner", "superAdmin"}
 @app.route("/auth/register", methods=["POST"])
 def register():
     """
-    User registration endpoint to create a new tenant and first user.
+    DEPRECATED: User-first registration endpoint (removed in tenant-first onboarding).
     
-    Request body:
-        {
-            "tenant_name": "Company Name",
-            "admin_email": "user@example.com",
-            "password": "password123",
-            "first_name": "John" (optional),
-            "last_name": "Doe" (optional),
-            "role": "admin" | "user" (optional, defaults to "user")
-        }
-    
-    Returns:
-        {
-            "access_token": "<jwt>",
-            "token_type": "bearer",
-            "user": {
-                "id": "<user_id>",
-                "email": "<email>",
-                "role": "<selected_role>",
-                "tenant_id": "<tenant_id>",
-                "first_name": "<first_name>",
-                "last_name": "<last_name>",
-                "tenant_name": "<tenant_name>"
-            }
-        }
+    This endpoint is no longer supported. Use tenant-first onboarding flow:
+    1. POST /api/v1/onboarding/tenant (create tenant)
+    2. POST /api/v1/onboarding/tenant/{tenant_id}/admin (create first admin user)
     """
-    try:
-        from db import get_db
-        from models import TenantUser, Tenant
-        from utils.slugify import slugify
-        import uuid as uuid_module
-        
-        # Get request data
-        data = request.get_json()
-        if not data:
-            return jsonify({"detail": "Request body must be JSON"}), 400
-        
-        tenant_name = data.get("tenant_name", "").strip()
-        admin_email = data.get("admin_email", "").strip()
-        password = data.get("password", "")
-        first_name = data.get("first_name", "").strip() or None
-        last_name = data.get("last_name", "").strip() or None
-        role = data.get("role", "user").strip()  # Default to "user" if not provided
-        
-        # Validate required fields
-        if not tenant_name:
-            return jsonify({"detail": "tenant_name is required"}), 400
-        if not admin_email:
-            return jsonify({"detail": "admin_email is required"}), 400
-        if not password:
-            return jsonify({"detail": "password is required"}), 400
-        
-        # Validate role
-        if role not in ALLOWED_ROLES_CREATE:
-            return jsonify({"detail": f"role must be one of: {', '.join(sorted(ALLOWED_ROLES_CREATE))}"}), 400
-        
-        # Normalize email: lowercase and trim
-        admin_email = admin_email.lower().strip()
-        
-        # Get database session
-        db = next(get_db())
-        try:
-            # Check if email already exists (across all tenants)
-            existing_user = db.query(TenantUser).filter(TenantUser.email == admin_email).first()
-            if existing_user:
-                return jsonify({"detail": "Email already registered", "error": "EMAIL_EXISTS"}), 409
-            
-            # Generate tenant slug with collision handling
-            base_slug = slugify(tenant_name)
-            counter = 1
-            final_slug = base_slug
-            
-            # Check if base slug exists, if so, try variants
-            while True:
-                existing_tenant = db.query(Tenant).filter(Tenant.slug == final_slug).first()
-                if not existing_tenant:
-                    break
-                counter += 1
-                final_slug = f"{base_slug}-{counter}"
-            
-            # Create new tenant
-            tenant = Tenant(
-                name=tenant_name,
-                slug=final_slug,
-                is_active=True,
-                subscription_status="Trial",
-                trial_requirements_runs_remaining=3,
-                trial_testplan_runs_remaining=3,
-                trial_writeback_runs_remaining=3
-            )
-            db.add(tenant)
-            db.flush()  # Flush to get tenant.id without committing
-            
-            # Hash password
-            password_bytes = password.encode('utf-8')
-            salt = bcrypt.gensalt()
-            password_hash_bytes = bcrypt.hashpw(password_bytes, salt)
-            password_hash = password_hash_bytes.decode('utf-8')
-            
-            # Create first user with selected role
-            tenant_user = TenantUser(
-                tenant_id=tenant.id,
-                email=admin_email,
-                password_hash=password_hash,
-                role=role,
-                is_active=True,
-                first_name=first_name,
-                last_name=last_name
-            )
-            db.add(tenant_user)
-            db.commit()
-            db.refresh(tenant_user)
-            db.refresh(tenant)
-            
-            # Create JWT token
-            access_token = create_access_token(
-                user_id=str(tenant_user.id),
-                tenant_id=str(tenant.id),
-                role=tenant_user.role
-            )
-            
-            # Return response (same format as login)
-            return jsonify({
-                "access_token": access_token,
-                "token_type": "bearer",
-                "user": {
-                    "id": str(tenant_user.id),
-                    "email": tenant_user.email,
-                    "role": tenant_user.role,
-                    "tenant_id": str(tenant.id),
-                    "first_name": tenant_user.first_name,
-                    "last_name": tenant_user.last_name,
-                    "tenant_name": tenant.name
-                }
-            }), 201
-            
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Registration error: {e}", exc_info=True)
-            # Check if it's a unique constraint violation (email already exists)
-            if "uq_tenant_users_tenant_email" in str(e) or "email" in str(e).lower():
-                return jsonify({"detail": "Email already registered", "error": "EMAIL_EXISTS"}), 409
-            return jsonify({"detail": "Internal server error"}), 500
-        finally:
-            db.close()
-            
-    except Exception as e:
-        logger.error(f"Registration error: {e}", exc_info=True)
-        return jsonify({"detail": "Internal server error"}), 500
+    return jsonify({
+        "detail": "This endpoint is deprecated. Please use tenant-first onboarding: POST /api/v1/onboarding/tenant",
+        "error": "DEPRECATED_ENDPOINT"
+    }), 410  # 410 Gone
 
 
 @app.route("/auth/login", methods=["POST"])
 def login():
     """
-    User login endpoint to obtain JWT access token.
+    User login endpoint to obtain JWT access token (email+password only).
     
     Request body:
         {
             "email": "user@example.com",
             "password": "password123"
         }
+        Optionally accepts "tenant_slug" for backward compatibility, but UI will not send it.
     
     Returns:
+        - 200: Success with JWT token (single tenant match)
+        - 409: Multiple tenants found, requires tenant selection
         {
-            "access_token": "<jwt>",
-            "token_type": "bearer",
-            "user": {
-                "id": "<user_id>",
-                "email": "<email>",
-                "role": "<role>",
-                "tenant_id": "<tenant_id>"
-            }
+            "code": "TENANT_SELECTION_REQUIRED",
+            "detail": "Multiple workspaces found for this email.",
+            "tenants": [
+                { "tenant_id": "...", "tenant_name": "...", "tenant_slug": "..." }
+            ]
         }
+        - 401: Invalid credentials (generic)
+        - 403: User or tenant inactive
     """
     try:
         from db import get_db
         from models import TenantUser, Tenant
+        from sqlalchemy import func
         
         # Get request data
         data = request.get_json()
@@ -3961,37 +4277,230 @@ def login():
         
         email = data.get("email", "").strip()
         password = data.get("password", "")
+        tenant_slug = data.get("tenant_slug", "").strip()  # Optional, for backward compatibility
         
         if not email or not password:
             return jsonify({"detail": "email and password are required"}), 400
         
         # Normalize email: lowercase and trim
-        email = email.lower().strip()
+        email_lower = email.lower().strip()
+        password_bytes = password.encode('utf-8')
         
         # Get database session
         db = next(get_db())
         try:
-            # Look up user by email (with tenant relationship)
-            user = db.query(TenantUser).filter(TenantUser.email == email).first()
+            # If tenant_slug provided (backward compatibility), use old flow
+            if tenant_slug:
+                tenant_slug_lower = tenant_slug.lower().strip()
+                tenant = db.query(Tenant).filter(func.lower(Tenant.slug) == tenant_slug_lower).first()
+                if not tenant:
+                    return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                
+                if not tenant.is_active:
+                    return jsonify({
+                        "code": "TENANT_INACTIVE",
+                        "detail": "Workspace is inactive. Contact hello@scopetraceai.com"
+                    }), 403
+                
+                user = db.query(TenantUser).filter(
+                    func.lower(TenantUser.email) == email_lower,
+                    TenantUser.tenant_id == tenant.id
+                ).first()
+                
+                if not user:
+                    return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                
+                if not user.is_active:
+                    return jsonify({
+                        "code": "USER_INACTIVE",
+                        "detail": "Your account is inactive. Contact hello@scopetraceai.com"
+                    }), 403
+                
+                if not bcrypt.checkpw(password_bytes, user.password_hash.encode('utf-8')):
+                    return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                
+                user.last_login_at = datetime.now(timezone.utc)
+                db.commit()
+                
+                access_token = create_access_token(
+                    user_id=str(user.id),
+                    tenant_id=str(user.tenant_id),
+                    role=user.role
+                )
+                
+                return jsonify({
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                    "user": {
+                        "id": str(user.id),
+                        "email": user.email,
+                        "role": user.role,
+                        "tenant_id": str(user.tenant_id),
+                        "tenant_slug": tenant.slug,
+                        "tenant_name": tenant.name,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name
+                    }
+                }), 200
             
-            # Reject if user not found
+            # New flow: lookup all tenant_users by email (case-insensitive)
+            users = db.query(TenantUser).filter(
+                func.lower(TenantUser.email) == email_lower
+            ).all()
+            
+            if not users:
+                return jsonify({"detail": "Invalid tenant or credentials"}), 401
+            
+            # Verify password for all matches and collect valid tenants
+            valid_tenants = []
+            for user in users:
+                try:
+                    if bcrypt.checkpw(password_bytes, user.password_hash.encode('utf-8')):
+                        # Password matches, check if tenant and user are active
+                        tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+                        if tenant and tenant.is_active and user.is_active:
+                            valid_tenants.append({
+                                "user": user,
+                                "tenant": tenant
+                            })
+                except Exception:
+                    # Skip invalid password hashes
+                    continue
+            
+            # If no valid matches after password check, return 401
+            if not valid_tenants:
+                return jsonify({"detail": "Invalid tenant or credentials"}), 401
+            
+            # If exactly one match, authenticate immediately
+            if len(valid_tenants) == 1:
+                user = valid_tenants[0]["user"]
+                tenant = valid_tenants[0]["tenant"]
+                
+                # Update last_login_at
+                user.last_login_at = datetime.now(timezone.utc)
+                db.commit()
+                
+                # Create JWT token
+                access_token = create_access_token(
+                    user_id=str(user.id),
+                    tenant_id=str(user.tenant_id),
+                    role=user.role
+                )
+                
+                return jsonify({
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                    "user": {
+                        "id": str(user.id),
+                        "email": user.email,
+                        "role": user.role,
+                        "tenant_id": str(user.tenant_id),
+                        "tenant_slug": tenant.slug,
+                        "tenant_name": tenant.name,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name
+                    }
+                }), 200
+            
+            # Multiple matches: return 409 with tenant list
+            tenant_list = []
+            for item in valid_tenants:
+                tenant = item["tenant"]
+                tenant_list.append({
+                    "tenant_id": str(tenant.id),
+                    "tenant_name": tenant.name,
+                    "tenant_slug": tenant.slug
+                })
+            
+            return jsonify({
+                "code": "TENANT_SELECTION_REQUIRED",
+                "detail": "Multiple workspaces found for this email.",
+                "tenants": tenant_list
+            }), 409
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Login error: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/auth/login/tenant", methods=["POST"])
+def login_with_tenant():
+    """
+    Second-step login when multiple tenants are found.
+    
+    Request body:
+        {
+            "tenant_id": "uuid-string",
+            "email": "user@example.com",
+            "password": "password123"
+        }
+    
+    Returns:
+        Same as /auth/login: JWT token on success
+    """
+    try:
+        from db import get_db
+        from models import TenantUser, Tenant
+        import uuid as uuid_module
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        tenant_id_str = data.get("tenant_id", "").strip()
+        email = data.get("email", "").strip()
+        password = data.get("password", "")
+        
+        if not tenant_id_str or not email or not password:
+            return jsonify({"detail": "tenant_id, email, and password are required"}), 400
+        
+        # Normalize email
+        email_lower = email.lower().strip()
+        password_bytes = password.encode('utf-8')
+        
+        # Convert tenant_id to UUID
+        try:
+            tenant_id_uuid = uuid_module.UUID(tenant_id_str)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant or credentials"}), 401
+        
+        db = next(get_db())
+        try:
+            # Load tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Invalid tenant or credentials"}), 401
+            
+            # Check if tenant is active
+            if not tenant.is_active:
+                return jsonify({
+                    "code": "TENANT_INACTIVE",
+                    "detail": "Workspace is inactive. Contact hello@scopetraceai.com"
+                }), 403
+            
+            # Look up user by email and tenant_id
+            from sqlalchemy import func
+            user = db.query(TenantUser).filter(
+                func.lower(TenantUser.email) == email_lower,
+                TenantUser.tenant_id == tenant_id_uuid
+            ).first()
+            
             if not user:
-                return jsonify({"detail": "Invalid email or password"}), 401
+                return jsonify({"detail": "Invalid tenant or credentials"}), 401
             
-            # Reject if user is not active
+            # Check if user is active
             if not user.is_active:
-                return jsonify({"detail": "Account is inactive"}), 401
+                return jsonify({
+                    "code": "USER_INACTIVE",
+                    "detail": "Your account is inactive. Contact hello@scopetraceai.com"
+                }), 403
             
-            # Verify password with bcrypt
-            password_bytes = password.encode('utf-8')
-            password_hash_bytes = user.password_hash.encode('utf-8')
-            
-            if not bcrypt.checkpw(password_bytes, password_hash_bytes):
-                return jsonify({"detail": "Invalid email or password"}), 401
-            
-            # Get tenant name
-            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
-            tenant_name = tenant.name if tenant else None
+            # Verify password
+            if not bcrypt.checkpw(password_bytes, user.password_hash.encode('utf-8')):
+                return jsonify({"detail": "Invalid tenant or credentials"}), 401
             
             # Update last_login_at
             user.last_login_at = datetime.now(timezone.utc)
@@ -4004,7 +4513,6 @@ def login():
                 role=user.role
             )
             
-            # Return response
             return jsonify({
                 "access_token": access_token,
                 "token_type": "bearer",
@@ -4013,41 +4521,561 @@ def login():
                     "email": user.email,
                     "role": user.role,
                     "tenant_id": str(user.tenant_id),
+                    "tenant_slug": tenant.slug,
+                    "tenant_name": tenant.name,
                     "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "tenant_name": tenant_name
+                    "last_name": user.last_name
                 }
             }), 200
             
         finally:
             db.close()
-            
     except Exception as e:
-        logger.error(f"Login error: {e}", exc_info=True)
-        return jsonify({"detail": "Internal server error"}), 500
+        logger.error(f"Error during tenant login: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Login failed"}), 500
 
 
 @app.route("/auth/me", methods=["GET"])
 def get_current_user():
     """
-    Get current user information from JWT token.
+    Get current user information from JWT token (tenant-first model).
+    Tenant info is always included (tenant_id is required for authenticated users).
+    
+    Returns:
+        {
+            "user_id": "<user_id>",
+            "email": "<email>",
+            "role": "<role>",
+            "tenant_id": "<tenant_id>",
+            "tenant_slug": "<tenant_slug>",
+            "tenant_name": "<tenant_name>",
+            "first_name": "<first_name>" | null,
+            "last_name": "<last_name>" | null
+        }
+    """
+    # JWT middleware already verified token and set g.user_id, g.tenant_id, g.role
+    if not hasattr(g, 'user_id') or not g.user_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    try:
+        from db import get_db
+        from models import TenantUser, Tenant
+        
+        db = next(get_db())
+        try:
+            user = db.query(TenantUser).filter(TenantUser.id == g.user_id).first()
+            if not user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            # Tenant-first model: tenant_id is always required
+            if not user.tenant_id:
+                logger.error(f"User {user.id} has no tenant_id (invalid in tenant-first model)")
+                return jsonify({"detail": "User has no tenant"}), 500
+            
+            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+            if not tenant:
+                logger.error(f"Tenant {user.tenant_id} not found for user {user.id}")
+                return jsonify({"detail": "Tenant not found"}), 500
+            
+            response = {
+                "user_id": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "tenant_id": str(user.tenant_id),
+                "tenant_slug": tenant.slug,
+                "tenant_name": tenant.name,
+                "subscription_status": getattr(tenant, "subscription_status", "unselected"),
+                "tenant_is_active": getattr(tenant, "is_active", True),
+                "user_is_active": getattr(user, "is_active", True),
+                "first_name": user.first_name,
+                "last_name": user.last_name
+            }
+            
+            return jsonify(response), 200
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error getting current user: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/tenants/<tenant_id>/subscription", methods=["PATCH"])
+def update_tenant_subscription(tenant_id):
+    """
+    Update tenant subscription plan (onboarding step or admin update).
+    Requires authentication and tenant scope.
+    
+    Path parameters:
+        tenant_id: UUID of the tenant
+    
+    Request body:
+        {
+            "plan": "trial" | "individual" | "team" | "canceled"
+        }
     
     Returns:
         {
             "tenant_id": "<tenant_id>",
-            "user_id": "<user_id>",
-            "role": "<role>"
+            "subscription_status": "<status>",
+            "trial_requirements_runs_remaining": <int>,
+            "trial_testplan_runs_remaining": <int>,
+            "trial_writeback_runs_remaining": <int>
         }
     """
-    # JWT middleware already verified token and set g.tenant_id, g.user_id, g.role
-    if not hasattr(g, 'tenant_id') or not g.tenant_id:
-        return jsonify({"detail": "Unauthorized"}), 401
+    try:
+        from db import get_db
+        from models import Tenant
+        import uuid as uuid_lib
+        
+        # Validate tenant_id format
+        try:
+            tenant_uuid = uuid_lib.UUID(tenant_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id format"}), 400
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        plan = data.get("plan", "").strip().lower()
+        if not plan:
+            return jsonify({"detail": "plan is required"}), 400
+        
+        # Validate plan
+        allowed_plans = ["trial", "individual", "team", "canceled"]
+        if plan not in allowed_plans:
+            return jsonify({
+                "detail": f"Invalid plan. Allowed: {allowed_plans}"
+            }), 400
+        
+        # Verify user is authenticated and has tenant context
+        if not hasattr(g, 'user_id') or not g.user_id:
+            return jsonify({"detail": "Unauthorized"}), 401
+        
+        if not hasattr(g, 'tenant_id') or not g.tenant_id:
+            return jsonify({"detail": "Unauthorized"}), 401
+        
+        # Verify tenant_id matches authenticated tenant (tenant isolation)
+        if str(g.tenant_id) != tenant_id:
+            return jsonify({"detail": "Forbidden: tenant_id mismatch"}), 403
+        
+        db = next(get_db())
+        try:
+            # Get tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Update subscription status and trial counters based on plan
+            if plan == "trial":
+                tenant.subscription_status = "trial"
+                tenant.trial_requirements_runs_remaining = 3
+                tenant.trial_testplan_runs_remaining = 3
+                tenant.trial_writeback_runs_remaining = 3
+            elif plan == "individual":
+                tenant.subscription_status = "individual"
+                # Individual plan: leave counters as-is (or set to 0)
+                tenant.trial_requirements_runs_remaining = 0
+                tenant.trial_testplan_runs_remaining = 0
+                tenant.trial_writeback_runs_remaining = 0
+            elif plan == "team":
+                tenant.subscription_status = "team"
+                # Team plan: leave counters as-is (not used for team)
+            elif plan == "canceled":
+                tenant.subscription_status = "canceled"
+                # Canceled plan: leave counters as-is
+            
+            db.commit()
+            db.refresh(tenant)
+            
+            return jsonify({
+                "tenant_id": str(tenant.id),
+                "subscription_status": tenant.subscription_status,
+                "trial_requirements_runs_remaining": tenant.trial_requirements_runs_remaining,
+                "trial_testplan_runs_remaining": tenant.trial_testplan_runs_remaining,
+                "trial_writeback_runs_remaining": tenant.trial_writeback_runs_remaining
+            }), 200
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error updating tenant subscription: {e}", exc_info=True)
+            return jsonify({"detail": "Internal server error"}), 500
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error updating tenant subscription: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/tenants/check-slug", methods=["GET"])
+def check_slug_availability():
+    """
+    Check if a company name slug is available and suggest alternatives if taken.
+    Public endpoint (no auth required).
     
+    Query parameters:
+        name: Company name to check
+    
+    Returns:
+        {
+            "available": boolean,
+            "slug": "computed-slug",
+            "suggestions": ["slug-2", "slug-3"] (if not available)
+        }
+    """
+    try:
+        from db import get_db
+        from models import Tenant
+        from utils.slugify import slugify
+        
+        company_name = request.args.get("name", "").strip()
+        if not company_name:
+            return jsonify({"detail": "name parameter is required"}), 400
+        
+        base_slug = slugify(company_name)
+        if not base_slug:
+            return jsonify({"detail": "Invalid company name"}), 400
+        
+        db = next(get_db())
+        try:
+            # Check if base slug is available
+            existing_tenant = db.query(Tenant).filter(Tenant.slug == base_slug).first()
+            
+            if not existing_tenant:
+                return jsonify({
+                    "available": True,
+                    "slug": base_slug,
+                    "suggestions": []
+                }), 200
+            
+            # Slug is taken, generate unique suggestions
+            suggestions = []
+            counter = 2
+            seen_slugs = set()  # Track seen slugs to ensure uniqueness
+            while len(suggestions) < 3:
+                candidate_slug = f"{base_slug}-{counter}"
+                # Ensure candidate is unique in our suggestions list
+                if candidate_slug not in seen_slugs:
+                    candidate_tenant = db.query(Tenant).filter(Tenant.slug == candidate_slug).first()
+                    if not candidate_tenant:
+                        suggestions.append(candidate_slug)
+                        seen_slugs.add(candidate_slug)
+                counter += 1
+                # Safety limit to prevent infinite loop
+                if counter > 100:
+                    break
+            
+            return jsonify({
+                "available": False,
+                "slug": base_slug,
+                "suggestions": suggestions
+            }), 200
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error checking slug availability: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/onboarding/company", methods=["POST"])
+def create_company():
+    """
+    DEPRECATED: User-first company creation endpoint (removed in tenant-first onboarding).
+    
+    This endpoint is no longer supported. Use tenant-first onboarding flow:
+    1. POST /api/v1/onboarding/tenant (create tenant)
+    2. POST /api/v1/onboarding/tenant/{tenant_id}/admin (create first admin user)
+    """
     return jsonify({
-        "tenant_id": g.tenant_id,
-        "user_id": g.user_id,
-        "role": g.role
-    }), 200
+        "detail": "This endpoint is deprecated. Please use tenant-first onboarding: POST /api/v1/onboarding/tenant",
+        "error": "DEPRECATED_ENDPOINT"
+    }), 410  # 410 Gone
+
+
+@app.route("/api/v1/onboarding/tenant", methods=["POST"])
+def create_tenant():
+    """
+    Create tenant (company/workspace) - Step 1 of tenant-first onboarding.
+    Public endpoint (no auth required).
+    
+    Request body:
+        {
+            "company_name": "Acme Widgets"
+        }
+    
+    Returns:
+        {
+            "tenant_id": "<tenant_id>",
+            "tenant_slug": "<tenant_slug>",
+            "tenant_name": "<tenant_name>"
+        }
+    
+    On slug collision (409):
+        {
+            "detail": "Tenant slug already exists",
+            "slug": "acme-widgets",
+            "suggestions": ["acme-widgets-2", "acme-widgets-3"]
+        }
+    """
+    # Rate limiting: max 10 requests per hour per IP
+    client_ip = _get_client_ip()
+    allowed, remaining = _check_rate_limit(client_ip, "/api/v1/onboarding/tenant", max_requests=10, window_seconds=3600)
+    if not allowed:
+        return jsonify({"detail": "Rate limit exceeded"}), 429
+    
+    try:
+        from db import get_db
+        from models import Tenant
+        from utils.slugify import slugify
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        company_name = data.get("company_name", "").strip()
+        if not company_name:
+            return jsonify({"detail": "company_name is required"}), 400
+        
+        # Generate slug
+        base_slug = slugify(company_name)
+        if not base_slug:
+            return jsonify({"detail": "Invalid company name"}), 400
+        
+        db = next(get_db())
+        try:
+            # Check if base slug is available
+            existing_tenant = db.query(Tenant).filter(Tenant.slug == base_slug).first()
+            
+            if existing_tenant:
+                # Slug is taken, return 409 with suggestions
+                suggestions = []
+                counter = 2
+                seen_slugs = {base_slug}
+                while len(suggestions) < 3:
+                    candidate_slug = f"{base_slug}-{counter}"
+                    if candidate_slug not in seen_slugs:
+                        candidate_tenant = db.query(Tenant).filter(Tenant.slug == candidate_slug).first()
+                        if not candidate_tenant:
+                            suggestions.append(candidate_slug)
+                            seen_slugs.add(candidate_slug)
+                    counter += 1
+                    if counter > 100:  # Safety limit
+                        break
+                
+                return jsonify({
+                    "detail": "Tenant slug already exists",
+                    "slug": base_slug,
+                    "suggestions": suggestions
+                }), 409
+            
+            # Create tenant with "unselected" subscription status (no defaults)
+            tenant = Tenant(
+                name=company_name,
+                slug=base_slug,
+                is_active=True,
+                subscription_status="unselected",
+                # Do NOT initialize trial counters - only set when plan is selected
+                trial_requirements_runs_remaining=0,
+                trial_testplan_runs_remaining=0,
+                trial_writeback_runs_remaining=0
+            )
+            db.add(tenant)
+            db.commit()
+            db.refresh(tenant)
+            
+            return jsonify({
+                "tenant_id": str(tenant.id),
+                "tenant_slug": tenant.slug,
+                "tenant_name": tenant.name
+            }), 201
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error creating tenant: {e}", exc_info=True)
+            # Check for unique constraint violation (slug collision)
+            if "ix_tenants_slug" in str(e) or "slug" in str(e).lower():
+                suggestions = []
+                counter = 2
+                while len(suggestions) < 3:
+                    suggestions.append(f"{base_slug}-{counter}")
+                    counter += 1
+                return jsonify({
+                    "detail": "Tenant slug already exists",
+                    "slug": base_slug,
+                    "suggestions": suggestions
+                }), 409
+            return jsonify({"detail": "Internal server error"}), 500
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error creating tenant: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/onboarding/tenant/<tenant_id>/admin", methods=["POST"])
+def create_tenant_admin(tenant_id):
+    """
+    Create first tenant admin user - Step 2 of tenant-first onboarding.
+    Public endpoint (no auth required).
+    
+    Path parameters:
+        tenant_id: UUID of the tenant (created in Step 1)
+    
+    Request body:
+        {
+            "email": "admin@example.com",
+            "password": "password123",
+            "role": "admin",  // REQUIRED but will be forced to "admin" for first user
+            "first_name": "John" (optional),
+            "last_name": "Doe" (optional)
+        }
+    
+    Returns:
+        {
+            "token": "<jwt>",
+            "tenant_id": "<tenant_id>",
+            "user": {
+                "id": "<user_id>",
+                "email": "<email>",
+                "role": "admin",
+                "first_name": "<first_name>",
+                "last_name": "<last_name>"
+            }
+        }
+    """
+    # Rate limiting: max 20 requests per hour per IP
+    client_ip = _get_client_ip()
+    allowed, remaining = _check_rate_limit(client_ip, f"/api/v1/onboarding/tenant/{tenant_id}/admin", max_requests=20, window_seconds=3600)
+    if not allowed:
+        return jsonify({"detail": "Rate limit exceeded"}), 429
+    
+    try:
+        from db import get_db
+        from models import TenantUser, Tenant
+        import uuid as uuid_lib
+        from sqlalchemy import func
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        email = data.get("email", "").strip()
+        password = data.get("password", "")
+        role = data.get("role", "admin").strip()  # Accept role but enforce admin
+        first_name = data.get("first_name", "").strip() or None
+        last_name = data.get("last_name", "").strip() or None
+        
+        # Validate required fields
+        if not email:
+            return jsonify({"detail": "email is required"}), 400
+        if not password:
+            return jsonify({"detail": "password is required"}), 400
+        
+        # Normalize email: lowercase and trim
+        email = email.lower().strip()
+        
+        # Validate tenant_id
+        try:
+            tenant_uuid = uuid_lib.UUID(tenant_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id format"}), 400
+        
+        db = next(get_db())
+        try:
+            # Verify tenant exists
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # FRESH-TENANT RULE: Check if tenant was created recently (within 15 minutes)
+            tenant_age_seconds = (datetime.now(timezone.utc) - tenant.created_at).total_seconds()
+            if tenant_age_seconds > 900:  # 15 minutes = 900 seconds
+                # Check if tenant has any users
+                user_count = db.query(func.count(TenantUser.id)).filter(
+                    TenantUser.tenant_id == tenant_uuid
+                ).scalar()
+                
+                if user_count == 0:
+                    # Tenant is older than 15 minutes and has no users - expired onboarding session
+                    return jsonify({
+                        "detail": "Onboarding session expired. Please restart onboarding."
+                    }), 410
+            
+            # FIRST USER ONLY INVARIANT: Check if tenant already has any users
+            user_count = db.query(func.count(TenantUser.id)).filter(
+                TenantUser.tenant_id == tenant_uuid
+            ).scalar()
+            
+            if user_count > 0:
+                return jsonify({
+                    "detail": "Tenant already has a user. Admin creation not allowed."
+                }), 409
+            
+            # Check if email already exists within this tenant (UNIQUE constraint check)
+            existing_user = db.query(TenantUser).filter(
+                TenantUser.email == email,
+                TenantUser.tenant_id == tenant_uuid
+            ).first()
+            if existing_user:
+                return jsonify({"detail": "Email already registered in this tenant"}), 409
+            
+            # Hash password
+            password_bytes = password.encode('utf-8')
+            salt = bcrypt.gensalt()
+            password_hash_bytes = bcrypt.hashpw(password_bytes, salt)
+            password_hash = password_hash_bytes.decode('utf-8')
+            
+            # Create user - FORCE role to "admin" for first user
+            tenant_user = TenantUser(
+                tenant_id=tenant_uuid,
+                email=email,
+                password_hash=password_hash,
+                role="admin",  # First user is always admin
+                is_active=True,
+                first_name=first_name,
+                last_name=last_name
+            )
+            db.add(tenant_user)
+            db.commit()
+            db.refresh(tenant_user)
+            
+            # Create JWT token with tenant_id (always required)
+            access_token = create_access_token(
+                user_id=str(tenant_user.id),
+                tenant_id=str(tenant_user.tenant_id),
+                role=tenant_user.role
+            )
+            
+            # Return response
+            return jsonify({
+                "token": access_token,
+                "tenant_id": str(tenant_user.tenant_id),
+                "user": {
+                    "id": str(tenant_user.id),
+                    "email": tenant_user.email,
+                    "role": tenant_user.role,
+                    "first_name": tenant_user.first_name,
+                    "last_name": tenant_user.last_name
+                }
+            }), 201
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error creating tenant admin: {e}", exc_info=True)
+            # Check for unique constraint violation
+            if "uq_tenant_users_tenant_email" in str(e) or "email" in str(e).lower():
+                return jsonify({"detail": "Email already registered in this tenant"}), 409
+            return jsonify({"detail": "Internal server error"}), 500
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error creating tenant admin: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
 
 
 @app.route("/jira-test", methods=["GET"])
@@ -7089,26 +8117,50 @@ def generate_test_plan():
     jira_ticket_count = 0
     usage_source = "text"  # Default, will be updated based on tickets
     
-    # Entitlement check: verify tenant can run test plan generation
-    # Always run when tenant_id is available (after JWT extraction)
+    # ============================================================================
+    # CENTRALIZED ENTITLEMENT ENFORCEMENT (Policy Authority)
+    # This is the SINGLE SOURCE OF TRUTH for all subscription, plan tier, and usage limits.
+    # ============================================================================
+    data = request.get_json() or {}
+    
+    # Calculate input_char_count from request payload
+    try:
+        input_char_count = len(json.dumps(data, default=str)) if data else 0
+    except Exception:
+        input_char_count = 0
+    
+    # Extract ticket count for enforcement
+    tickets = data.get("tickets", [])
+    ticket_count = len(tickets) if isinstance(tickets, list) else 0
+    
     if tenant_id:
         try:
             from db import get_db
-            from services.entitlements import check_entitlement
+            from services.entitlements_centralized import enforce_entitlements
             
             db = next(get_db())
             try:
-                allowed, reason, subscription_status, remaining = check_entitlement(db, str(tenant_id))
+                # Comprehensive entitlement check (subscription, plan tier, limits, trials)
+                allowed, reason, metadata = enforce_entitlements(
+                    db=db,
+                    tenant_id=str(tenant_id),
+                    agent="test_plan",
+                    ticket_count=ticket_count if ticket_count > 0 else None,
+                    input_char_count=input_char_count if input_char_count > 0 else None
+                )
+                
                 if not allowed:
                     # Build response with status and remaining
                     response_detail = {
-                        "error": "PAYWALLED",
-                        "message": "Trial limit reached. Activate subscription to continue."
+                        "error": reason or "PAYWALLED",
+                        "message": "Request blocked by subscription or plan limits."
                     }
-                    if subscription_status is not None:
-                        response_detail["subscription_status"] = subscription_status
-                    if remaining is not None:
-                        response_detail["remaining"] = remaining
+                    if "subscription_status" in metadata:
+                        response_detail["subscription_status"] = metadata["subscription_status"]
+                    if "trial_remaining" in metadata:
+                        response_detail["remaining"] = metadata["trial_remaining"]
+                    if "plan_tier" in metadata:
+                        response_detail["plan_tier"] = metadata["plan_tier"]
                     
                     return jsonify(response_detail), 403
             finally:
@@ -7129,13 +8181,6 @@ def generate_test_plan():
                 }), 503
     
     try:
-        data = request.get_json()
-        
-        # Calculate input_char_count from request payload
-        try:
-            input_char_count = len(json.dumps(data, default=str)) if data else 0
-        except Exception:
-            input_char_count = 0
         
         # Extract created_by from request header (X-Actor) or body field, default to "anonymous"
         created_by = request.headers.get("X-Actor") or data.get("created_by") if data else None
@@ -7217,6 +8262,18 @@ def generate_test_plan():
                 
                 # Compile and generate test plan for this ticket
                 compiled_ticket = compile_ticket_for_llm(ticket)
+                
+                # DEBUG: Log ticket info before test plan generation
+                debug_requirements = os.getenv("DEBUG_REQUIREMENTS", "0") == "1"
+                if debug_requirements:
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: Starting test plan generation")
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: source={source}")
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: compiled_ticket keys={list(compiled_ticket.keys())}")
+                    compiled_desc = compiled_ticket.get("description", "")
+                    logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: compiled_ticket['description'] length={len(compiled_desc)}")
+                    if compiled_desc:
+                        logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: compiled_ticket['description'] first 120 chars: {compiled_desc[:120]}")
+                
                 test_plan = generate_test_plan_with_llm(compiled_ticket)
                 
                 # Store ticket items in test plan metadata for later mapping
@@ -8852,7 +9909,7 @@ def generate_test_plan():
                 
                 db = next(get_db())
                 try:
-                    consume_trial_run(db, str(tenant_id))
+                    consume_trial_run(db, str(tenant_id), agent="test_plan")
                 finally:
                     db.close()
             except Exception as consume_error:
@@ -9003,6 +10060,539 @@ def generate_test_plan():
         }), 500
 
 
+@app.route("/api/v1/analyze", methods=["POST"])
+def analyze_requirements():
+    """
+    Analyze and normalize business requirements (gateway route).
+    
+    This route acts as a gateway that:
+    1. Enforces JWT authentication (via middleware)
+    2. Proxies request to BA Requirements Agent with internal service key
+    
+    NOTE: Subscription enforcement is intentionally NOT applied here to restore 1/14 behavior.
+    Requirements extraction must always work regardless of subscription status.
+    Subscription checks remain in place for Jira push, dry-run, and test plan generation.
+    
+    Supports both JSON and multipart/form-data requests (for file attachments).
+    
+    Returns:
+        JSON response from BA agent containing analyzed requirements
+    """
+    # Get tenant_id and user_id from JWT (set by middleware)
+    tenant_id = g.tenant_id
+    user_id = g.user_id
+    
+    if not tenant_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    # Capture start time for usage tracking
+    start_time_ms = int(time.time() * 1000)
+    
+    # ============================================================================
+    # NOTE: Subscription enforcement REMOVED for /api/v1/analyze to restore 1/14 behavior
+    # Requirements extraction must always work regardless of subscription status.
+    # Subscription checks remain in place for:
+    # - Jira push (jira_rewrite_execute)
+    # - Dry-run (jira_rewrite_dry_run)
+    # - Test plan generation (generate_test_plan)
+    # ============================================================================
+    
+    try:
+        from services.agent_client import call_ba_agent, get_internal_headers
+        
+        # Determine request type and prepare payload
+        content_type = request.content_type or ""
+        
+        if "multipart/form-data" in content_type:
+            # Handle FormData request (with attachments)
+            form_data = request.form
+            files = request.files
+            
+            # For FormData with files, we need to send as multipart to BA agent
+            # Use requests library to forward the request
+            import requests as req_lib
+            from services.agent_client import BA_AGENT_BASE_URL
+            url = f"{BA_AGENT_BASE_URL}/api/v1/analyze"
+            
+            # Build headers with internal service key
+            headers = get_internal_headers(tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None, agent="requirements_ba")
+            # Remove Content-Type - let requests set it with boundary for multipart
+            headers.pop("Content-Type", None)
+            
+            # Prepare files for forwarding
+            files_to_send = []
+            if files:
+                for file_key in files:
+                    file_list = files.getlist(file_key)
+                    for file in file_list:
+                        if file and file.filename:
+                            files_to_send.append(("attachments", (file.filename, file.read(), file.content_type)))
+                            file.seek(0)  # Reset for potential retry
+            
+            # Prepare form data
+            form_data_to_send = {}
+            if form_data.get("input_text"):
+                form_data_to_send["input_text"] = form_data.get("input_text")
+            if form_data.get("source"):
+                form_data_to_send["source"] = form_data.get("source")
+            if form_data.get("context"):
+                form_data_to_send["context"] = form_data.get("context")
+            
+            # Forward request to BA agent
+            response = req_lib.post(
+                url,
+                headers=headers,
+                data=form_data_to_send,
+                files=files_to_send if files_to_send else None,
+                timeout=300
+            )
+            response.raise_for_status()
+            result = response.json()
+        else:
+            # Handle JSON request (no attachments)
+            data = request.get_json() or {}
+            payload = {
+                "input_text": data.get("input_text", ""),
+            }
+            if data.get("source"):
+                payload["source"] = data.get("source")
+            if data.get("context"):
+                payload["context"] = data.get("context")
+            
+            # Call BA agent via agent_client
+            result = call_ba_agent("/api/v1/analyze", payload, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+        
+        # Consume trial run after successful requirements generation
+        if tenant_id:
+            try:
+                from db import get_db
+                from services.entitlements import consume_trial_run
+                
+                db = next(get_db())
+                try:
+                    consume_trial_run(db, str(tenant_id), agent="requirements_ba")
+                finally:
+                    db.close()
+            except Exception as consume_error:
+                # Log but don't fail the request if consumption fails
+                logger.error(f"Failed to consume trial run for tenant {tenant_id}: {str(consume_error)}", exc_info=True)
+        
+        # Record usage event (success)
+        if tenant_id:
+            try:
+                from db import get_db
+                from services.usage import record_usage_event
+                
+                end_time_ms = int(time.time() * 1000)
+                duration_ms = end_time_ms - start_time_ms
+                
+                # Determine source type
+                source = "text"
+                if request.is_json:
+                    data = request.get_json() or {}
+                    if data.get("source") == "jira":
+                        source = "jira"
+                elif request.content_type and "multipart/form-data" in request.content_type:
+                    if request.form.get("source") == "jira":
+                        source = "jira"
+                
+                db = next(get_db())
+                try:
+                    record_usage_event(
+                        db=db,
+                        tenant_id=str(tenant_id),
+                        user_id=str(user_id) if user_id else None,
+                        agent="requirements_ba",
+                        source=source,
+                        jira_ticket_count=None,
+                        input_char_count=input_char_count if input_char_count > 0 else None,
+                        success=True,
+                        error_code=None,
+                        run_id=None,  # Requirements generation doesn't create runs
+                        duration_ms=duration_ms
+                    )
+                    logger.info(f"Usage event recorded for tenant {tenant_id}, agent=requirements_ba, source={source}")
+                finally:
+                    db.close()
+            except Exception as usage_error:
+                # Log but don't fail the request if usage tracking fails
+                logger.warning(f"Failed to record usage event: {str(usage_error)}", exc_info=True)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        # Record usage event (failure)
+        if tenant_id:
+            try:
+                from db import get_db
+                from services.usage import record_usage_event
+                
+                end_time_ms = int(time.time() * 1000)
+                duration_ms = end_time_ms - start_time_ms
+                
+                db = next(get_db())
+                try:
+                    record_usage_event(
+                        db=db,
+                        tenant_id=str(tenant_id),
+                        user_id=str(user_id) if user_id else None,
+                        agent="requirements_ba",
+                        source="text",
+                        jira_ticket_count=None,
+                        input_char_count=input_char_count if input_char_count > 0 else None,
+                        success=False,
+                        error_code="INTERNAL_ERROR",
+                        run_id=None,
+                        duration_ms=duration_ms
+                    )
+                finally:
+                    db.close()
+            except Exception as usage_error:
+                logger.warning(f"Failed to record usage event: {str(usage_error)}", exc_info=True)
+        
+        # Provide more specific error messages
+        error_detail = str(e)
+        error_code = "INTERNAL_ERROR"
+        
+        # Check if it's a connection error to BA agent
+        if "Connection" in str(type(e).__name__) or "timeout" in error_detail.lower() or "refused" in error_detail.lower():
+            from services.agent_client import BA_AGENT_BASE_URL
+            error_detail = f"Requirements analysis service is unavailable. Please ensure the BA agent service is running at {BA_AGENT_BASE_URL}"
+            error_code = "SERVICE_UNAVAILABLE"
+        elif "RequestException" in str(type(e).__name__):
+            error_detail = f"Failed to communicate with requirements analysis service: {error_detail}"
+            error_code = "SERVICE_ERROR"
+        
+        logger.error(f"Error analyzing requirements: {error_detail}", exc_info=True)
+        return jsonify({
+            "detail": error_detail,
+            "error": error_code
+        }), 500
+
+
+@app.route("/api/v1/jira/rewrite/dry-run", methods=["POST"])
+def jira_rewrite_dry_run():
+    """
+    Jira rewrite dry-run (gateway route).
+    
+    Proxies request to jira-writeback-agent with internal service key.
+    """
+    tenant_id = g.tenant_id
+    user_id = g.user_id
+    
+    if not tenant_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    # Enforce entitlements
+    try:
+        from db import get_db
+        from services.entitlements_centralized import enforce_entitlements
+        
+        db = next(get_db())
+        try:
+            allowed, reason, metadata = enforce_entitlements(
+                db=db,
+                tenant_id=str(tenant_id),
+                agent="jira_writeback",
+                ticket_count=None,
+                input_char_count=None
+            )
+            
+            if not allowed:
+                response_detail = {
+                    "error": reason or "PAYWALLED",
+                    "message": "Request blocked by subscription or plan limits."
+                }
+                if "subscription_status" in metadata:
+                    response_detail["subscription_status"] = metadata["subscription_status"]
+                if "trial_remaining" in metadata:
+                    response_detail["remaining"] = metadata["trial_remaining"]
+                return jsonify(response_detail), 403
+        finally:
+            db.close()
+    except Exception as e:
+        fail_open = os.getenv("ENTITLEMENT_FAIL_OPEN", "false").lower() == "true"
+        if not fail_open:
+            logger.error(f"Entitlement check failed: {str(e)}", exc_info=True)
+            return jsonify({"error": "ENTITLEMENT_UNAVAILABLE", "message": "Unable to verify subscription status."}), 503
+    
+    try:
+        from services.agent_client import call_jira_writeback_agent
+        data = request.get_json() or {}
+        result = call_jira_writeback_agent("/api/v1/jira/rewrite/dry-run", data, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error in jira rewrite dry-run: {str(e)}", exc_info=True)
+        return jsonify({"detail": f"Failed to run rewrite dry-run: {str(e)}"}), 500
+
+
+@app.route("/api/v1/jira/rewrite/execute", methods=["POST"])
+def jira_rewrite_execute():
+    """
+    Jira rewrite execute (gateway route).
+    
+    Proxies request to jira-writeback-agent with internal service key.
+    """
+    tenant_id = g.tenant_id
+    user_id = g.user_id
+    
+    if not tenant_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    # Enforce entitlements
+    try:
+        from db import get_db
+        from services.entitlements_centralized import enforce_entitlements
+        
+        db = next(get_db())
+        try:
+            allowed, reason, metadata = enforce_entitlements(
+                db=db,
+                tenant_id=str(tenant_id),
+                agent="jira_writeback",
+                ticket_count=None,
+                input_char_count=None
+            )
+            
+            if not allowed:
+                response_detail = {
+                    "error": reason or "PAYWALLED",
+                    "message": "Request blocked by subscription or plan limits."
+                }
+                if "subscription_status" in metadata:
+                    response_detail["subscription_status"] = metadata["subscription_status"]
+                if "trial_remaining" in metadata:
+                    response_detail["remaining"] = metadata["trial_remaining"]
+                return jsonify(response_detail), 403
+        finally:
+            db.close()
+    except Exception as e:
+        fail_open = os.getenv("ENTITLEMENT_FAIL_OPEN", "false").lower() == "true"
+        if not fail_open:
+            logger.error(f"Entitlement check failed: {str(e)}", exc_info=True)
+            return jsonify({"error": "ENTITLEMENT_UNAVAILABLE", "message": "Unable to verify subscription status."}), 503
+    
+    try:
+        from services.agent_client import call_jira_writeback_agent
+        from services.entitlements import consume_trial_run
+        
+        data = request.get_json() or {}
+        result = call_jira_writeback_agent("/api/v1/jira/rewrite/execute", data, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+        
+        # Consume trial run after successful execution
+        if tenant_id:
+            try:
+                from db import get_db
+                db = next(get_db())
+                try:
+                    consume_trial_run(db, str(tenant_id), agent="jira_writeback")
+                finally:
+                    db.close()
+            except Exception as consume_error:
+                logger.error(f"Failed to consume trial run: {str(consume_error)}", exc_info=True)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error in jira rewrite execute: {str(e)}", exc_info=True)
+        return jsonify({"detail": f"Failed to execute rewrite: {str(e)}"}), 500
+
+
+@app.route("/api/v1/jira/create/dry-run", methods=["POST"])
+def jira_create_dry_run():
+    """
+    Jira create dry-run (gateway route).
+    
+    Proxies request to jira-writeback-agent with internal service key.
+    """
+    tenant_id = g.tenant_id
+    user_id = g.user_id
+    
+    if not tenant_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    # Enforce entitlements
+    try:
+        from db import get_db
+        from services.entitlements_centralized import enforce_entitlements
+        
+        db = next(get_db())
+        try:
+            allowed, reason, metadata = enforce_entitlements(
+                db=db,
+                tenant_id=str(tenant_id),
+                agent="jira_writeback",
+                ticket_count=None,
+                input_char_count=None
+            )
+            
+            if not allowed:
+                response_detail = {
+                    "error": reason or "PAYWALLED",
+                    "message": "Request blocked by subscription or plan limits."
+                }
+                if "subscription_status" in metadata:
+                    response_detail["subscription_status"] = metadata["subscription_status"]
+                if "trial_remaining" in metadata:
+                    response_detail["remaining"] = metadata["trial_remaining"]
+                return jsonify(response_detail), 403
+        finally:
+            db.close()
+    except Exception as e:
+        fail_open = os.getenv("ENTITLEMENT_FAIL_OPEN", "false").lower() == "true"
+        if not fail_open:
+            logger.error(f"Entitlement check failed: {str(e)}", exc_info=True)
+            return jsonify({"error": "ENTITLEMENT_UNAVAILABLE", "message": "Unable to verify subscription status."}), 503
+    
+    try:
+        from services.agent_client import call_jira_writeback_agent
+        data = request.get_json() or {}
+        result = call_jira_writeback_agent("/api/v1/jira/create/dry-run", data, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error in jira create dry-run: {str(e)}", exc_info=True)
+        return jsonify({"detail": f"Failed to run create dry-run: {str(e)}"}), 500
+
+
+@app.route("/api/v1/jira/create/execute", methods=["POST"])
+def jira_create_execute():
+    """
+    Jira create execute (gateway route).
+    
+    Proxies request to jira-writeback-agent with internal service key.
+    """
+    tenant_id = g.tenant_id
+    user_id = g.user_id
+    
+    if not tenant_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    # Enforce entitlements
+    try:
+        from db import get_db
+        from services.entitlements_centralized import enforce_entitlements
+        
+        db = next(get_db())
+        try:
+            allowed, reason, metadata = enforce_entitlements(
+                db=db,
+                tenant_id=str(tenant_id),
+                agent="jira_writeback",
+                ticket_count=None,
+                input_char_count=None
+            )
+            
+            if not allowed:
+                response_detail = {
+                    "error": reason or "PAYWALLED",
+                    "message": "Request blocked by subscription or plan limits."
+                }
+                if "subscription_status" in metadata:
+                    response_detail["subscription_status"] = metadata["subscription_status"]
+                if "trial_remaining" in metadata:
+                    response_detail["remaining"] = metadata["trial_remaining"]
+                return jsonify(response_detail), 403
+        finally:
+            db.close()
+    except Exception as e:
+        fail_open = os.getenv("ENTITLEMENT_FAIL_OPEN", "false").lower() == "true"
+        if not fail_open:
+            logger.error(f"Entitlement check failed: {str(e)}", exc_info=True)
+            return jsonify({"error": "ENTITLEMENT_UNAVAILABLE", "message": "Unable to verify subscription status."}), 503
+    
+    try:
+        from services.agent_client import call_jira_writeback_agent
+        from services.entitlements import consume_trial_run
+        
+        data = request.get_json() or {}
+        result = call_jira_writeback_agent("/api/v1/jira/create/execute", data, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+        
+        # Consume trial run after successful execution
+        if tenant_id:
+            try:
+                from db import get_db
+                db = next(get_db())
+                try:
+                    consume_trial_run(db, str(tenant_id), agent="jira_writeback")
+                finally:
+                    db.close()
+            except Exception as consume_error:
+                logger.error(f"Failed to consume trial run: {str(consume_error)}", exc_info=True)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error in jira create execute: {str(e)}", exc_info=True)
+        return jsonify({"detail": f"Failed to execute create: {str(e)}"}), 500
+
+
+@app.route("/api/v1/requirements/<requirement_id>/overrides", methods=["POST"])
+def apply_requirement_override(requirement_id: str):
+    """
+    Apply requirement override (gateway route).
+    
+    Proxies request to BA agent with internal service key.
+    """
+    tenant_id = g.tenant_id
+    user_id = g.user_id
+    
+    if not tenant_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    try:
+        from services.agent_client import call_ba_agent
+        data = request.get_json() or {}
+        result = call_ba_agent(f"/api/v1/requirements/{requirement_id}/overrides", data, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error applying requirement override: {str(e)}", exc_info=True)
+        return jsonify({"detail": f"Failed to apply requirement override: {str(e)}"}), 500
+
+
+@app.route("/api/v1/packages/<package_id>/review", methods=["POST"])
+def mark_package_reviewed(package_id: str):
+    """
+    Mark package as reviewed (gateway route).
+    
+    Proxies request to BA agent with internal service key.
+    """
+    tenant_id = g.tenant_id
+    user_id = g.user_id
+    
+    if not tenant_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    try:
+        from services.agent_client import call_ba_agent
+        data = request.get_json() or {}
+        result = call_ba_agent(f"/api/v1/packages/{package_id}/review", data, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error marking package as reviewed: {str(e)}", exc_info=True)
+        return jsonify({"detail": f"Failed to mark package as reviewed: {str(e)}"}), 500
+
+
+@app.route("/api/v1/packages/<package_id>/lock", methods=["POST"])
+def lock_package_scope(package_id: str):
+    """
+    Lock package scope (gateway route).
+    
+    Proxies request to BA agent with internal service key.
+    """
+    tenant_id = g.tenant_id
+    user_id = g.user_id
+    
+    if not tenant_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    try:
+        from services.agent_client import call_ba_agent
+        data = request.get_json() or {}
+        result = call_ba_agent(f"/api/v1/packages/{package_id}/lock", data, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error locking package scope: {str(e)}", exc_info=True)
+        return jsonify({"detail": f"Failed to lock package scope: {str(e)}"}), 500
+
+
 @app.route("/api/v1/tenant/status", methods=["GET"])
 def get_tenant_status():
     """
@@ -9026,10 +10616,10 @@ def get_tenant_status():
             return jsonify({
                 "tenant_id": str(tenant.id),
                 "tenant_name": tenant.name,
-                "subscription_status": getattr(tenant, "subscription_status", "Trial"),
-                "trial_requirements_runs_remaining": getattr(tenant, "trial_requirements_runs_remaining", 3),
-                "trial_testplan_runs_remaining": getattr(tenant, "trial_testplan_runs_remaining", 3),
-                "trial_writeback_runs_remaining": getattr(tenant, "trial_writeback_runs_remaining", 3),
+                "subscription_status": getattr(tenant, "subscription_status", "unselected"),
+                "trial_requirements_runs_remaining": getattr(tenant, "trial_requirements_runs_remaining", 0),
+                "trial_testplan_runs_remaining": getattr(tenant, "trial_testplan_runs_remaining", 0),
+                "trial_writeback_runs_remaining": getattr(tenant, "trial_writeback_runs_remaining", 0),
             }), 200
         finally:
             db.close()
@@ -9242,10 +10832,10 @@ def list_tenants():
                     "id": str(tenant.id),
                     "name": tenant.name,
                     "slug": tenant.slug,
-                    "subscription_status": getattr(tenant, "subscription_status", "Trial"),
-                    "req_remaining": getattr(tenant, "trial_requirements_runs_remaining", 3),
-                    "test_remaining": getattr(tenant, "trial_testplan_runs_remaining", 3),
-                    "wb_remaining": getattr(tenant, "trial_writeback_runs_remaining", 3),
+                    "subscription_status": getattr(tenant, "subscription_status", "unselected"),
+                    "req_remaining": getattr(tenant, "trial_requirements_runs_remaining", 0),
+                    "test_remaining": getattr(tenant, "trial_testplan_runs_remaining", 0),
+                    "wb_remaining": getattr(tenant, "trial_writeback_runs_remaining", 0),
                     "is_active": getattr(tenant, "is_active", True),
                     "created_at": tenant.created_at.isoformat() + "Z" if tenant.created_at else None
                 })
@@ -9263,7 +10853,7 @@ def list_tenants():
 @app.route("/api/v1/admin/tenants/<tenant_id>/trial/reset", methods=["POST"])
 def reset_tenant_trial(tenant_id: str):
     """
-    Reset tenant trial to default values (3/3/3, Trial status).
+    Reset tenant trial to default values (3/3/3, trial status).
     Requires owner or superAdmin role.
     
     Body (optional):
@@ -9271,7 +10861,7 @@ def reset_tenant_trial(tenant_id: str):
             "req": 3,
             "test": 3,
             "writeback": 3,
-            "status": "Trial"
+            "status": "trial"
         }
     
     Returns:
@@ -9303,11 +10893,12 @@ def reset_tenant_trial(tenant_id: str):
         req_value = data.get("req", 3)
         test_value = data.get("test", 3)
         writeback_value = data.get("writeback", 3)
-        status_value = data.get("status", "Trial")
+        status_value = data.get("status", "trial")
         
         # Validate status
-        if status_value not in ["Trial", "Active", "Paywalled"]:
-            status_value = "Trial"
+        allowed_statuses = ["unselected", "trial", "individual", "team", "paywalled", "canceled"]
+        if status_value not in allowed_statuses:
+            status_value = "trial"
         
         # Convert tenant_id to UUID
         try:
@@ -9391,7 +10982,7 @@ def set_tenant_trial(tenant_id: str):
             "req": <int>,
             "test": <int>,
             "writeback": <int>,
-            "status": "Trial" | "Active" | "Paywalled"
+            "status": "unselected" | "trial" | "individual" | "team" | "paywalled" | "canceled"
         }
     
     Returns:
@@ -9443,8 +11034,9 @@ def set_tenant_trial(tenant_id: str):
         if req_value < 0 or test_value < 0 or writeback_value < 0:
             return jsonify({"error": "INVALID_REQUEST", "message": "req, test, and writeback must be >= 0"}), 400
         
-        if status_value not in ["Trial", "Active", "Paywalled"]:
-            return jsonify({"error": "INVALID_REQUEST", "message": "status must be one of: Trial, Active, Paywalled"}), 400
+        allowed_statuses = ["unselected", "trial", "individual", "team", "paywalled", "canceled"]
+        if status_value not in allowed_statuses:
+            return jsonify({"error": "INVALID_REQUEST", "message": f"status must be one of: {allowed_statuses}"}), 400
         
         # Convert tenant_id to UUID
         try:
@@ -9525,7 +11117,7 @@ def get_bootstrap_status():
     Returns:
         {
             "tenant_id": "...",
-            "subscription_status": "Trial|Active|Paywalled",
+            "subscription_status": "unselected|trial|individual|team|paywalled|canceled",
             "trial": {
                 "requirements": <int>,
                 "testplan": <int>,
@@ -9590,11 +11182,11 @@ def get_bootstrap_status():
 
             return jsonify({
                 "tenant_id": str(tenant.id),
-                "subscription_status": getattr(tenant, "subscription_status", "Trial"),
+                "subscription_status": getattr(tenant, "subscription_status", "unselected"),
                 "trial": {
-                    "requirements": getattr(tenant, "trial_requirements_runs_remaining", 3),
-                    "testplan": getattr(tenant, "trial_testplan_runs_remaining", 3),
-                    "writeback": getattr(tenant, "trial_writeback_runs_remaining", 3)
+                    "requirements": getattr(tenant, "trial_requirements_runs_remaining", 0),
+                    "testplan": getattr(tenant, "trial_testplan_runs_remaining", 0),
+                    "writeback": getattr(tenant, "trial_writeback_runs_remaining", 0)
                 },
                 "jira": jira_status
             }), 200
@@ -10823,6 +12415,60 @@ def create_jira_ticket(run_id: str):
         from services.persistence import get_artifact_path
         import json as json_module
         
+        # Get tenant_id from JWT (set by middleware) - MUST be from JWT, not request
+        tenant_id = g.tenant_id
+        if not tenant_id:
+            return jsonify({"detail": "Unauthorized"}), 401
+        
+        # ============================================================================
+        # CENTRALIZED ENTITLEMENT ENFORCEMENT (Policy Authority)
+        # Enforce writeback entitlements BEFORE any side effects
+        # ============================================================================
+        try:
+            from services.entitlements_centralized import enforce_entitlements
+            
+            db = next(get_db())
+            try:
+                # Comprehensive entitlement check for writeback operation
+                allowed, reason, metadata = enforce_entitlements(
+                    db=db,
+                    tenant_id=str(tenant_id),
+                    agent="jira_writeback",
+                    ticket_count=None,  # Writeback doesn't have ticket limits
+                    input_char_count=None  # Writeback doesn't have input size limits
+                )
+                
+                if not allowed:
+                    # Build response with status and remaining
+                    response_detail = {
+                        "error": reason or "PAYWALLED",
+                        "message": "Request blocked by subscription or plan limits."
+                    }
+                    if "subscription_status" in metadata:
+                        response_detail["subscription_status"] = metadata["subscription_status"]
+                    if "trial_remaining" in metadata:
+                        response_detail["remaining"] = metadata["trial_remaining"]
+                    if "plan_tier" in metadata:
+                        response_detail["plan_tier"] = metadata["plan_tier"]
+                    
+                    return jsonify(response_detail), 403
+            finally:
+                db.close()
+        except Exception as e:
+            # Fail closed: return 503 on entitlement check errors (unless ENTITLEMENT_FAIL_OPEN=true)
+            fail_open = os.getenv("ENTITLEMENT_FAIL_OPEN", "false").lower() == "true"
+            
+            if fail_open:
+                logger.warning(f"ENTITLEMENT_FAIL_OPEN=true: Allowing request despite entitlement check error: {str(e)}", exc_info=True)
+                # Continue with request (fail open)
+            else:
+                # Fail closed: return 503
+                logger.error(f"Entitlement check failed for tenant {tenant_id}: {str(e)}", exc_info=True)
+                return jsonify({
+                    "error": "ENTITLEMENT_UNAVAILABLE",
+                    "message": "Unable to verify subscription status. Please try again."
+                }), 503
+        
         # Get actor from X-Actor header
         actor = request.headers.get("X-Actor", "anonymous")
         
@@ -10844,10 +12490,6 @@ def create_jira_ticket(run_id: str):
         
         db = next(get_db())
         try:
-            # Get tenant_id from JWT (set by middleware)
-            tenant_id = g.tenant_id
-            if not tenant_id:
-                return jsonify({"detail": "Unauthorized"}), 401
             
             # Validate run exists (tenant-scoped)
             run = db.query(Run).filter(
@@ -11090,6 +12732,24 @@ def create_jira_ticket(run_id: str):
                 except JiraClientError as e:
                     # Log but don't fail - comment is optional
                     logger.warning(f"Failed to add audit comment to issue {issue_key}: {str(e)}")
+            
+            # ============================================================================
+            # Consume trial run after successful Jira ticket creation
+            # This preserves existing trial counter behavior - MUST NOT be broken.
+            # ============================================================================
+            if tenant_id and issue_key:
+                try:
+                    from services.entitlements import consume_trial_run
+                    # Use a fresh DB session for trial consumption (atomic operation)
+                    trial_db = next(get_db())
+                    try:
+                        consume_trial_run(trial_db, str(tenant_id), agent="jira_writeback")
+                    finally:
+                        trial_db.close()
+                except Exception as consume_error:
+                    # Log but don't fail the request if consumption fails
+                    logger.error(f"Failed to consume trial run for tenant {tenant_id}: {str(consume_error)}", exc_info=True)
+                    # Continue - the writeback succeeded, consumption failure is non-fatal
             
             # Return success response
             response_status = 201 if not is_existing_issue else 200

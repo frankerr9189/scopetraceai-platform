@@ -100,11 +100,12 @@ class Tenant(Base):
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False, server_default=text('now()'))
     
     # Subscription and trial (onboarding gating Step 1)
-    # subscription_status: 'Trial' | 'Active' | 'Paywalled'
-    subscription_status = Column(String, nullable=False, server_default=text("'Trial'"))
-    trial_requirements_runs_remaining = Column(Integer, nullable=False, server_default=text("3"))
-    trial_testplan_runs_remaining = Column(Integer, nullable=False, server_default=text("3"))
-    trial_writeback_runs_remaining = Column(Integer, nullable=False, server_default=text("3"))
+    # subscription_status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
+    # No default - must be explicitly set during onboarding
+    subscription_status = Column(String, nullable=False)
+    trial_requirements_runs_remaining = Column(Integer, nullable=False, server_default=text("0"))
+    trial_testplan_runs_remaining = Column(Integer, nullable=False, server_default=text("0"))
+    trial_writeback_runs_remaining = Column(Integer, nullable=False, server_default=text("0"))
     
     # Relationship to tenant users
     users = relationship("TenantUser", back_populates="tenant", cascade="all, delete-orphan")
@@ -113,11 +114,12 @@ class Tenant(Base):
 class TenantUser(Base):
     """
     Model for users within a tenant organization.
-    Foundation schema for future SaaS onboarding.
+    Tenant-first onboarding: users always belong to a tenant (tenant_id is NOT NULL).
     """
     __tablename__ = "tenant_users"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # tenant_id is REQUIRED (NOT NULL) - tenant-first onboarding model
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     email = Column(String, nullable=False)
     password_hash = Column(String, nullable=False)
@@ -142,11 +144,11 @@ class TenantUser(Base):
     # Relationship to tenant
     tenant = relationship("Tenant", back_populates="users")
     
-    # Indexes for performance
+    # Indexes and constraints for performance and data integrity
     __table_args__ = (
         Index('idx_tenant_users_tenant_id', 'tenant_id'),
         Index('idx_tenant_users_email', 'email'),
-        # Composite unique constraint: email must be unique per tenant
+        # Per-tenant email uniqueness: same email can exist in different tenants
         UniqueConstraint('tenant_id', 'email', name='uq_tenant_users_tenant_email'),
     )
 

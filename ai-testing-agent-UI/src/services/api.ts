@@ -7,7 +7,7 @@ import { API_BASE_URL, TEST_PLAN_API_BASE_URL } from '../config'
 export interface TenantStatus {
   tenant_id: string
   tenant_name: string
-  subscription_status: 'Trial' | 'Active' | 'Paywalled'
+  subscription_status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
   trial_requirements_runs_remaining: number
   trial_testplan_runs_remaining: number
   trial_writeback_runs_remaining: number
@@ -15,7 +15,7 @@ export interface TenantStatus {
 
 export interface BootstrapStatus {
   tenant_id: string
-  subscription_status: 'Trial' | 'Active' | 'Paywalled'
+  subscription_status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
   trial: {
     requirements: number
     testplan: number
@@ -133,10 +133,31 @@ function handleUnauthorized() {
  * Returns the error data if PAYWALLED, null otherwise.
  * Note: This function consumes the response body, so callers should clone the response first.
  */
-async function handleApiError(response: Response): Promise<{ error: string; message: string } | null> {
+async function handleApiError(response: Response): Promise<{ error: string; message: string; code?: string } | null> {
+  // Check if this is a Jira meta endpoint - skip global toasts for Jira configuration errors
+  // RequirementsPage handles displaying these errors locally with a banner
+  const isJiraMetaRequest = response.url && response.url.includes('/api/v1/jira/meta')
+  
+  // Handle 400 errors from Jira meta endpoints (Jira not configured)
+  if (response.status === 400 && isJiraMetaRequest) {
+    try {
+      const errorData = await response.json().catch(() => ({}))
+      // Don't show global toast - RequirementsPage will handle this with a banner
+      return errorData
+    } catch {
+      // If JSON parsing fails, continue with normal error handling
+    }
+  }
+  
   if (response.status === 403) {
     try {
       const errorData = await response.json().catch(() => ({}))
+      
+      // Check if this is a login request - skip global toasts for login errors
+      // LoginPage.tsx handles displaying these errors
+      const isLoginRequest = response.url && response.url.includes('/auth/login')
+      
+      // Handle PAYWALLED errors
       if (errorData.error === 'PAYWALLED') {
         // Show toast notification
         const { showToast } = await import('../components/Toast')
@@ -148,11 +169,40 @@ async function handleApiError(response: Response): Promise<{ error: string; mess
         
         return errorData // Return error data for caller
       }
+      
+      // Handle USER_INACTIVE errors
+      if (errorData.code === 'USER_INACTIVE') {
+        // Skip toast for login requests - LoginPage handles the error display
+        if (!isLoginRequest) {
+          const { showToast } = await import('../components/Toast')
+          const message = errorData.detail || 'Your account is inactive. Contact hello@scopetraceai.com'
+          showToast(message, 'error')
+        }
+        return errorData
+      }
+      
+      // Handle TENANT_INACTIVE errors
+      if (errorData.code === 'TENANT_INACTIVE') {
+        // Skip toast for login requests - LoginPage handles the error display
+        if (!isLoginRequest) {
+          const { showToast } = await import('../components/Toast')
+          const message = errorData.detail || 'Workspace is inactive. Contact hello@scopetraceai.com'
+          showToast(message, 'error')
+        }
+        return errorData
+      }
+      
+      // Handle JIRA_NOT_CONFIGURED errors - don't show global toast for Jira meta requests
+      // RequirementsPage handles this locally with a banner
+      if (errorData.code === 'JIRA_NOT_CONFIGURED' && isJiraMetaRequest) {
+        // Don't show global toast - RequirementsPage will handle this
+        return errorData
+      }
     } catch {
       // If JSON parsing fails, continue with normal error handling
     }
   }
-  return null // Error was not handled (not PAYWALLED)
+  return null // Error was not handled
 }
 
 export interface TicketInput {
@@ -713,7 +763,8 @@ export async function applyRequirementOverride(
   overrideRequest: RequirementOverrideRequest,
   packageData: Record<string, any>
 ): Promise<OverrideResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/requirements/${requirementId}/overrides`, {
+  // Call Flask gateway instead of BA agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/requirements/${requirementId}/overrides`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -761,7 +812,8 @@ export async function markPackageReviewed(
   packageData: Record<string, any>,
   transitionRequest: ScopeStatusTransitionRequest
 ): Promise<ScopeStatusTransitionResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/packages/${packageId}/review`, {
+  // Call Flask gateway instead of BA agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/packages/${packageId}/review`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -801,7 +853,8 @@ export async function lockPackageScope(
   packageData: Record<string, any>,
   transitionRequest: ScopeStatusTransitionRequest
 ): Promise<ScopeStatusTransitionResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/packages/${packageId}/lock`, {
+  // Call Flask gateway instead of BA agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/packages/${packageId}/lock`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -840,6 +893,7 @@ export async function analyzeRequirements(
   request: AnalyzeRequirementsRequest
 ): Promise<AnalyzeRequirementsResponse> {
   // PHASE 1 ATTACHMENT SUPPORT: Use FormData if attachments exist, otherwise JSON
+  // NOTE: Now calling Flask gateway instead of BA agent directly
   if (request.attachments && request.attachments.length > 0) {
     const formData = new FormData()
     formData.append('input_text', request.input_text)
@@ -884,7 +938,8 @@ export async function analyzeRequirements(
       headers.set('X-Actor', 'anonymous')
     }
     
-    const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {
+    // Call Flask gateway instead of BA agent directly
+    const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/analyze`, {
       method: 'POST',
       headers: headers,
       body: formData,
@@ -892,7 +947,9 @@ export async function analyzeRequirements(
 
     if (response.status === 401) {
       handleUnauthorized()
-      throw new Error('Unauthorized')
+      // Don't throw error - redirect is happening, error would be caught and displayed
+      // Return a user-friendly error that won't be displayed (since redirect happens)
+      throw new Error('Session expired. Redirecting to login...')
     }
 
     if (!response.ok) {
@@ -934,7 +991,8 @@ export async function analyzeRequirements(
     }
   } else {
     // No attachments - use JSON
-    const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {
+    // Call Flask gateway instead of BA agent directly
+    const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/analyze`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -946,7 +1004,9 @@ export async function analyzeRequirements(
 
     if (response.status === 401) {
       handleUnauthorized()
-      throw new Error('Unauthorized')
+      // Don't throw error - redirect is happening, error would be caught and displayed
+      // Return a user-friendly error that won't be displayed (since redirect happens)
+      throw new Error('Session expired. Redirecting to login...')
     }
 
     if (!response.ok) {
@@ -1023,7 +1083,8 @@ export interface RewriteExecuteResponse {
 export async function rewriteDryRun(
   request: RewriteDryRunRequest
 ): Promise<RewriteDryRunResponse> {
-  const response = await fetch(`${JIRA_WB_API_BASE_URL}/api/v1/jira/rewrite/dry-run`, {
+  // Call Flask gateway instead of jira-writeback-agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/jira/rewrite/dry-run`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(request),
@@ -1056,7 +1117,8 @@ export async function rewriteDryRun(
 export async function rewriteExecute(
   request: RewriteExecuteRequest
 ): Promise<RewriteExecuteResponse> {
-  const response = await fetch(`${JIRA_WB_API_BASE_URL}/api/v1/jira/rewrite/execute`, {
+  // Call Flask gateway instead of jira-writeback-agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/jira/rewrite/execute`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(request),
@@ -1164,7 +1226,8 @@ const getJiraWritebackAPIBase = (): string => {
 const JIRA_WB_API_BASE_URL = getJiraWritebackAPIBase()
 
 export async function getJiraProjects(): Promise<JiraProject[]> {
-  const response = await fetch(`${JIRA_WB_API_BASE_URL}/api/v1/jira/meta/projects`, {
+  // Call Flask gateway instead of jira-writeback-agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/jira/meta/projects`, {
     method: 'GET',
     headers: getAuthHeaders(),
   })
@@ -1194,7 +1257,8 @@ export async function getJiraProjects(): Promise<JiraProject[]> {
 }
 
 export async function getJiraIssueTypes(projectKey: string): Promise<JiraIssueType[]> {
-  const response = await fetch(`${JIRA_WB_API_BASE_URL}/api/v1/jira/meta/issue-types?project_key=${encodeURIComponent(projectKey)}`, {
+  // Call Flask gateway instead of jira-writeback-agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/jira/meta/issue-types?project_key=${encodeURIComponent(projectKey)}`, {
     method: 'GET',
     headers: getAuthHeaders(),
   })
@@ -1226,7 +1290,8 @@ export async function getJiraIssueTypes(projectKey: string): Promise<JiraIssueTy
 export async function createJiraTicketDryRun(
   request: CreateDryRunRequest
 ): Promise<CreateDryRunResponse> {
-  const response = await fetch(`${JIRA_WB_API_BASE_URL}/api/v1/jira/create/dry-run`, {
+  // Call Flask gateway instead of jira-writeback-agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/jira/create/dry-run`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(request),
@@ -1264,7 +1329,7 @@ export interface TenantSummary {
   id: string
   name: string
   slug: string
-  subscription_status: 'Trial' | 'Active' | 'Paywalled'
+  subscription_status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
   req_remaining: number
   test_remaining: number
   wb_remaining: number
@@ -1300,7 +1365,7 @@ export interface ResetTrialRequest {
   req?: number
   test?: number
   writeback?: number
-  status?: 'Trial' | 'Active' | 'Paywalled'
+  status?: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
 }
 
 export async function resetTenantTrial(tenantId: string, request?: ResetTrialRequest): Promise<TenantSummary> {
@@ -1332,7 +1397,7 @@ export interface SetTrialRequest {
   req: number
   test: number
   writeback: number
-  status: 'Trial' | 'Active' | 'Paywalled'
+  status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
 }
 
 export async function setTenantTrial(tenantId: string, request: SetTrialRequest): Promise<TenantSummary> {
@@ -1363,7 +1428,8 @@ export async function setTenantTrial(tenantId: string, request: SetTrialRequest)
 export async function createJiraTicketExecute(
   request: CreateExecuteRequest
 ): Promise<CreateExecuteResponse> {
-  const response = await fetch(`${JIRA_WB_API_BASE_URL}/api/v1/jira/create/execute`, {
+  // Call Flask gateway instead of jira-writeback-agent directly
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/jira/create/execute`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(request),

@@ -619,14 +619,14 @@ export function RequirementsPage() {
   
   // Check if requirements generation is disabled
   const isRequirementsDisabled = tenantStatus 
-    ? (tenantStatus.subscription_status === 'Paywalled' || 
-       (tenantStatus.subscription_status === 'Trial' && tenantStatus.trial_requirements_runs_remaining <= 0))
+    ? (tenantStatus.subscription_status === 'paywalled' || 
+       (tenantStatus.subscription_status === 'trial' && tenantStatus.trial_requirements_runs_remaining <= 0))
     : false
   
   // Check if Jira writeback is disabled
   const isWritebackDisabled: boolean = tenantStatus
-    ? (tenantStatus.subscription_status === 'Paywalled' ||
-       (tenantStatus.subscription_status === 'Trial' && tenantStatus.trial_writeback_runs_remaining <= 0))
+    ? (tenantStatus.subscription_status === 'paywalled' ||
+       (tenantStatus.subscription_status === 'trial' && tenantStatus.trial_writeback_runs_remaining <= 0))
     : false
   
   // Also disable if Jira is not configured
@@ -702,9 +702,16 @@ export function RequirementsPage() {
     return 'Story'
   }
 
-  // Load Jira projects when component mounts or when input source changes to free-form/document
-  const loadJiraProjects = async () => {
-    if (isLoadingProjects || jiraProjects.length > 0) return
+  // Load Jira projects lazily - only when user actually needs them (e.g., clicking "Push to Jira")
+  // Do NOT fetch on page load or when switching to free-text mode
+  const loadJiraProjects = async (): Promise<boolean> => {
+    // Check if Jira is configured before attempting to fetch
+    if (isJiraNotConfigured) {
+      // Jira is not configured - don't attempt fetch, return false
+      return false
+    }
+    
+    if (isLoadingProjects || jiraProjects.length > 0) return true
     
     setIsLoadingProjects(true)
     try {
@@ -718,8 +725,25 @@ export function RequirementsPage() {
       } else if (projects.length > 0) {
         setSelectedProjectKey(projects[0].key)
       }
+      return true
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load Jira projects')
+      // Handle Jira errors gracefully - don't set main error state for JIRA_NOT_CONFIGURED
+      // This allows free-text mode to work without Jira
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load Jira projects'
+      
+      // Check if this is a JIRA_NOT_CONFIGURED error - handle silently
+      // The banner will show that Jira is not configured
+      if (errorMessage.includes('JIRA_NOT_CONFIGURED') || errorMessage.includes('not configured')) {
+        // Only log the error, don't block the page
+        console.warn('Jira is not configured - projects cannot be loaded')
+        return false
+      }
+      
+      // For other errors, log but don't block
+      console.warn('Jira projects could not be loaded:', errorMessage)
+      
+      // Don't set main error state - this is non-blocking for free-text mode
+      return false
     } finally {
       setIsLoadingProjects(false)
     }
@@ -737,17 +761,29 @@ export function RequirementsPage() {
       // Clear Jira Target state when switching to Jira Tickets
       setSelectedProjectKey('')
       setCreateDryRunResult(null)
-    } else if (newSource === 'free-text' || newSource === 'document-upload') {
-      // Load projects when switching to free-form/document
-      if (jiraProjects.length === 0) {
-        loadJiraProjects()
-      }
     }
+    // Do NOT load Jira projects when switching to free-text/document-upload
+    // Projects will be loaded lazily when user clicks "Push to Jira" or "Create Dry Run"
   }
   
   // Handle Create Dry-Run
   const handleCreateDryRun = async () => {
-    if (!results?.package || !selectedProjectKey) return
+    if (!results?.package) return
+    
+    // Lazy-load Jira projects if not already loaded
+    if (jiraProjects.length === 0) {
+      const loaded = await loadJiraProjects()
+      if (!loaded) {
+        // Jira is not configured - show error but don't block
+        setError('Jira is not configured. Please configure Jira integration to push tickets.')
+        return
+      }
+    }
+    
+    if (!selectedProjectKey) {
+      setError('Please select a Jira project')
+      return
+    }
     
     setIsCreatingDryRun(true)
     setError(null)
@@ -792,12 +828,8 @@ export function RequirementsPage() {
     }
   }
 
-  // Load Jira projects when input source is free-form or document-upload
-  useEffect(() => {
-    if ((inputSource === 'free-text' || inputSource === 'document-upload') && jiraProjects.length === 0) {
-      loadJiraProjects()
-    }
-  }, [inputSource])
+  // Do NOT auto-load Jira projects on page load or input source change
+  // Projects will be loaded lazily when user actually needs them (e.g., clicking "Push to Jira")
 
   const handleJiraAddTicket = () => {
     setJiraTickets([...jiraTickets, ''])
@@ -964,6 +996,12 @@ export function RequirementsPage() {
       setResults(response)
       refreshTenantStatus()
     } catch (err) {
+      // Don't show error if it's a redirect message (session expired)
+      if (err instanceof Error && err.message.includes('Redirecting to login')) {
+        // Redirect is happening, don't show error
+        return
+      }
+      
       // Show exact error message from backend (detail field)
       let errorMessage = 'Failed to generate requirements'
       if (err instanceof Error) {
@@ -1029,10 +1067,19 @@ export function RequirementsPage() {
                 <select
                   value={selectedProjectKey}
                   onChange={(e) => handleProjectChange(e.target.value)}
-                  disabled={isLoading || isLoadingProjects}
+                  onFocus={async () => {
+                    // Lazy-load Jira projects when user focuses on the dropdown
+                    if (jiraProjects.length === 0 && !isLoadingProjects) {
+                      await loadJiraProjects()
+                    }
+                  }}
+                  disabled={isLoading || isLoadingProjects || isJiraNotConfigured}
                   className="w-full px-4 py-2 bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
                 >
                   <option value="">Select a project...</option>
+                  {isLoadingProjects && (
+                    <option value="" disabled>Loading projects...</option>
+                  )}
                   {jiraProjects.map((project) => (
                     <option key={project.key} value={project.key}>
                       {project.name} ({project.key})

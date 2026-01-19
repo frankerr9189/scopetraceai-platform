@@ -1,0 +1,90 @@
+{
+  "assumptions": [],
+  "audit_metadata": {
+    "agent_metadata": {
+      "agent": "test-plan-agent",
+      "agent_version": "1.0.0",
+      "change_policy": "idempotent",
+      "determinism": "LLM + deterministic post-pass",
+      "logic_version": "testplan-v1+coverage-enforcer-v1"
+    },
+    "agent_version": "1.0.0",
+    "algorithms": {
+      "confidence_calculation": "Risk-weighted coverage confidence with dimension analysis",
+      "coverage_analysis": "Requirement-to-test mapping with RTM generation",
+      "quality_scoring": "Heuristic-based clarity and testability scoring",
+      "test_generation": "LLM-based structured generation with deterministic ID assignment"
+    },
+    "environment": "development",
+    "generated_at": "2026-01-18T22:56:56Z",
+    "jira_created_at": null,
+    "jira_created_by": null,
+    "jira_issue_key": null,
+    "model": {
+      "name": "gpt-4o-mini",
+      "response_format": "json_object",
+      "temperature": 0.2
+    },
+    "run_id": "06919434-706d-443a-a10e-3ef1f5759df1",
+    "scope_approved_at": null,
+    "scope_approved_by": null,
+    "scope_id": "MANUAL",
+    "scope_reviewed_at": null,
+    "scope_reviewed_by": null,
+    "scope_status": null,
+    "source": {
+      "scope_id": "MANUAL",
+      "scope_type": "manual",
+      "ticket_count": 1,
+      "type": "jira"
+    }
+  },
+  "business_intent": "",
+  "gaps_detected": [],
+  "metadata": {
+    "generated_at": "2026-01-18T22:56:56Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [],
+  "rtm": [],
+  "rtm_agent_metadata": {
+    "agent": "rtm-generator",
+    "agent_version": "1.0.0",
+    "change_policy": "idempotent",
+    "determinism": "deterministic mapping",
+    "logic_version": "rtm-v1"
+  },
+  "schema_version": "1.0",
+  "scope_summary": {
+    "failed_tickets": [
+      {
+        "description": "",
+        "reason": "Error fetching JIRA ticket ATA-46: JIRA API returned status 404: {\"errorMessages\":[\"Issue does not exist or you do not have permission to see it.\"],\"errors\":{}}",
+        "status": "failed",
+        "summary": "",
+        "ticket_id": "ATA-46"
+      }
+    ],
+    "requirements_covered": 0,
+    "requirements_total": 0,
+    "requirements_uncovered": 0,
+    "scope_id": "MANUAL",
+    "scope_type": "manual",
+    "ticket_details": null,
+    "tickets_analyzed": 0,
+    "tickets_failed": 1,
+    "tickets_requested": 1
+  },
+  "summary": "",
+  "test_plan": {
+    "api_tests": [],
+    "data_validation_tests": [],
+    "edge_cases": [],
+    "negative_tests": [],
+    "ui_tests": []
+  },
+  "test_plan_by_requirement": [],
+  "ticket_item_coverage": [],
+  "ticket_traceability": []
+}

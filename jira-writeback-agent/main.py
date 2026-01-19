@@ -34,18 +34,21 @@ if not _env_loaded:
     # But DATABASE_URL and JWT_SECRET are already set from testing agent's .env above
     env_path = os.path.join(os.path.dirname(__file__), '.env')
     try:
-        # Save DATABASE_URL and JWT_SECRET before loading local .env
+        # Save DATABASE_URL, JWT_SECRET, and INTERNAL_SERVICE_KEY before loading local .env
         saved_db_url = os.getenv("DATABASE_URL")
         saved_jwt_secret = os.getenv("JWT_SECRET")
+        saved_internal_service_key = os.getenv("INTERNAL_SERVICE_KEY")
         
-        # Load local .env (may override other vars, but we'll restore DATABASE_URL and JWT_SECRET)
+        # Load local .env (may override other vars, but we'll restore DATABASE_URL, JWT_SECRET, and INTERNAL_SERVICE_KEY)
         load_dotenv(env_path, override=True)
         
-        # Restore DATABASE_URL and JWT_SECRET from testing agent (they must come from testing agent only)
+        # Restore DATABASE_URL, JWT_SECRET, and INTERNAL_SERVICE_KEY from testing agent (they must come from testing agent only)
         if saved_db_url:
             os.environ["DATABASE_URL"] = saved_db_url
         if saved_jwt_secret:
             os.environ["JWT_SECRET"] = saved_jwt_secret
+        if saved_internal_service_key:
+            os.environ["INTERNAL_SERVICE_KEY"] = saved_internal_service_key
             
         logger.info("Loaded local .env (DATABASE_URL and JWT_SECRET preserved from testing agent)")
     except (PermissionError, OSError):

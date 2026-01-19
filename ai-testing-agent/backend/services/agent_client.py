@@ -1,0 +1,129 @@
+"""
+HTTP client wrapper for calling agent services with internal authentication.
+
+TRUST BOUNDARY: Flask app is the policy authority. Agent services are trusted
+internal executors that only validate the internal service key.
+
+This module handles:
+- Injecting X-Internal-Service-Key header
+- Injecting tenant context (tenant_id, user_id, agent name)
+- Error handling and retries
+- Request/response logging
+"""
+import os
+import logging
+import requests
+from typing import Dict, Any, Optional
+from flask import g
+
+logger = logging.getLogger(__name__)
+
+# Agent service base URLs (from environment or defaults)
+BA_AGENT_BASE_URL = os.getenv("BA_AGENT_BASE_URL", "http://localhost:8000")
+JIRA_WRITEBACK_AGENT_BASE_URL = os.getenv("JIRA_WRITEBACK_AGENT_BASE_URL", "http://localhost:8001")
+
+# Internal service key for agent authentication
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "")
+if not INTERNAL_SERVICE_KEY:
+    logger.warning("INTERNAL_SERVICE_KEY not set - agent calls will fail authentication")
+
+
+def get_internal_headers(tenant_id: Optional[str] = None, user_id: Optional[str] = None, agent: Optional[str] = None) -> Dict[str, str]:
+    """
+    Build headers for internal agent service calls.
+    
+    Includes:
+    - X-Internal-Service-Key: Required by agents for authentication
+    - X-Tenant-ID: Tenant context (for logging/audit)
+    - X-User-ID: User context (for logging/audit)
+    - X-Agent-Name: Agent identifier (for logging/audit)
+    
+    Args:
+        tenant_id: Tenant UUID string (from flask.g if not provided)
+        user_id: User UUID string (from flask.g if not provided)
+        agent: Agent name (e.g., 'requirements_ba', 'jira_writeback')
+        
+    Returns:
+        Dictionary of headers
+    """
+    headers = {
+        "Content-Type": "application/json",
+        "X-Internal-Service-Key": INTERNAL_SERVICE_KEY
+    }
+    
+    # Extract from flask.g if available
+    if not tenant_id and hasattr(g, 'tenant_id'):
+        tenant_id = str(g.tenant_id)
+    if not user_id and hasattr(g, 'user_id'):
+        user_id = str(g.user_id)
+    
+    if tenant_id:
+        headers["X-Tenant-ID"] = tenant_id
+    if user_id:
+        headers["X-User-ID"] = user_id
+    if agent:
+        headers["X-Agent-Name"] = agent
+    
+    return headers
+
+
+def call_ba_agent(endpoint: str, payload: Dict[str, Any], tenant_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Call BA Requirements Agent service.
+    
+    Args:
+        endpoint: API endpoint (e.g., '/api/v1/analyze')
+        payload: Request payload
+        tenant_id: Tenant UUID (optional, uses flask.g if not provided)
+        user_id: User UUID (optional, uses flask.g if not provided)
+        
+    Returns:
+        Response JSON as dictionary
+        
+    Raises:
+        requests.RequestException: If HTTP request fails
+        ValueError: If response indicates error
+    """
+    url = f"{BA_AGENT_BASE_URL}{endpoint}"
+    headers = get_internal_headers(tenant_id=tenant_id, user_id=user_id, agent="requirements_ba")
+    
+    logger.info(f"Calling BA agent: {endpoint} (tenant={tenant_id})")
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=300)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"BA agent call failed: {endpoint} - {str(e)}")
+        raise
+
+
+def call_jira_writeback_agent(endpoint: str, payload: Dict[str, Any], tenant_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Call Jira Writeback Agent service.
+    
+    Args:
+        endpoint: API endpoint (e.g., '/api/v1/jira/rewrite/execute')
+        payload: Request payload
+        tenant_id: Tenant UUID (optional, uses flask.g if not provided)
+        user_id: User UUID (optional, uses flask.g if not provided)
+        
+    Returns:
+        Response JSON as dictionary
+        
+    Raises:
+        requests.RequestException: If HTTP request fails
+        ValueError: If response indicates error
+    """
+    url = f"{JIRA_WRITEBACK_AGENT_BASE_URL}{endpoint}"
+    headers = get_internal_headers(tenant_id=tenant_id, user_id=user_id, agent="jira_writeback")
+    
+    logger.info(f"Calling Jira writeback agent: {endpoint} (tenant={tenant_id})")
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=300)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Jira writeback agent call failed: {endpoint} - {str(e)}")
+        raise

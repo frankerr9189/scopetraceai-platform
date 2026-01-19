@@ -19,7 +19,7 @@ export function AdminPage() {
     req: number
     test: number
     writeback: number
-    status: 'Trial' | 'Active' | 'Paywalled'
+    status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
   } | null>(null)
   const [isResetting, setIsResetting] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState<string | null>(null)
@@ -138,9 +138,12 @@ export function AdminPage() {
 
   const getStatusBadge = (status: string) => {
     const colors = {
-      'Trial': 'bg-blue-500/20 text-blue-400',
-      'Active': 'bg-green-500/20 text-green-400',
-      'Paywalled': 'bg-destructive/20 text-destructive'
+      'trial': 'bg-blue-500/20 text-blue-400',
+      'individual': 'bg-green-500/20 text-green-400',
+      'team': 'bg-green-500/20 text-green-400',
+      'paywalled': 'bg-destructive/20 text-destructive',
+      'canceled': 'bg-destructive/20 text-destructive',
+      'unselected': 'bg-muted/20 text-muted-foreground'
     }
     return (
       <Badge variant="default" className={colors[status as keyof typeof colors] || ''}>
@@ -254,12 +257,15 @@ export function AdminPage() {
                                 <label className="text-xs font-medium text-foreground">Status</label>
                                 <select
                                   value={editForm.status}
-                                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value as 'Trial' | 'Active' | 'Paywalled' })}
+                                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value as 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled' })}
                                   className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                 >
-                                  <option value="Trial">Trial</option>
-                                  <option value="Active">Active</option>
-                                  <option value="Paywalled">Paywalled</option>
+                                  <option value="unselected">Unselected</option>
+                                  <option value="trial">Trial</option>
+                                  <option value="individual">Individual</option>
+                                  <option value="team">Team</option>
+                                  <option value="paywalled">Paywalled</option>
+                                  <option value="canceled">Canceled</option>
                                 </select>
                               </div>
                               <div className="space-y-2">

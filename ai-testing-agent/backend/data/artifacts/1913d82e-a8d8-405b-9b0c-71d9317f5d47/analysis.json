@@ -1,0 +1,14 @@
+{
+  "business_intent": "",
+  "metadata": {
+    "generated_at": "2026-01-19T01:21:25Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [],
+  "scope": {
+    "id": "MANUAL",
+    "name": "",
+    "type": "manual"
+  }
+}

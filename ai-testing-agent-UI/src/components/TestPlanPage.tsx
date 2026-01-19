@@ -31,8 +31,8 @@ export function TestPlanPage({ testPlanData, setTestPlanData, activeTab, setActi
   
   // Check if test plan generation is disabled
   const isTestPlanDisabled = tenantStatus
-    ? (tenantStatus.subscription_status === 'Paywalled' ||
-       (tenantStatus.subscription_status === 'Trial' && tenantStatus.trial_testplan_runs_remaining <= 0))
+    ? (tenantStatus.subscription_status === 'paywalled' ||
+       (tenantStatus.subscription_status === 'trial' && tenantStatus.trial_testplan_runs_remaining <= 0))
     : false
 
   const handleGenerate = async (tickets: { ticket_id: string }[]) => {

@@ -8,6 +8,9 @@ import { RequirementsPage } from './components/RequirementsPage'
 import { RunHistoryPage } from './components/RunHistoryPage'
 import { LoginPage } from './components/LoginPage'
 import { RegisterPage } from './components/RegisterPage'
+import { TenantOnboardingPage } from './components/TenantOnboardingPage'
+import { AdminOnboardingPage } from './components/AdminOnboardingPage'
+import { CompanyOnboardingPage } from './components/CompanyOnboardingPage'
 import { JiraOnboardingPage } from './components/JiraOnboardingPage'
 import { FirstRunOnboardingPage } from './components/FirstRunOnboardingPage'
 import { PlanSelectionPage } from './components/PlanSelectionPage'
@@ -28,6 +31,72 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!accessToken) {
     // Redirect to login, preserving the attempted route
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+  
+  return <>{children}</>
+}
+
+/**
+ * Onboarding guard component for tenant-first onboarding.
+ * Ensures user is authenticated. Tenant-first model: all authenticated users have tenant_id.
+ */
+function OnboardingGuard({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
+  const accessToken = localStorage.getItem('access_token')
+  
+  // Allow onboarding routes (tenant creation, admin creation, plan selection, Jira setup)
+  const allowedOnboardingRoutes = [
+    '/onboarding/tenant', 
+    '/onboarding/admin', 
+    '/onboarding/plan',
+    '/onboarding/jira',
+    '/onboarding/first-run',
+    '/onboarding/activate'
+  ]
+  const isAllowedRoute = allowedOnboardingRoutes.some(route => 
+    location.pathname.startsWith(route)
+  )
+  
+  // If not authenticated and not on an allowed onboarding route, redirect to login
+  if (!accessToken && !isAllowedRoute) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // If authenticated but on tenant/admin creation pages, allow (they handle their own flow)
+  if (isAllowedRoute) {
+    return <>{children}</>
+  }
+  
+  // For authenticated users on protected routes, ensure they have tenant_id and plan selected
+  if (accessToken) {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        // Tenant-first model: tenant_id should always exist for authenticated users
+        if (!user.tenant_id) {
+          // This shouldn't happen in tenant-first model, but handle gracefully
+          return <Navigate to="/onboarding/tenant" replace />
+        }
+        
+        // Check if subscription plan is selected
+        // Allow access to plan selection page even if unselected
+        if (user.subscription_status === 'unselected' && location.pathname !== '/onboarding/plan') {
+          return <Navigate to="/onboarding/plan" replace />
+        }
+        
+        // Block access if subscription is canceled
+        if (user.subscription_status === 'canceled' && location.pathname !== '/onboarding/plan') {
+          return <Navigate to="/onboarding/plan" replace />
+        }
+      } catch {
+        // If parsing fails, redirect to login
+        return <Navigate to="/login" replace />
+      }
+    } else {
+      // No user data, redirect to login
+      return <Navigate to="/login" replace />
+    }
   }
   
   return <>{children}</>
@@ -140,81 +209,91 @@ function AppContent() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/onboarding/tenant" element={<TenantOnboardingPage />} />
+            <Route path="/onboarding/admin" element={<AdminOnboardingPage />} />
+            <Route 
+              path="/onboarding/company" 
+              element={
+                <ProtectedRoute>
+                  <CompanyOnboardingPage />
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/onboarding/jira" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <JiraOnboardingPage />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
             <Route 
               path="/onboarding/first-run" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <FirstRunOnboardingPage />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
             <Route 
               path="/onboarding/plan" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <PlanSelectionPage />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
             <Route 
               path="/onboarding/activate" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <ActivationPage />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
             <Route 
               path="/" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <TestPlanPage 
                     testPlanData={testPlanData}
                     setTestPlanData={setTestPlanData}
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
                   />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
             <Route 
               path="/requirements" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <RequirementsPage />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
             <Route 
               path="/run-history" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <RunHistoryPage />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
             <Route 
               path="/run-history/:runId" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <RunHistoryPage />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
             <Route 
               path="/admin" 
               element={
-                <ProtectedRoute>
+                <OnboardingGuard>
                   <AdminPage />
-                </ProtectedRoute>
+                </OnboardingGuard>
               } 
             />
           </Routes>

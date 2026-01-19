@@ -787,7 +787,7 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
     
     Args:
         execute_request: Execute request with package, checksum, and approval info
-        request: FastAPI Request object (for JWT extraction)
+        request: FastAPI Request object (for internal service key validation)
         
     Returns:
         ExecuteResponse with result and details
@@ -796,110 +796,26 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
         HTTPException: If validation fails, revision changed, or Jira update fails
     """
     # ============================================================================
-    # HARDENING: Enforce tenant_id requirement - return 401 if missing/invalid
+    # TRUST BOUNDARY: This agent is a trusted internal executor.
+    # All policy enforcement (subscription, plan tiers, trials) happens in Flask app.
+    # This agent ONLY validates the internal service key.
     # ============================================================================
-    # Extract tenant_id and user_id from JWT (raises 401 if missing/invalid)
-    tenant_id, user_id = _extract_tenant_user_from_jwt(request)
-    # At this point, tenant_id is guaranteed to be a non-empty string
+    from middleware.internal_auth import verify_internal_service_key, extract_tenant_context_for_logging
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Verify internal service key (required - this is the ONLY auth enforcement)
+    await verify_internal_service_key(request)
+    
+    # Extract tenant/user context for logging only (optional, not for enforcement)
+    tenant_id, user_id = extract_tenant_context_for_logging(request)
+    if tenant_id:
+        logger.info(f"Processing execute request (tenant={tenant_id}, user={user_id})")
     
     # ============================================================================
-    # Entitlement check: verify tenant can run Jira writeback execute
+    # NOTE: Entitlement checks (subscription, plan tiers, trials) are REMOVED.
+    # Flask app enforces all policy before calling this agent.
     # ============================================================================
-    try:
-        import os
-        import sys
-        
-        # Calculate path to testing agent backend
-        current_file = os.path.abspath(__file__)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-        backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
-        
-        if os.path.exists(backend_path):
-            # Verify DATABASE_URL is PostgreSQL
-            db_url = os.getenv("DATABASE_URL")
-            if db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
-                # Use local jira-writeback-agent entitlements (imported at module level)
-                # Save current directory and change to backend for reliable imports
-                original_cwd = os.getcwd()
-                try:
-                    if backend_path not in sys.path:
-                        sys.path.insert(0, backend_path)
-                    os.chdir(backend_path)
-                    
-                    # Clear cached modules to force re-import from new location (but NOT services.entitlements - we use local)
-                    modules_to_clear = [k for k in sys.modules.keys() if k.startswith(('db', 'models'))]
-                    for mod in modules_to_clear:
-                        del sys.modules[mod]
-                    
-                    from db import get_db
-                    
-                    db = next(get_db())
-                    try:
-                        allowed, reason, subscription_status, remaining = _local_check_entitlement(db, str(tenant_id))
-                        if not allowed:
-                            # Record usage event for paywall block (non-blocking)
-                            try:
-                                # Calculate input_char_count from request payload
-                                try:
-                                    input_char_count = len(json.dumps(execute_request.dict(), default=str))
-                                except Exception:
-                                    input_char_count = 0
-                                
-                                _record_usage_event(
-                                    tenant_id=tenant_id,
-                                    user_id=user_id,
-                                    agent="jira-writeback-agent",
-                                    source="ui_execute",
-                                    jira_ticket_count=0,
-                                    input_char_count=input_char_count,
-                                    success=False,
-                                    error_code="PAYWALLED",
-                                    run_id=str(uuid.uuid4()),
-                                    duration_ms=0
-                                )
-                            except Exception as usage_err:
-                                # Never block on usage tracking failure
-                                import logging
-                                logger = logging.getLogger(__name__)
-                                logger.warning(f"Failed to record usage event for paywall: {str(usage_err)}", exc_info=True)
-                            
-                            # Build response with status and remaining
-                            response_detail = {
-                                "error": "PAYWALLED",
-                                "message": "Trial limit reached. Activate subscription to continue."
-                            }
-                            if subscription_status is not None:
-                                response_detail["subscription_status"] = subscription_status
-                            if remaining is not None:
-                                response_detail["remaining"] = remaining
-                            
-                            raise HTTPException(status_code=403, detail=response_detail)
-                    finally:
-                        db.close()
-                finally:
-                    os.chdir(original_cwd)
-    except HTTPException:
-        # Re-raise HTTP exceptions (403 from entitlement check)
-        raise
-    except Exception as e:
-        # Fail closed: return 503 on entitlement check errors (unless ENTITLEMENT_FAIL_OPEN=true)
-        import logging
-        logger = logging.getLogger(__name__)
-        fail_open = os.getenv("ENTITLEMENT_FAIL_OPEN", "false").lower() == "true"
-        
-        if fail_open:
-            logger.warning(f"ENTITLEMENT_FAIL_OPEN=true: Allowing request despite entitlement check error: {str(e)}", exc_info=True)
-            # Continue with request (fail open)
-        else:
-            # Fail closed: return 503
-            logger.error(f"Entitlement check failed for tenant {tenant_id}: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "error": "ENTITLEMENT_UNAVAILABLE",
-                    "message": "Unable to verify subscription status. Please try again."
-                }
-            )
     
     # Capture start time for usage tracking
     start_time_ms = int(time.time() * 1000)
@@ -1116,47 +1032,10 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
             duration_ms=duration_ms
         )
         
-        # Consume trial run after successful writeback (not on idempotent skip)
-        try:
-            import os
-            import sys
-            
-            # Use local jira-writeback-agent entitlements (imported at module level)
-            # Calculate path to testing agent backend
-            current_file = os.path.abspath(__file__)
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-            backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
-            
-            if os.path.exists(backend_path):
-                # Verify DATABASE_URL is PostgreSQL
-                db_url = os.getenv("DATABASE_URL")
-                if db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
-                    # Save current directory and change to backend for reliable imports
-                    original_cwd = os.getcwd()
-                    try:
-                        if backend_path not in sys.path:
-                            sys.path.insert(0, backend_path)
-                        os.chdir(backend_path)
-                        
-                        # Clear cached modules to force re-import from new location (but NOT services.entitlements - we use local)
-                        modules_to_clear = [k for k in sys.modules.keys() if k.startswith(('db', 'models'))]
-                        for mod in modules_to_clear:
-                            del sys.modules[mod]
-                        
-                        from db import get_db
-                        db = next(get_db())
-                        try:
-                            _local_consume_trial_run(db, str(tenant_id))
-                        finally:
-                            db.close()
-                    finally:
-                        os.chdir(original_cwd)
-        except Exception as consume_error:
-            # Log but don't fail the request if consumption fails
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to consume trial run for tenant {tenant_id}: {str(consume_error)}", exc_info=True)
-            # Continue - the writeback succeeded, consumption failure is non-fatal
+        # ============================================================================
+        # NOTE: Trial consumption REMOVED - Flask app handles trial consumption
+        # after successful agent execution. This agent is execution-only.
+        # ============================================================================
         
         return ExecuteResponse(
             jira_issue=issue_key,
@@ -1513,116 +1392,39 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
     
     Args:
         execute_request: Create execute request
-        request: FastAPI Request object (for JWT extraction)
+        request: FastAPI Request object (for internal service key validation)
         
     Returns:
         CreateExecuteResponse with created issue key and details
     """
     # ============================================================================
-    # HARDENING: Enforce tenant_id requirement - return 401 if missing/invalid
+    # TRUST BOUNDARY: This agent is a trusted internal executor.
+    # All policy enforcement (subscription, plan tiers, trials) happens in Flask app.
+    # This agent ONLY validates the internal service key.
     # ============================================================================
-    # Extract tenant_id and user_id from JWT (raises 401 if missing/invalid)
-    tenant_id, user_id = _extract_tenant_user_from_jwt(request)
-    # At this point, tenant_id is guaranteed to be a non-empty string
+    import sys
+    import os
+    # Import internal auth middleware
+    current_file = os.path.abspath(__file__)
+    middleware_path = os.path.join(os.path.dirname(os.path.dirname(current_file)), "middleware")
+    if middleware_path not in sys.path:
+        sys.path.insert(0, middleware_path)
+    from middleware.internal_auth import verify_internal_service_key, extract_tenant_context_for_logging
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Verify internal service key (required - this is the ONLY auth enforcement)
+    await verify_internal_service_key(request)
+    
+    # Extract tenant/user context for logging only (optional, not for enforcement)
+    tenant_id, user_id = extract_tenant_context_for_logging(request)
+    if tenant_id:
+        logger.info(f"Processing create_execute request (tenant={tenant_id}, user={user_id})")
     
     # ============================================================================
-    # Entitlement check: verify tenant can run Jira writeback execute
+    # NOTE: Entitlement checks (subscription, plan tiers, trials) are REMOVED.
+    # Flask app enforces all policy before calling this agent.
     # ============================================================================
-    try:
-        import os
-        import sys
-        
-        # Calculate path to testing agent backend
-        current_file = os.path.abspath(__file__)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-        backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
-        
-        if os.path.exists(backend_path):
-            # Verify DATABASE_URL is PostgreSQL
-            db_url = os.getenv("DATABASE_URL")
-            if db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
-                # Use local jira-writeback-agent entitlements (imported at module level)
-                # Save current directory and change to backend for reliable imports
-                original_cwd = os.getcwd()
-                try:
-                    if backend_path not in sys.path:
-                        sys.path.insert(0, backend_path)
-                    os.chdir(backend_path)
-                    
-                    # Clear cached modules to force re-import from new location (but NOT services.entitlements - we use local)
-                    modules_to_clear = [k for k in sys.modules.keys() if k.startswith(('db', 'models'))]
-                    for mod in modules_to_clear:
-                        del sys.modules[mod]
-                    
-                    from db import get_db
-                    
-                    db = next(get_db())
-                    try:
-                        allowed, reason, subscription_status, remaining = _local_check_entitlement(db, str(tenant_id))
-                        if not allowed:
-                            # Record usage event for paywall block (non-blocking)
-                            try:
-                                # Calculate input_char_count from request payload
-                                try:
-                                    input_char_count = len(json.dumps(execute_request.dict(), default=str))
-                                except Exception:
-                                    input_char_count = 0
-                                
-                                _record_usage_event(
-                                    tenant_id=tenant_id,
-                                    user_id=user_id,
-                                    agent="jira-writeback-agent",
-                                    source="ui_execute",
-                                    jira_ticket_count=0,
-                                    input_char_count=input_char_count,
-                                    success=False,
-                                    error_code="PAYWALLED",
-                                    run_id=str(uuid.uuid4()),
-                                    duration_ms=0
-                                )
-                            except Exception as usage_err:
-                                # Never block on usage tracking failure
-                                import logging
-                                logger = logging.getLogger(__name__)
-                                logger.warning(f"Failed to record usage event for paywall: {str(usage_err)}", exc_info=True)
-                            
-                            # Build response with status and remaining
-                            response_detail = {
-                                "error": "PAYWALLED",
-                                "message": "Trial limit reached. Activate subscription to continue."
-                            }
-                            if subscription_status is not None:
-                                response_detail["subscription_status"] = subscription_status
-                            if remaining is not None:
-                                response_detail["remaining"] = remaining
-                            
-                            raise HTTPException(status_code=403, detail=response_detail)
-                    finally:
-                        db.close()
-                finally:
-                    os.chdir(original_cwd)
-    except HTTPException:
-        # Re-raise HTTP exceptions (403 from entitlement check)
-        raise
-    except Exception as e:
-        # Fail closed: return 503 on entitlement check errors (unless ENTITLEMENT_FAIL_OPEN=true)
-        import logging
-        logger = logging.getLogger(__name__)
-        fail_open = os.getenv("ENTITLEMENT_FAIL_OPEN", "false").lower() == "true"
-        
-        if fail_open:
-            logger.warning(f"ENTITLEMENT_FAIL_OPEN=true: Allowing request despite entitlement check error: {str(e)}", exc_info=True)
-            # Continue with request (fail open)
-        else:
-            # Fail closed: return 503
-            logger.error(f"Entitlement check failed for tenant {tenant_id}: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "error": "ENTITLEMENT_UNAVAILABLE",
-                    "message": "Unable to verify subscription status. Please try again."
-                }
-            )
     
     # Capture start time for usage tracking
     start_time_ms = int(time.time() * 1000)
@@ -1848,47 +1650,10 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
             duration_ms=duration_ms
         )
         
-        # Consume trial run after successful writeback (not on idempotent skip)
-        try:
-            import os
-            import sys
-            
-            # Use local jira-writeback-agent entitlements (imported at module level)
-            # Calculate path to testing agent backend
-            current_file = os.path.abspath(__file__)
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-            backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
-            
-            if os.path.exists(backend_path):
-                # Verify DATABASE_URL is PostgreSQL
-                db_url = os.getenv("DATABASE_URL")
-                if db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
-                    # Save current directory and change to backend for reliable imports
-                    original_cwd = os.getcwd()
-                    try:
-                        if backend_path not in sys.path:
-                            sys.path.insert(0, backend_path)
-                        os.chdir(backend_path)
-                        
-                        # Clear cached modules to force re-import from new location (but NOT services.entitlements - we use local)
-                        modules_to_clear = [k for k in sys.modules.keys() if k.startswith(('db', 'models'))]
-                        for mod in modules_to_clear:
-                            del sys.modules[mod]
-                        
-                        from db import get_db
-                        db = next(get_db())
-                        try:
-                            _local_consume_trial_run(db, str(tenant_id))
-                        finally:
-                            db.close()
-                    finally:
-                        os.chdir(original_cwd)
-        except Exception as consume_error:
-            # Log but don't fail the request if consumption fails
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to consume trial run for tenant {tenant_id}: {str(consume_error)}", exc_info=True)
-            # Continue - the writeback succeeded, consumption failure is non-fatal
+        # ============================================================================
+        # NOTE: Trial consumption REMOVED - Flask app handles trial consumption
+        # after successful agent execution. This agent is execution-only.
+        # ============================================================================
         
         return CreateExecuteResponse(
             created_issue_key=created_issue_key,

@@ -1,0 +1,167 @@
+{
+  "business_intent": "To implement secure storage for third-party API credentials to prevent unauthorized access and exposure of sensitive information.",
+  "metadata": {
+    "generated_at": "2026-01-19T02:48:37Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]) Secure storage of base_url",
+      "id": "ATA-41-REQ-001",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "This capability shall securely store the base_url for a third-party API.",
+      "id": "ATA-41-REQ-002",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Depends on external system behavior"
+        ],
+        "testability_score": 0.5
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Expected authorization testing not covered"
+        ],
+        "score": 0.65
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "This capability shall mask or omit the api_token in any responses returned from the API.",
+      "id": "ATA-41-REQ-003",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement"
+        ],
+        "testability_score": 1.0
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "Expected authorization testing not covered"
+        ],
+        "score": 0.65
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "This capability shall restrict access to the POST endpoint for credential storage to admin users only.",
+      "id": "ATA-41-REQ-004",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable"
+        ],
+        "testability_score": 0.7
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "Expected authorization testing not covered",
+          "All coverage is inferred"
+        ],
+        "score": 0.55
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Service-to-service access for the GET endpoint to retrieve API credentials.",
+      "id": "ATA-41-REQ-005",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": false
+    }
+  ],
+  "scope": {
+    "id": "MANUAL",
+    "name": "",
+    "type": "manual"
+  }
+}

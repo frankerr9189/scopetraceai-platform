@@ -7,8 +7,12 @@ from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from dotenv import load_dotenv
 
 # Load environment variables
+# Load from current directory explicitly to ensure it's found
 try:
-    load_dotenv()
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    load_dotenv(env_path, override=True)
+    # Also try loading from current working directory as fallback
+    load_dotenv(override=False)
 except (PermissionError, OSError):
     pass
 

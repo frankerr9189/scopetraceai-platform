@@ -11,17 +11,17 @@ export function FirstRunOnboardingPage() {
 
   // Determine if test plan generation is disabled
   const isTestPlanDisabled = tenantStatus
-    ? (tenantStatus.subscription_status === 'Paywalled' ||
-       (tenantStatus.subscription_status === 'Trial' && tenantStatus.trial_testplan_runs_remaining <= 0))
+    ? (tenantStatus.subscription_status === 'paywalled' ||
+       (tenantStatus.subscription_status === 'trial' && tenantStatus.trial_testplan_runs_remaining <= 0))
     : false
 
   // Determine if requirements generation is disabled
   const isRequirementsDisabled = tenantStatus
-    ? (tenantStatus.subscription_status === 'Paywalled' ||
-       (tenantStatus.subscription_status === 'Trial' && tenantStatus.trial_requirements_runs_remaining <= 0))
+    ? (tenantStatus.subscription_status === 'paywalled' ||
+       (tenantStatus.subscription_status === 'trial' && tenantStatus.trial_requirements_runs_remaining <= 0))
     : false
 
-  const subscriptionStatus = tenantStatus?.subscription_status || 'Trial'
+  const subscriptionStatus = tenantStatus?.subscription_status || 'trial'
   const requirementsRemaining = tenantStatus?.trial_requirements_runs_remaining ?? 3
   const testplanRemaining = tenantStatus?.trial_testplan_runs_remaining ?? 3
   const writebackRemaining = tenantStatus?.trial_writeback_runs_remaining ?? 3
@@ -44,7 +44,7 @@ export function FirstRunOnboardingPage() {
               <span className={`px-2 py-1 rounded text-xs font-medium ${
                 subscriptionStatus === 'Active' 
                   ? 'bg-green-500/20 text-green-400' 
-                  : subscriptionStatus === 'Paywalled'
+                  : subscriptionStatus === 'paywalled'
                   ? 'bg-destructive/20 text-destructive'
                   : 'bg-blue-500/20 text-blue-400'
               }`}>
@@ -61,7 +61,7 @@ export function FirstRunOnboardingPage() {
                 </ul>
               </div>
             )}
-            {subscriptionStatus === 'Paywalled' && (
+            {subscriptionStatus === 'paywalled' && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
                 <p className="text-sm text-destructive">
                   Trial complete. Activate subscription to continue.

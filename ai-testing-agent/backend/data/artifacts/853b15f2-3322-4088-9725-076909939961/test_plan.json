@@ -1,0 +1,1341 @@
+{
+  "_has_numbered_acceptance_criteria": true,
+  "assumptions": [
+    "Generated 2 inferred authorization test(s) based on coverage expectations. These tests assume standard authorization error handling."
+  ],
+  "audit_metadata": {
+    "agent_metadata": {
+      "agent": "test-plan-agent",
+      "agent_version": "1.0.0",
+      "change_policy": "idempotent",
+      "determinism": "LLM + deterministic post-pass",
+      "logic_version": "testplan-v1+coverage-enforcer-v1"
+    },
+    "agent_version": "1.0.0",
+    "algorithms": {
+      "confidence_calculation": "Risk-weighted coverage confidence with dimension analysis",
+      "coverage_analysis": "Requirement-to-test mapping with RTM generation",
+      "quality_scoring": "Heuristic-based clarity and testability scoring",
+      "test_generation": "LLM-based structured generation with deterministic ID assignment"
+    },
+    "environment": "development",
+    "generated_at": "2026-01-19T02:48:37Z",
+    "jira_created_at": null,
+    "jira_created_by": null,
+    "jira_issue_key": null,
+    "model": {
+      "name": "gpt-4o-mini",
+      "response_format": "json_object",
+      "temperature": 0.2
+    },
+    "run_id": "853b15f2-3322-4088-9725-076909939961",
+    "scope_approved_at": null,
+    "scope_approved_by": null,
+    "scope_id": "MANUAL",
+    "scope_reviewed_at": null,
+    "scope_reviewed_by": null,
+    "scope_status": null,
+    "source": {
+      "scope_id": "MANUAL",
+      "scope_type": "manual",
+      "ticket_count": 1,
+      "type": "jira"
+    }
+  },
+  "business_intent": "To implement secure storage for third-party API credentials to prevent unauthorized access and exposure of sensitive information.",
+  "gaps_detected": [],
+  "metadata": {
+    "generated_at": "2026-01-19T02:48:37Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]) Secure storage of base_url",
+      "id": "ATA-41-REQ-001",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "This capability shall securely store the base_url for a third-party API.",
+      "id": "ATA-41-REQ-002",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Depends on external system behavior"
+        ],
+        "testability_score": 0.5
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Expected authorization testing not covered"
+        ],
+        "score": 0.65
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "This capability shall mask or omit the api_token in any responses returned from the API.",
+      "id": "ATA-41-REQ-003",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement"
+        ],
+        "testability_score": 1.0
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "Expected authorization testing not covered"
+        ],
+        "score": 0.65
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "This capability shall restrict access to the POST endpoint for credential storage to admin users only.",
+      "id": "ATA-41-REQ-004",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable"
+        ],
+        "testability_score": 0.7
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "Expected authorization testing not covered",
+          "All coverage is inferred"
+        ],
+        "score": 0.55
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Service-to-service access for the GET endpoint to retrieve API credentials.",
+      "id": "ATA-41-REQ-005",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": false
+    }
+  ],
+  "rtm": [
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "API-001"
+      ],
+      "requirement_description": "[1]) Secure storage of base_url",
+      "requirement_id": "ATA-41-REQ-001",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "API-004",
+        "NEG-002"
+      ],
+      "requirement_description": "This capability shall securely store the base_url for a third-party API.",
+      "requirement_id": "ATA-41-REQ-002",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "API-002",
+        "API-003",
+        "API-007",
+        "AUTH-001"
+      ],
+      "requirement_description": "This capability shall mask or omit the api_token in any responses returned from the API.",
+      "requirement_id": "ATA-41-REQ-003",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "API-005",
+        "API-006",
+        "API-008",
+        "AUTH-002"
+      ],
+      "requirement_description": "This capability shall restrict access to the POST endpoint for credential storage to admin users only.",
+      "requirement_id": "ATA-41-REQ-004",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "API-009",
+        "AUTH-004"
+      ],
+      "requirement_description": "Service-to-service access for the GET endpoint to retrieve API credentials.",
+      "requirement_id": "ATA-41-REQ-005",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "N/A",
+      "covered_by_tests": [],
+      "rationale": "Informational content; not independently testable",
+      "requirement_description": "Secure storage of base_url",
+      "requirement_id": "ATA-41-ITEM-001",
+      "source_section": "description",
+      "testability": "not_testable",
+      "trace_type": "informational"
+    },
+    {
+      "coverage_status": "N/A",
+      "covered_by_tests": [],
+      "rationale": "Informational content; not independently testable",
+      "requirement_description": "Masking or omitting api_token in responses",
+      "requirement_id": "ATA-41-ITEM-002",
+      "source_section": "description",
+      "testability": "not_testable",
+      "trace_type": "informational"
+    },
+    {
+      "coverage_status": "N/A",
+      "covered_by_tests": [],
+      "rationale": "Informational content; not independently testable",
+      "requirement_description": "Admin-only access for POST endpoint",
+      "requirement_id": "ATA-41-ITEM-003",
+      "source_section": "description",
+      "testability": "not_testable",
+      "trace_type": "informational"
+    },
+    {
+      "coverage_status": "N/A",
+      "covered_by_tests": [],
+      "rationale": "Informational content; not independently testable",
+      "requirement_description": "Service-to-service access for GET endpoint",
+      "requirement_id": "ATA-41-ITEM-004",
+      "source_section": "description",
+      "testability": "not_testable",
+      "trace_type": "informational"
+    },
+    {
+      "coverage_status": "N/A",
+      "covered_by_tests": [],
+      "rationale": "Informational content; not independently testable",
+      "requirement_description": "Credential validation against the third-party service",
+      "requirement_id": "ATA-41-ITEM-005",
+      "source_section": "description",
+      "testability": "not_testable",
+      "trace_type": "informational"
+    },
+    {
+      "coverage_status": "N/A",
+      "covered_by_tests": [],
+      "rationale": "Informational content; not independently testable",
+      "requirement_description": "Rotation of credentials",
+      "requirement_id": "ATA-41-ITEM-006",
+      "source_section": "description",
+      "testability": "not_testable",
+      "trace_type": "informational"
+    },
+    {
+      "coverage_status": "N/A",
+      "covered_by_tests": [],
+      "rationale": "Informational content; not independently testable",
+      "requirement_description": "Potential exposure of sensitive credentials if not properly secured.",
+      "requirement_id": "ATA-41-ITEM-007",
+      "source_section": "description",
+      "testability": "not_testable",
+      "trace_type": "informational"
+    },
+    {
+      "coverage_status": "N/A",
+      "covered_by_tests": [],
+      "rationale": "Informational content; not independently testable",
+      "requirement_description": "[security] Potential exposure of sensitive credentials if not properly secured. (Severity: high)",
+      "requirement_id": "ATA-41-ITEM-008",
+      "source_section": "description",
+      "testability": "not_testable",
+      "trace_type": "informational"
+    }
+  ],
+  "rtm_agent_metadata": {
+    "agent": "rtm-generator",
+    "agent_version": "1.0.0",
+    "change_policy": "idempotent",
+    "determinism": "deterministic mapping",
+    "logic_version": "rtm-v1"
+  },
+  "schema_version": "1.0",
+  "scope_summary": {
+    "failed_tickets": null,
+    "requirements_covered": 5,
+    "requirements_total": 5,
+    "requirements_uncovered": 0,
+    "scope_id": "MANUAL",
+    "scope_type": "manual",
+    "ticket_details": [
+      {
+        "description": "Normalized Requirements:\n1) Secure storage of base_url\n   This capability shall securely store the base_url for a third-party API.\nScope (In):\n- Secure storage of base_url\n- Masking or omitting api_to...",
+        "explanation": null,
+        "has_acceptance_criteria": true,
+        "has_explicit_requirements": true,
+        "requirements_count": 5,
+        "status": "processed",
+        "summary": "BA Package PKG-CC887003: Secure storage for third-party API credentials",
+        "ticket_id": "ATA-41"
+      }
+    ],
+    "tickets_analyzed": 1,
+    "tickets_failed": 0,
+    "tickets_requested": 1
+  },
+  "summary": "Test cases generated for secure storage of API credentials, including happy path, negative, and authorization scenarios.",
+  "test_plan": {
+    "api_tests": [
+      {
+        "confidence": "explicit",
+        "expected_result": "The base_url is securely stored and the response does not include the api_token.",
+        "id": "API-001",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-001"
+        ],
+        "source_requirement_id": "ATA-41-REQ-001",
+        "steps": [
+          "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
+          "Verify the response status code indicates success (201)",
+          "Validate the response structure matches expected format from the requirement"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Happy path: Secure storage of base_url"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "The response indicates that access is forbidden for non-admin users.",
+        "id": "API-002",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-003"
+        ],
+        "source_requirement_id": "ATA-41-REQ-003",
+        "steps": [
+          "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
+          "Verify the response status code indicates an error (403)",
+          "Validate the error response structure and error message",
+          "Confirm the error message indicates unauthorized access"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Negative: Invalid access for POST endpoint"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "The request is successful and the base_url is stored.",
+        "id": "API-003",
+        "intent_type": "authorization",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-003"
+        ],
+        "source_requirement_id": "ATA-41-REQ-003",
+        "steps": [
+          "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
+          "Verify the response status code indicates success (201)",
+          "Validate the response structure matches expected format from the requirement"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Authorization: Admin-only access for POST endpoint"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "The response includes base_url and client_id, but not the api_token.",
+        "id": "API-004",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-002"
+        ],
+        "source_requirement_id": "ATA-41-REQ-002",
+        "steps": [
+          "Send a valid GET request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
+          "Verify the response status code indicates success (200)",
+          "Validate the response structure matches expected format from the requirement"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Happy path: Masking api_token in responses"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "The response indicates that access is forbidden for frontend sessions.",
+        "id": "API-005",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-004"
+        ],
+        "source_requirement_id": "ATA-41-REQ-004",
+        "steps": [
+          "Send the request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
+          "Verify the response status code indicates an error (403)",
+          "Validate the error response structure and error message",
+          "Confirm the error message indicates unauthorized access from frontend"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Negative: Attempt to access GET endpoint from frontend"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "The request is successful and the response includes base_url and client_id, but not the api_token.",
+        "id": "API-006",
+        "intent_type": "authorization",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-004"
+        ],
+        "source_requirement_id": "ATA-41-REQ-004",
+        "steps": [
+          "Send the request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
+          "Verify the response status code indicates success (200)",
+          "Validate the response structure matches expected format from the requirement"
+        ],
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "title": "Authorization: Service-to-service access for GET endpoint"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Happy Path behavior validated",
+        "id": "API-007",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-003"
+        ],
+        "source_requirement_id": "ATA-41-REQ-003",
+        "steps": [
+          "Prepare a valid request with all required fields as specified in the requirement",
+          "Send the request to the system",
+          "Observe the response and verify it contains the expected data and status"
+        ],
+        "steps_origin": "inferred",
+        "title": "Happy Path: This capability shall mask or omit the api_token in any responses returned from the API."
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Happy Path behavior validated",
+        "id": "API-008",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-004"
+        ],
+        "source_requirement_id": "ATA-41-REQ-004",
+        "steps": [
+          "Prepare a valid request with all required fields as specified in the requirement",
+          "Send the request to the system",
+          "Observe the response and verify it contains the expected data and status"
+        ],
+        "steps_origin": "inferred",
+        "title": "Happy Path: This capability shall restrict access to the POST endpoint for credential storage to admin users onl"
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Happy Path behavior validated",
+        "id": "API-009",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-005"
+        ],
+        "source_requirement_id": "ATA-41-REQ-005",
+        "steps": [
+          "Prepare a valid request with all required fields as specified in the requirement",
+          "Send the request to the system",
+          "Observe the response and verify it contains the expected data and status"
+        ],
+        "steps_origin": "inferred",
+        "title": "Happy Path: Service-to-service access for the GET endpoint to retrieve API credentials."
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "Response status 201 with valid response body and api_token/token/secret NOT included",
+        "id": "API_POST__api_v1_integrations_thirdparty_credentials_201",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-001"
+        ],
+        "source_requirement_id": "ATA-41-REQ-001",
+        "steps": [
+          "Send POST request to /api/v1/integrations/thirdparty/credentials",
+          "Verify response status code is 201",
+          "Verify response body does NOT contain 'api_token' field",
+          "Verify response body does NOT contain 'token' field",
+          "Verify response body does NOT contain 'secret' field",
+          "Verify response body contains expected data"
+        ],
+        "steps_origin": "deterministic-postpass",
+        "title": "Happy path: POST /api/v1/integrations/thirdparty/credentials returns 201"
+      }
+    ],
+    "data_validation_tests": [],
+    "edge_cases": [],
+    "negative_tests": [
+      {
+        "confidence": "inferred",
+        "expected_result": "Negative behavior validated",
+        "id": "NEG-002",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-002"
+        ],
+        "source_requirement_id": "ATA-41-REQ-002",
+        "steps": [
+          "Prepare a request with invalid or missing required fields",
+          "Send the request to the system",
+          "Observe the response and verify appropriate error handling is returned"
+        ],
+        "steps_origin": "inferred",
+        "title": "Negative: This capability shall securely store the base_url for a third-party API."
+      },
+      {
+        "confidence": "inferred",
+        "dimension": "authorization",
+        "expected_result": "Authorization behavior validated",
+        "id": "AUTH-004",
+        "intent_type": "authorization",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-005"
+        ],
+        "source_requirement_id": "ATA-41-REQ-005",
+        "steps": [
+          "Prepare a request without proper authentication or authorization",
+          "Send the request to the system",
+          "Observe the response and verify access is denied with appropriate status code"
+        ],
+        "steps_origin": "inferred",
+        "title": "Authorization: Service-to-service access for the GET endpoint to retrieve API credentials."
+      },
+      {
+        "confidence": "inferred",
+        "dimension": "authorization",
+        "expected_result": "Unauthorized access is properly rejected",
+        "id": "AUTH-001",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-003"
+        ],
+        "steps": [
+          "Prepare a valid request with all required fields as specified in the requirement",
+          "Send the request to the system",
+          "Observe the response and verify it contains the expected data and status"
+        ],
+        "steps_origin": "inferred",
+        "title": "Inferred authorization test for ATA-41-REQ-003"
+      },
+      {
+        "confidence": "inferred",
+        "dimension": "authorization",
+        "expected_result": "Unauthorized access is properly rejected",
+        "id": "AUTH-002",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-41-REQ-004"
+        ],
+        "steps": [
+          "Prepare a valid request with all required fields as specified in the requirement",
+          "Send the request to the system",
+          "Observe the response and verify it contains the expected data and status"
+        ],
+        "steps_origin": "inferred",
+        "title": "Inferred authorization test for ATA-41-REQ-004"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "Response status 403 Forbidden",
+        "id": "AUTHZ_GET__api_v1_integrations_thirdparty_credentials_403",
+        "intent_type": "authorization",
+        "priority": "high",
+        "requirements_covered": [
+          "ATA-41-REQ-001"
+        ],
+        "source_requirement_id": "ATA-41-REQ-001",
+        "steps": [
+          "Authenticate as non-admin user",
+          "Send GET request to /api/v1/integrations/thirdparty/credentials",
+          "Verify response status code is 403",
+          "Verify response indicates insufficient permissions"
+        ],
+        "steps_origin": "deterministic-postpass",
+        "title": "Authorization required: GET /api/v1/integrations/thirdparty/credentials returns 403 when not authorized"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "Response status 403 Forbidden",
+        "id": "AUTHZ_POST__api_v1_integrations_thirdparty_credentials_FRONTEND_403",
+        "intent_type": "authorization",
+        "priority": "high",
+        "requirements_covered": [
+          "ATA-41-REQ-001"
+        ],
+        "source_requirement_id": "ATA-41-REQ-001",
+        "steps": [
+          "Authenticate as frontend session user",
+          "Send POST request to /api/v1/integrations/thirdparty/credentials",
+          "Verify response status code is 403",
+          "Verify response indicates access is forbidden for frontend sessions"
+        ],
+        "steps_origin": "deterministic-postpass",
+        "title": "Frontend session forbidden: POST /api/v1/integrations/thirdparty/credentials returns 403 for frontend session"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "Response does not contain api_token, token, or secret fields",
+        "id": "SEC_POST__api_v1_integrations_thirdparty_credentials_NO_SECRET",
+        "intent_type": "security",
+        "priority": "high",
+        "requirements_covered": [
+          "ATA-41-REQ-001"
+        ],
+        "source_requirement_id": "ATA-41-REQ-001",
+        "steps": [
+          "Send POST request to /api/v1/integrations/thirdparty/credentials",
+          "Verify response status code is 200 or 201",
+          "Verify response body does not contain 'api_token' field",
+          "Verify response body does not contain 'token' field",
+          "Verify response body does not contain 'secret' field"
+        ],
+        "steps_origin": "deterministic-postpass",
+        "title": "Secret not returned: POST /api/v1/integrations/thirdparty/credentials response excludes api_token"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "Response masks or omits api_token and token fields",
+        "id": "SEC_GET__api_v1_integrations_thirdparty_credentials_MASKED",
+        "intent_type": "security",
+        "priority": "high",
+        "requirements_covered": [
+          "ATA-41-REQ-001"
+        ],
+        "source_requirement_id": "ATA-41-REQ-001",
+        "steps": [
+          "Send GET request to /api/v1/integrations/thirdparty/credentials",
+          "Verify response status code is 200",
+          "If response contains 'api_token' field, verify it is masked (e.g., '***' or 'REDACTED')",
+          "If response contains 'token' field, verify it is masked or omitted",
+          "Verify no secret values are exposed in plain text"
+        ],
+        "steps_origin": "deterministic-postpass",
+        "title": "Secret masked: GET /api/v1/integrations/thirdparty/credentials response masks or omits api_token"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "Logs do not contain api_token, token, or secret in plain text",
+        "id": "SEC_LOG_REDACTION",
+        "intent_type": "security",
+        "priority": "high",
+        "requirements_covered": [
+          "ATA-41-REQ-001"
+        ],
+        "source_requirement_id": "ATA-41-REQ-001",
+        "steps": [
+          "Perform operations that generate log entries",
+          "Inspect application logs",
+          "Verify logs do not contain 'api_token' in plain text",
+          "Verify logs do not contain 'token' in plain text",
+          "Verify logs do not contain 'secret' in plain text",
+          "Verify any secret values are redacted (e.g., '***' or 'REDACTED')"
+        ],
+        "steps_origin": "deterministic-postpass",
+        "title": "Log redaction: Verify logs do not contain secrets"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "Data is encrypted at rest and plain text is not accessible",
+        "id": "SEC_ENCRYPTION_AT_REST",
+        "intent_type": "security",
+        "priority": "high",
+        "requirements_covered": [
+          "ATA-41-REQ-001"
+        ],
+        "source_requirement_id": "ATA-41-REQ-001",
+        "steps": [
+          "Store sensitive data through the application",
+          "Inspect storage layer (database, file system, etc.)",
+          "Verify stored data is encrypted",
+          "Verify encryption keys are properly managed",
+          "Verify plain text data is not accessible in storage"
+        ],
+        "steps_origin": "deterministic-postpass",
+        "title": "Encryption at rest: Verify data is encrypted in storage"
+      }
+    ],
+    "ui_tests": []
+  },
+  "test_plan_by_requirement": [
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-41-REQ-001",
+      "requirement_source": "jira",
+      "requirement_text": "[1]) Secure storage of base_url",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The base_url is securely stored and the response does not include the api_token.",
+            "id": "API-001",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-001"
+            ],
+            "source_requirement_id": "ATA-41-REQ-001",
+            "steps": [
+              "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
+              "Verify the response status code indicates success (201)",
+              "Validate the response structure matches expected format from the requirement"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Happy path: Secure storage of base_url"
+          }
+        ],
+        "negative": [],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Depends on external system behavior"
+        ],
+        "testability_score": 0.5
+      },
+      "requirement_id": "ATA-41-REQ-002",
+      "requirement_source": "inferred",
+      "requirement_text": "This capability shall securely store the base_url for a third-party API.",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The response includes base_url and client_id, but not the api_token.",
+            "id": "API-004",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-002"
+            ],
+            "source_requirement_id": "ATA-41-REQ-002",
+            "steps": [
+              "Send a valid GET request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
+              "Verify the response status code indicates success (200)",
+              "Validate the response structure matches expected format from the requirement"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Happy path: Masking api_token in responses"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Negative behavior validated",
+            "id": "NEG-002",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-002"
+            ],
+            "source_requirement_id": "ATA-41-REQ-002",
+            "steps": [
+              "Prepare a request with invalid or missing required fields",
+              "Send the request to the system",
+              "Observe the response and verify appropriate error handling is returned"
+            ],
+            "steps_origin": "inferred",
+            "title": "Negative: This capability shall securely store the base_url for a third-party API."
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Expected authorization testing not covered"
+        ],
+        "score": 0.65
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Multiple behaviors combined in one requirement"
+        ],
+        "testability_score": 1.0
+      },
+      "requirement_id": "ATA-41-REQ-003",
+      "requirement_source": "inferred",
+      "requirement_text": "This capability shall mask or omit the api_token in any responses returned from the API.",
+      "tests": {
+        "authorization": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The request is successful and the base_url is stored.",
+            "id": "API-003",
+            "intent_type": "authorization",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-003"
+            ],
+            "source_requirement_id": "ATA-41-REQ-003",
+            "steps": [
+              "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
+              "Verify the response status code indicates success (201)",
+              "Validate the response structure matches expected format from the requirement"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Authorization: Admin-only access for POST endpoint"
+          },
+          {
+            "confidence": "inferred",
+            "dimension": "authorization",
+            "expected_result": "Unauthorized access is properly rejected",
+            "id": "AUTH-001",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-003"
+            ],
+            "steps": [
+              "Prepare a valid request with all required fields as specified in the requirement",
+              "Send the request to the system",
+              "Observe the response and verify it contains the expected data and status"
+            ],
+            "steps_origin": "inferred",
+            "title": "Inferred authorization test for ATA-41-REQ-003"
+          }
+        ],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Happy Path behavior validated",
+            "id": "API-007",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-003"
+            ],
+            "source_requirement_id": "ATA-41-REQ-003",
+            "steps": [
+              "Prepare a valid request with all required fields as specified in the requirement",
+              "Send the request to the system",
+              "Observe the response and verify it contains the expected data and status"
+            ],
+            "steps_origin": "inferred",
+            "title": "Happy Path: This capability shall mask or omit the api_token in any responses returned from the API."
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The response indicates that access is forbidden for non-admin users.",
+            "id": "API-002",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-003"
+            ],
+            "source_requirement_id": "ATA-41-REQ-003",
+            "steps": [
+              "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
+              "Verify the response status code indicates an error (403)",
+              "Validate the error response structure and error message",
+              "Confirm the error message indicates unauthorized access"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Negative: Invalid access for POST endpoint"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "Expected authorization testing not covered"
+        ],
+        "score": 0.65
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable"
+        ],
+        "testability_score": 0.7
+      },
+      "requirement_id": "ATA-41-REQ-004",
+      "requirement_source": "inferred",
+      "requirement_text": "This capability shall restrict access to the POST endpoint for credential storage to admin users only.",
+      "tests": {
+        "authorization": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The request is successful and the response includes base_url and client_id, but not the api_token.",
+            "id": "API-006",
+            "intent_type": "authorization",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-004"
+            ],
+            "source_requirement_id": "ATA-41-REQ-004",
+            "steps": [
+              "Send the request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
+              "Verify the response status code indicates success (200)",
+              "Validate the response structure matches expected format from the requirement"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Authorization: Service-to-service access for GET endpoint"
+          },
+          {
+            "confidence": "inferred",
+            "dimension": "authorization",
+            "expected_result": "Unauthorized access is properly rejected",
+            "id": "AUTH-002",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-004"
+            ],
+            "steps": [
+              "Prepare a valid request with all required fields as specified in the requirement",
+              "Send the request to the system",
+              "Observe the response and verify it contains the expected data and status"
+            ],
+            "steps_origin": "inferred",
+            "title": "Inferred authorization test for ATA-41-REQ-004"
+          }
+        ],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Happy Path behavior validated",
+            "id": "API-008",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-004"
+            ],
+            "source_requirement_id": "ATA-41-REQ-004",
+            "steps": [
+              "Prepare a valid request with all required fields as specified in the requirement",
+              "Send the request to the system",
+              "Observe the response and verify it contains the expected data and status"
+            ],
+            "steps_origin": "inferred",
+            "title": "Happy Path: This capability shall restrict access to the POST endpoint for credential storage to admin users onl"
+          }
+        ],
+        "negative": [
+          {
+            "confidence": "explicit",
+            "expected_result": "The response indicates that access is forbidden for frontend sessions.",
+            "id": "API-005",
+            "intent_type": "negative",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-004"
+            ],
+            "source_requirement_id": "ATA-41-REQ-004",
+            "steps": [
+              "Send the request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
+              "Verify the response status code indicates an error (403)",
+              "Validate the error response structure and error message",
+              "Confirm the error message indicates unauthorized access from frontend"
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "title": "Negative: Attempt to access GET endpoint from frontend"
+          }
+        ],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement testability",
+          "Expected authorization testing not covered",
+          "All coverage is inferred"
+        ],
+        "score": 0.55
+      },
+      "coverage_expectations": {
+        "authorization": "expected",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-41-REQ-005",
+      "requirement_source": "inferred",
+      "requirement_text": "Service-to-service access for the GET endpoint to retrieve API credentials.",
+      "tests": {
+        "authorization": [
+          {
+            "confidence": "inferred",
+            "dimension": "authorization",
+            "expected_result": "Authorization behavior validated",
+            "id": "AUTH-004",
+            "intent_type": "authorization",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-005"
+            ],
+            "source_requirement_id": "ATA-41-REQ-005",
+            "steps": [
+              "Prepare a request without proper authentication or authorization",
+              "Send the request to the system",
+              "Observe the response and verify access is denied with appropriate status code"
+            ],
+            "steps_origin": "inferred",
+            "title": "Authorization: Service-to-service access for the GET endpoint to retrieve API credentials."
+          }
+        ],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Happy Path behavior validated",
+            "id": "API-009",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-41-REQ-005"
+            ],
+            "source_requirement_id": "ATA-41-REQ-005",
+            "steps": [
+              "Prepare a valid request with all required fields as specified in the requirement",
+              "Send the request to the system",
+              "Observe the response and verify it contains the expected data and status"
+            ],
+            "steps_origin": "inferred",
+            "title": "Happy Path: Service-to-service access for the GET endpoint to retrieve API credentials."
+          }
+        ],
+        "negative": [],
+        "other": []
+      }
+    }
+  ],
+  "ticket_item_coverage": [
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-41-ITEM-001",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Secure storage of base_url"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-41-ITEM-002",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Masking or omitting api_token in responses"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-41-ITEM-003",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Admin-only access for POST endpoint"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-41-ITEM-004",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Service-to-service access for GET endpoint"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-41-ITEM-005",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Credential validation against the third-party service"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-41-ITEM-006",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Rotation of credentials"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-41-ITEM-007",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Potential exposure of sensitive credentials if not properly secured."
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-41-ITEM-008",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "[security] Potential exposure of sensitive credentials if not properly secured. (Severity: high)"
+    }
+  ],
+  "ticket_traceability": [
+    {
+      "items": [
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-41-ITEM-001",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Secure storage of base_url"
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-41-ITEM-002",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Masking or omitting api_token in responses"
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-41-ITEM-003",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Admin-only access for POST endpoint"
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-41-ITEM-004",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Service-to-service access for GET endpoint"
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-41-ITEM-005",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Credential validation against the third-party service"
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-41-ITEM-006",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Rotation of credentials"
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-41-ITEM-007",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Potential exposure of sensitive credentials if not properly secured."
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-41-ITEM-008",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "[security] Potential exposure of sensitive credentials if not properly secured. (Severity: high)"
+        }
+      ],
+      "ticket_id": "ATA-41"
+    }
+  ]
+}

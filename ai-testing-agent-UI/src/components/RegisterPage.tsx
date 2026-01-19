@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -7,13 +7,23 @@ import { useTenantStatus } from '../contexts/TenantStatusContext'
 import { TEST_PLAN_API_BASE_URL } from '../config'
 
 export function RegisterPage() {
-  const [tenantName, setTenantName] = useState('')
+  const navigate = useNavigate()
+
+  // Redirect to tenant-first onboarding
+  React.useEffect(() => {
+    navigate('/onboarding/tenant', { replace: true })
+  }, [navigate])
+
+  return null
+}
+
+// Legacy RegisterPage component - kept for reference but redirects to tenant-first onboarding
+export function RegisterPageLegacy() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [role, setRole] = useState<'admin' | 'user'>('admin') // Default to admin for first account
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
@@ -23,8 +33,8 @@ export function RegisterPage() {
     e.preventDefault()
     setError(null)
 
-    // Client-side validation
-    if (!tenantName || !email || !password || !confirmPassword) {
+    // Client-side validation - only email and password required
+    if (!email || !password || !confirmPassword) {
       setError('Please fill in all required fields')
       return
     }
@@ -45,12 +55,10 @@ export function RegisterPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            tenant_name: tenantName,
-            admin_email: email,
+            email: email,
             password: password,
             first_name: firstName || undefined,
             last_name: lastName || undefined,
-            role: role,
           }),
         })
       } catch (fetchError) {
@@ -123,8 +131,8 @@ export function RegisterPage() {
         console.error('Failed to refresh tenant status after registration:', refreshError)
       }
 
-      // Route to plan selection page
-      navigate('/onboarding/plan', { replace: true })
+      // Route to company creation page (onboarding step)
+      navigate('/onboarding/company', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       localStorage.removeItem('access_token')
@@ -153,23 +161,8 @@ export function RegisterPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="tenantName" className="text-sm font-medium text-foreground">
-                Company Name <span className="text-destructive">*</span>
-              </label>
-              <input
-                id="tenantName"
-                type="text"
-                value={tenantName}
-                onChange={(e) => setTenantName(e.target.value)}
-                required
-                disabled={isLoading}
-                className="w-full px-4 py-2 bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
-                placeholder="Enter your company name"
-              />
-            </div>
-            <div className="space-y-2">
               <label htmlFor="firstName" className="text-sm font-medium text-foreground">
-                First Name
+                First Name <span className="text-muted-foreground text-xs">(optional)</span>
               </label>
               <input
                 id="firstName"
@@ -183,7 +176,7 @@ export function RegisterPage() {
             </div>
             <div className="space-y-2">
               <label htmlFor="lastName" className="text-sm font-medium text-foreground">
-                Last Name
+                Last Name <span className="text-muted-foreground text-xs">(optional)</span>
               </label>
               <input
                 id="lastName"
@@ -194,22 +187,6 @@ export function RegisterPage() {
                 className="w-full px-4 py-2 bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
                 placeholder="Enter your last name"
               />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="role" className="text-sm font-medium text-foreground">
-                Role <span className="text-destructive">*</span>
-              </label>
-              <select
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as 'admin' | 'user')}
-                required
-                disabled={isLoading}
-                className="w-full px-4 py-2 bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
-              >
-                <option value="admin">Admin</option>
-                <option value="user">User</option>
-              </select>
             </div>
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-foreground">
@@ -263,7 +240,7 @@ export function RegisterPage() {
             )}
             <Button
               type="submit"
-              disabled={isLoading || !tenantName || !email || !password || !confirmPassword}
+              disabled={isLoading || !email || !password || !confirmPassword}
               className="w-full"
             >
               {isLoading ? 'Creating Account...' : 'Create Account'}
