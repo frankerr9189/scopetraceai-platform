@@ -30,7 +30,7 @@ export function AdminPage() {
     req: number
     test: number
     writeback: number
-    status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
+    status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled' | 'suspended' | 'active'
   } | null>(null)
   const [isResetting, setIsResetting] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState<string | null>(null)
@@ -436,7 +436,7 @@ export function AdminPage() {
                                       <label className="text-xs font-medium text-foreground">Status</label>
                                       <select
                                         value={editForm.status}
-                                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value as 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled' })}
+                                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value as 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled' | 'suspended' | 'active' })}
                                         className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                       >
                                         <option value="unselected">Unselected</option>
@@ -445,6 +445,8 @@ export function AdminPage() {
                                         <option value="team">Team</option>
                                         <option value="paywalled">Paywalled</option>
                                         <option value="canceled">Canceled</option>
+                                        <option value="suspended">Suspended</option>
+                                        <option value="active">Active</option>
                                       </select>
                                     </div>
                                     <div className="space-y-2">
