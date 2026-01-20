@@ -1419,7 +1419,7 @@ export interface SetTrialRequest {
   req: number
   test: number
   writeback: number
-  status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
+  status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled' | 'suspended' | 'active'
 }
 
 export async function setTenantTrial(tenantId: string, request: SetTrialRequest): Promise<TenantSummary> {
