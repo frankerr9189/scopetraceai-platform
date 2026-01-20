@@ -89,20 +89,22 @@ export function LoginPage() {
           }),
         })
         
-        // Check if response has no headers (CORS failure or server not responding)
+        // Check if response is in an invalid state (CORS failure or server not responding)
         // Status 0 typically indicates a CORS failure or network error
-        // This can happen when the request is blocked before reaching the server
+        // This happens when the browser blocks the request before it reaches the server
         if (response.status === 0) {
           setError(`Cannot connect to backend at ${TEST_PLAN_API_BASE_URL}. This may be a CORS issue or the server is not responding. Please check your network connection and ensure the backend server is running.`)
+          setIsLoading(false)
           return
         }
       } catch (fetchError) {
         // Network error (backend not running, CORS, etc.)
         if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
-          setError(`Cannot connect to backend at ${TEST_PLAN_API_BASE_URL}. Please ensure the backend server is running.`)
+          setError(`Cannot connect to backend at ${TEST_PLAN_API_BASE_URL}. Please ensure the backend server is running and CORS is properly configured.`)
         } else {
           setError(fetchError instanceof Error ? fetchError.message : 'Network error: Failed to connect to server')
         }
+        setIsLoading(false)
         return
       }
 
