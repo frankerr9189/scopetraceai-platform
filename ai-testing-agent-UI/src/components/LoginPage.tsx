@@ -88,6 +88,14 @@ export function LoginPage() {
             password 
           }),
         })
+        
+        // Check if response has no headers (CORS failure or server not responding)
+        // Status 0 typically indicates a CORS failure or network error
+        // This can happen when the request is blocked before reaching the server
+        if (response.status === 0) {
+          setError(`Cannot connect to backend at ${TEST_PLAN_API_BASE_URL}. This may be a CORS issue or the server is not responding. Please check your network connection and ensure the backend server is running.`)
+          return
+        }
       } catch (fetchError) {
         // Network error (backend not running, CORS, etc.)
         if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
