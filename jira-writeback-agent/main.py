@@ -81,10 +81,37 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS configuration with explicit allowlist
+# Base allowed origins for local development
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5137",
+    "http://localhost:3000",  # Marketing site (Next.js) local development
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5137",
+    "http://127.0.0.1:3000",  # Marketing site alternative localhost
+    # Production frontend domains
+    "https://app.scopetraceai.com",
+    "https://scopetraceai-platform.vercel.app",
+    # Marketing site domains
+    "https://scopetraceai.com",
+    "https://www.scopetraceai.com",
+]
+
+# Add additional production domains from environment variable if set
+# Supports comma-separated list of origins (e.g., "https://staging.example.com,https://dev.example.com")
+production_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+if production_origins:
+    # Split by comma and add to allowed origins
+    for origin in production_origins.split(","):
+        origin = origin.strip()
+        if origin and origin not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(origin)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5137", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5137"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

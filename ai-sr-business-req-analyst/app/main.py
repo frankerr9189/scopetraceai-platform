@@ -84,10 +84,37 @@ app = FastAPI(
     version="0.1.0"
 )
 
+# CORS configuration with explicit allowlist
+# Base allowed origins for local development
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5137",
+    "http://localhost:3000",  # Marketing site (Next.js) local development
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5137",
+    "http://127.0.0.1:3000",  # Marketing site alternative localhost
+    # Production frontend domains
+    "https://app.scopetraceai.com",
+    "https://scopetraceai-platform.vercel.app",
+    # Marketing site domains
+    "https://scopetraceai.com",
+    "https://www.scopetraceai.com",
+]
+
+# Add additional production domains from environment variable if set
+# Supports comma-separated list of origins (e.g., "https://staging.example.com,https://dev.example.com")
+production_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+if production_origins:
+    # Split by comma and add to allowed origins
+    for origin in production_origins.split(","):
+        origin = origin.strip()
+        if origin and origin not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(origin)
+
 # Add CORS middleware - must be added before exception handlers
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5137", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5137"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -102,13 +129,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     """
     from fastapi import HTTPException
     
+    # Get origin from request, validate against allowed origins
+    origin = request.headers.get("Origin", "")
+    allowed_origin = origin if origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "http://localhost:5173"
+    
     if isinstance(exc, HTTPException):
         # For HTTPExceptions, include CORS headers
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail},
             headers={
-                "Access-Control-Allow-Origin": request.headers.get("Origin", "http://localhost:5173"),
+                "Access-Control-Allow-Origin": allowed_origin,
                 "Access-Control-Allow-Credentials": "true",
                 "Access-Control-Allow-Methods": "*",
                 "Access-Control-Allow-Headers": "*",
@@ -120,7 +151,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             status_code=500,
             content={"detail": f"Internal server error: {str(exc)}"},
             headers={
-                "Access-Control-Allow-Origin": request.headers.get("Origin", "http://localhost:5173"),
+                "Access-Control-Allow-Origin": allowed_origin,
                 "Access-Control-Allow-Credentials": "true",
                 "Access-Control-Allow-Methods": "*",
                 "Access-Control-Allow-Headers": "*",
@@ -133,11 +164,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """
     Validation exception handler with CORS headers.
     """
+    # Get origin from request, validate against allowed origins
+    origin = request.headers.get("Origin", "")
+    allowed_origin = origin if origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "http://localhost:5173"
+    
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors(), "body": exc.body},
         headers={
-            "Access-Control-Allow-Origin": "http://localhost:5173",
+            "Access-Control-Allow-Origin": allowed_origin,
             "Access-Control-Allow-Credentials": "true",
             "Access-Control-Allow-Methods": "*",
             "Access-Control-Allow-Headers": "*",
