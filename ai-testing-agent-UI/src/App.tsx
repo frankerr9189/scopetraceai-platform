@@ -8,6 +8,9 @@ import { RequirementsPage } from './components/RequirementsPage'
 import { RunHistoryPage } from './components/RunHistoryPage'
 import { LoginPage } from './components/LoginPage'
 import { RegisterPage } from './components/RegisterPage'
+import { ProfilePage } from './components/ProfilePage'
+import { ForgotPasswordPage } from './components/ForgotPasswordPage'
+import { ResetPasswordPage } from './components/ResetPasswordPage'
 import { TenantOnboardingPage } from './components/TenantOnboardingPage'
 import { AdminOnboardingPage } from './components/AdminOnboardingPage'
 import { CompanyOnboardingPage } from './components/CompanyOnboardingPage'
@@ -209,6 +212,8 @@ function AppContent() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/onboarding/tenant" element={<TenantOnboardingPage />} />
             <Route path="/onboarding/admin" element={<AdminOnboardingPage />} />
             <Route 
@@ -293,6 +298,14 @@ function AppContent() {
               element={
                 <OnboardingGuard>
                   <AdminPage />
+                </OnboardingGuard>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <OnboardingGuard>
+                  <ProfilePage />
                 </OnboardingGuard>
               } 
             />

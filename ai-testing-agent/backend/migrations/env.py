@@ -35,7 +35,7 @@ def get_engine_url():
 # add your model's MetaData object here
 # for 'autogenerate' support
 # Import all models to ensure they're registered with Base.metadata
-from models import Run, Artifact, Tenant, TenantUser  # noqa: F401
+from models import Run, Artifact, Tenant, TenantUser, PasswordResetToken, AdminAuditLog  # noqa: F401
 from db import Base
 target_metadata = Base.metadata
 

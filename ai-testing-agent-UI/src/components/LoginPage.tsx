@@ -329,6 +329,11 @@ export function LoginPage() {
               {isLoading ? 'Logging in...' : 'Login'}
             </Button>
             <div className="text-center text-sm text-foreground/70">
+              <Link to="/forgot-password" className="text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+            <div className="text-center text-sm text-foreground/70">
               <span>Don't have a workspace? </span>
               <Link to="/onboarding/tenant" className="text-primary hover:underline">
                 Create Workspace

@@ -547,8 +547,34 @@ export interface Run {
   run_kind?: string
 }
 
-export async function fetchRuns(): Promise<Run[]> {
-  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/runs`, {
+export interface PaginationParams {
+  page?: number
+  limit?: number
+}
+
+export interface PaginationMeta {
+  total: number
+  page: number
+  limit: number
+  total_pages: number
+  has_prev: boolean
+  has_next: boolean
+}
+
+export interface PaginatedRunsResponse {
+  items: Run[]
+  pagination: PaginationMeta
+}
+
+export async function fetchRuns(params?: PaginationParams): Promise<PaginatedRunsResponse> {
+  const page = params?.page ?? 1
+  const limit = params?.limit ?? 10
+  
+  const url = new URL(`${TEST_PLAN_API_BASE_URL}/api/v1/runs`)
+  url.searchParams.set('page', page.toString())
+  url.searchParams.set('limit', limit.toString())
+  
+  const response = await fetch(url.toString(), {
     method: 'GET',
     headers: getAuthHeaders(),
   })
@@ -1337,7 +1363,24 @@ export async function listTenants(): Promise<TenantSummary[]> {
     throw new Error(error.detail || error.message || `Failed to list tenants: ${response.statusText}`)
   }
 
-  return response.json()
+  const data = await response.json()
+  // Handle new format with "items" array
+  if (data.items && Array.isArray(data.items)) {
+    // Map new format to old format for compatibility
+    return data.items.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      slug: item.slug,
+      subscription_status: item.subscription_status,
+      req_remaining: item.trial_requirements_runs_remaining,
+      test_remaining: item.trial_testplan_runs_remaining,
+      wb_remaining: item.trial_writeback_runs_remaining,
+      is_active: item.is_active,
+      created_at: item.created_at
+    }))
+  }
+  // Fallback to old format (array directly)
+  return data
 }
 
 export interface ResetTrialRequest {
@@ -1433,6 +1476,558 @@ export async function createJiraTicketExecute(
       }
     }
     throw new Error(errorMessage)
+  }
+
+  return response.json()
+}
+
+// ============================================================================
+// User Profile API (Phase 2.1)
+// ============================================================================
+
+export interface UserProfile {
+  id: string
+  email: string
+  role: string
+  is_active: boolean
+  first_name: string | null
+  last_name: string | null
+  address_1: string | null
+  address_2: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  phone: string | null
+  tenant_id: string
+}
+
+export interface UpdateUserProfileRequest {
+  first_name?: string | null
+  last_name?: string | null
+  address_1?: string | null
+  address_2?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  phone?: string | null
+}
+
+export interface ChangePasswordRequest {
+  current_password: string
+  new_password: string
+}
+
+export interface ForgotPasswordRequest {
+  email: string
+}
+
+export interface ResetPasswordRequest {
+  token: string
+  new_password: string
+}
+
+/**
+ * Get current user profile
+ */
+export async function getUserProfile(): Promise<UserProfile> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/users/me`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to fetch user profile: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Update current user profile
+ */
+export async function updateUserProfile(request: UpdateUserProfileRequest): Promise<UserProfile> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/users/me`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to update user profile: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Change user password
+ */
+export async function changePassword(request: ChangePasswordRequest): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/users/me/change-password`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to change password: ${response.statusText}`)
+  }
+}
+
+/**
+ * Request password reset (forgot password)
+ */
+export async function forgotPassword(request: ForgotPasswordRequest): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/auth/forgot-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  // Always returns 200, even if email doesn't exist (security)
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to request password reset: ${response.statusText}`)
+  }
+}
+
+/**
+ * Reset password using token
+ */
+export async function resetPassword(request: ResetPasswordRequest): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/auth/reset-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to reset password: ${response.statusText}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Admin Ops Safety (owner + kerr-ai-studio only)
+// ---------------------------------------------------------------------------
+
+export interface AdminUser {
+  id: string
+  email: string
+  role: string
+  is_active: boolean
+  first_name: string | null
+  last_name: string | null
+  created_at: string | null
+  last_login_at: string | null
+}
+
+export interface UsageSummary {
+  days: number
+  totals: {
+    events: number
+    success: number
+    failed: number
+    jira_ticket_count: number
+    input_char_count: number
+  }
+  by_agent: Array<{
+    agent: string
+    events: number
+    success: number
+    failed: number
+    jira_ticket_count: number
+    input_char_count: number
+  }>
+}
+
+export interface AdminRun {
+  run_id: string
+  created_at: string | null
+  agent: string
+  status: string
+  review_status: string
+  jira_issue_key: string | null
+  summary: string | null
+}
+
+export interface AdminAuditLogEntry {
+  id: string
+  user_id: string
+  action: string
+  target_type: string | null
+  target_id: string | null
+  metadata: any
+  created_at: string | null
+}
+
+export async function adminListUsers(): Promise<AdminUser[]> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/users`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to list users: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+export async function adminDeactivateUser(userId: string): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/users/${userId}/deactivate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to deactivate user: ${response.statusText}`)
+  }
+}
+
+export async function adminReactivateUser(userId: string): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/users/${userId}/reactivate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to reactivate user: ${response.statusText}`)
+  }
+}
+
+export async function adminSuspendTenant(): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenant/suspend`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to suspend tenant: ${response.statusText}`)
+  }
+}
+
+export async function adminReactivateTenant(): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenant/reactivate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to reactivate tenant: ${response.statusText}`)
+  }
+}
+
+export async function adminUsageSummary(days: number = 30): Promise<UsageSummary> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/usage/summary?days=${days}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to get usage summary: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+export async function adminRecentRuns(limit: number = 25): Promise<AdminRun[]> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/runs/recent?limit=${limit}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to get recent runs: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+export async function adminAudit(limit: number = 50): Promise<AdminAuditLogEntry[]> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/audit?limit=${limit}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to get audit log: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+// ============================================================================
+// Tenant-Addressable Admin API (Owner can manage ALL tenants)
+// ============================================================================
+
+export async function adminListTenants(): Promise<TenantSummary[]> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenants`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (response.status === 403) {
+    const error = await response.json().catch(() => ({ error: 'FORBIDDEN', message: 'Owner access required' }))
+    throw new Error(error.message || 'Owner access required')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || error.message || `Failed to list tenants: ${response.statusText}`)
+  }
+
+  const data = await response.json()
+  // Map new format to old format for compatibility
+  if (data.items && Array.isArray(data.items)) {
+    return data.items.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      slug: item.slug,
+      subscription_status: item.subscription_status,
+      req_remaining: item.trial_requirements_runs_remaining,
+      test_remaining: item.trial_testplan_runs_remaining,
+      wb_remaining: item.trial_writeback_runs_remaining,
+      is_active: item.is_active,
+      created_at: item.created_at
+    }))
+  }
+  return data.items || []
+}
+
+export async function adminSetTenantStatus(tenantId: string, status: 'active' | 'suspended'): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenants/${tenantId}/status`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (response.status === 403) {
+    const error = await response.json().catch(() => ({ error: 'FORBIDDEN', message: 'Owner access required' }))
+    throw new Error(error.message || 'Owner access required')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to set tenant status: ${response.statusText}`)
+  }
+}
+
+export async function adminListTenantUsers(tenantId: string): Promise<AdminUser[]> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenants/${tenantId}/users`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (response.status === 403) {
+    const error = await response.json().catch(() => ({ error: 'FORBIDDEN', message: 'Owner access required' }))
+    throw new Error(error.message || 'Owner access required')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to list tenant users: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+export async function adminDeactivateTenantUser(tenantId: string, userId: string): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenants/${tenantId}/users/${userId}/deactivate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (response.status === 403) {
+    const error = await response.json().catch(() => ({ error: 'FORBIDDEN', message: 'Owner access required' }))
+    throw new Error(error.message || 'Owner access required')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to deactivate user: ${response.statusText}`)
+  }
+}
+
+export async function adminReactivateTenantUser(tenantId: string, userId: string): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenants/${tenantId}/users/${userId}/reactivate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (response.status === 403) {
+    const error = await response.json().catch(() => ({ error: 'FORBIDDEN', message: 'Owner access required' }))
+    throw new Error(error.message || 'Owner access required')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to reactivate user: ${response.statusText}`)
+  }
+}
+
+export async function adminTenantUsageSummary(tenantId: string, days: number = 30): Promise<UsageSummary> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenants/${tenantId}/usage/summary?days=${days}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (response.status === 403) {
+    const error = await response.json().catch(() => ({ error: 'FORBIDDEN', message: 'Owner access required' }))
+    throw new Error(error.message || 'Owner access required')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to get usage summary: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+export async function adminTenantRecentRuns(tenantId: string, limit: number = 25): Promise<AdminRun[]> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenants/${tenantId}/runs/recent?limit=${limit}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (response.status === 403) {
+    const error = await response.json().catch(() => ({ error: 'FORBIDDEN', message: 'Owner access required' }))
+    throw new Error(error.message || 'Owner access required')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to get recent runs: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+export async function adminTenantAudit(tenantId: string, limit: number = 50): Promise<AdminAuditLogEntry[]> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/admin/tenants/${tenantId}/audit?limit=${limit}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (response.status === 403) {
+    const error = await response.json().catch(() => ({ error: 'FORBIDDEN', message: 'Owner access required' }))
+    throw new Error(error.message || 'Owner access required')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `Failed to get audit log: ${response.statusText}`)
   }
 
   return response.json()

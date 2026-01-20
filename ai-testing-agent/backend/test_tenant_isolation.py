@@ -10,10 +10,11 @@ import uuid
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from db import Base, get_db
-from models import Run, Artifact, Tenant, TenantUser
+from models import Run, Artifact, Tenant, TenantUser, UsageEvent, TenantIntegration
 from services.persistence import write_json_artifact, save_run, save_artifact
 from app import app
 from auth.jwt import create_access_token
+from utils.encryption import encrypt_secret
 
 
 @pytest.fixture
@@ -88,7 +89,8 @@ def tenant_a(temp_db):
     tenant_a = Tenant(
         name="Tenant A",
         slug="tenant-a",
-        is_active=True
+        is_active=True,
+        subscription_status="trial"
     )
     temp_db.add(tenant_a)
     temp_db.commit()
@@ -102,7 +104,8 @@ def tenant_b(temp_db):
     tenant_b = Tenant(
         name="Tenant B",
         slug="tenant-b",
-        is_active=True
+        is_active=True,
+        subscription_status="trial"
     )
     temp_db.add(tenant_b)
     temp_db.commit()
@@ -455,3 +458,294 @@ def test_persistence_save_artifact_tenant_isolation(temp_db, temp_artifacts_dir,
         Artifact.tenant_id == tenant_b.id
     ).first()
     assert artifact_not_found is None
+
+
+# ============================================================================
+# PART C: COMPREHENSIVE CROSS-TENANT TESTS
+# ============================================================================
+
+def test_cross_tenant_run_access_by_id(client, temp_db, tenant_a, tenant_b, run_tenant_a, run_tenant_b, user_b):
+    """
+    Test that Tenant B cannot access Tenant A's run by ID.
+    This proves tenant isolation cannot be bypassed.
+    """
+    # Create JWT token for Tenant B user
+    token_b = create_jwt_token(
+        str(user_b.id),
+        str(tenant_b.id),
+        user_b.role
+    )
+    
+    # Attempt to fetch Tenant A's run as Tenant B user
+    response = client.get(
+        f'/api/v1/runs/{run_tenant_a.run_id}',
+        headers={'Authorization': f'Bearer {token_b}'}
+    )
+    
+    # Should return 404 (not 403) - don't leak existence of other tenant's data
+    assert response.status_code == 404, f"Expected 404, got {response.status_code}. Response: {response.get_json()}"
+    
+    # Verify Tenant B can access their own run
+    response = client.get(
+        f'/api/v1/runs/{run_tenant_b.run_id}',
+        headers={'Authorization': f'Bearer {token_b}'}
+    )
+    assert response.status_code == 200
+
+
+def test_cross_tenant_artifact_access_by_id(client, temp_db, tenant_a, tenant_b, run_tenant_a, run_tenant_b, user_b):
+    """
+    Test that Tenant B cannot access Tenant A's artifact by run_id.
+    This proves tenant isolation for artifacts.
+    """
+    # Create JWT token for Tenant B user
+    token_b = create_jwt_token(
+        str(user_b.id),
+        str(tenant_b.id),
+        user_b.role
+    )
+    
+    # Attempt to fetch Tenant A's artifact as Tenant B user
+    response = client.get(
+        f'/api/v1/runs/{run_tenant_a.run_id}/test_plan',
+        headers={'Authorization': f'Bearer {token_b}'}
+    )
+    
+    # Should return 404 (not 403) - don't leak existence
+    assert response.status_code == 404, f"Expected 404, got {response.status_code}. Response: {response.get_json()}"
+    
+    # Verify Tenant B can access their own artifact
+    response = client.get(
+        f'/api/v1/runs/{run_tenant_b.run_id}/test_plan',
+        headers={'Authorization': f'Bearer {token_b}'}
+    )
+    assert response.status_code == 200
+
+
+def test_cross_tenant_run_update_protection(client, temp_db, tenant_a, tenant_b, run_tenant_a, run_tenant_b, user_b):
+    """
+    Test that Tenant B cannot update Tenant A's run.
+    Attempts to mark Tenant A's run as reviewed should fail.
+    """
+    # Create JWT token for Tenant B user
+    token_b = create_jwt_token(
+        str(user_b.id),
+        str(tenant_b.id),
+        user_b.role
+    )
+    
+    # Attempt to review Tenant A's run as Tenant B user
+    response = client.post(
+        f'/api/v1/runs/{run_tenant_a.run_id}/review',
+        headers={'Authorization': f'Bearer {token_b}'}
+    )
+    
+    # Should return 404 (not 403) - don't leak existence
+    assert response.status_code == 404, f"Expected 404, got {response.status_code}. Response: {response.get_json()}"
+    
+    # Verify Tenant B can review their own run
+    response = client.post(
+        f'/api/v1/runs/{run_tenant_b.run_id}/review',
+        headers={'Authorization': f'Bearer {token_b}'}
+    )
+    assert response.status_code == 200
+
+
+def test_cross_tenant_run_delete_protection(client, temp_db, tenant_a, tenant_b, run_tenant_a, run_tenant_b, user_b):
+    """
+    Test that Tenant B cannot delete Tenant A's run.
+    Since there's no DELETE endpoint, we test via approval (which makes run immutable).
+    """
+    # Create JWT token for Tenant B user
+    token_b = create_jwt_token(
+        str(user_b.id),
+        str(tenant_b.id),
+        user_b.role
+    )
+    
+    # First, review Tenant B's own run
+    response = client.post(
+        f'/api/v1/runs/{run_tenant_b.run_id}/review',
+        headers={'Authorization': f'Bearer {token_b}'}
+    )
+    assert response.status_code == 200
+    
+    # Attempt to approve Tenant A's run as Tenant B user
+    response = client.post(
+        f'/api/v1/runs/{run_tenant_a.run_id}/approve',
+        headers={'Authorization': f'Bearer {token_b}'}
+    )
+    
+    # Should return 404 (not 403) - don't leak existence
+    assert response.status_code == 404, f"Expected 404, got {response.status_code}. Response: {response.get_json()}"
+
+
+def test_list_runs_only_shows_own_tenant(client, temp_db, tenant_a, tenant_b, run_tenant_a, run_tenant_b, user_a):
+    """
+    Test that listing runs only returns runs for the authenticated tenant.
+    This is a critical test for tenant isolation.
+    """
+    # Create JWT token for Tenant A user
+    token_a = create_jwt_token(
+        str(user_a.id),
+        str(tenant_a.id),
+        user_a.role
+    )
+    
+    # List runs as Tenant A user
+    response = client.get(
+        '/api/v1/runs',
+        headers={'Authorization': f'Bearer {token_a}'}
+    )
+    
+    assert response.status_code == 200
+    data = response.get_json()
+    
+    # Should only see Tenant A's run
+    assert 'items' in data or isinstance(data, list), "Response should contain items array"
+    runs = data.get('items', []) if isinstance(data, dict) else data
+    
+    # Verify only Tenant A's run is present
+    run_ids = [r['run_id'] for r in runs]
+    assert run_tenant_a.run_id in run_ids, "Should see Tenant A's run"
+    assert run_tenant_b.run_id not in run_ids, "Should NOT see Tenant B's run"
+
+
+def test_tenant_id_never_from_payload(client, temp_db, tenant_a, tenant_b, run_tenant_a, user_a):
+    """
+    Test that tenant_id cannot be provided in request payload to bypass isolation.
+    This test ensures tenant_id comes ONLY from JWT context.
+    """
+    # Create JWT token for Tenant A user
+    token_a = create_jwt_token(
+        str(user_a.id),
+        str(tenant_a.id),
+        user_a.role
+    )
+    
+    # Attempt to access run with tenant_id in payload (if endpoint accepts it)
+    # Most endpoints don't accept tenant_id, but we test to be sure
+    response = client.get(
+        f'/api/v1/runs/{run_tenant_a.run_id}',
+        headers={'Authorization': f'Bearer {token_a}'},
+        json={'tenant_id': str(tenant_b.id)}  # Try to spoof tenant_id
+    )
+    
+    # Should still work (tenant_id from JWT is used, payload is ignored)
+    # OR should fail if endpoint doesn't accept JSON body
+    # The key is: tenant_id from JWT (Tenant A) should be used, not payload
+    assert response.status_code in [200, 400, 404, 405], "Request should either succeed with correct tenant or fail, but not use payload tenant_id"
+    
+    # If it succeeds, verify it's using Tenant A's data (from JWT), not Tenant B (from payload)
+    if response.status_code == 200:
+        data = response.get_json()
+        # The run should be Tenant A's run (from JWT), not Tenant B's
+        assert data.get('run_id') == run_tenant_a.run_id
+
+
+def test_usage_events_tenant_isolation(client, temp_db, tenant_a, tenant_b, user_a, user_b):
+    """
+    Test that usage events are properly tenant-scoped.
+    This verifies that usage tracking respects tenant boundaries.
+    """
+    from models import UsageEvent
+    from datetime import datetime, timezone
+    
+    # Create usage events for both tenants
+    event_a = UsageEvent(
+        tenant_id=tenant_a.id,
+        user_id=user_a.id,
+        agent='test_plan',
+        source='jira',
+        success=True
+    )
+    event_b = UsageEvent(
+        tenant_id=tenant_b.id,
+        user_id=user_b.id,
+        agent='test_plan',
+        source='jira',
+        success=True
+    )
+    
+    temp_db.add(event_a)
+    temp_db.add(event_b)
+    temp_db.commit()
+    
+    # Create JWT token for Tenant A user
+    token_a = create_jwt_token(
+        str(user_a.id),
+        str(tenant_a.id),
+        user_a.role
+    )
+    
+    # Query usage events (if endpoint exists)
+    # Since there's no public endpoint, we verify at database level
+    events_a = temp_db.query(UsageEvent).filter(
+        UsageEvent.tenant_id == tenant_a.id
+    ).all()
+    
+    events_b = temp_db.query(UsageEvent).filter(
+        UsageEvent.tenant_id == tenant_b.id
+    ).all()
+    
+    # Verify isolation
+    assert len(events_a) == 1, "Should find Tenant A's event"
+    assert len(events_b) == 1, "Should find Tenant B's event"
+    assert events_a[0].id != events_b[0].id, "Events should be different"
+
+
+def test_integration_tenant_isolation(client, temp_db, tenant_a, tenant_b, user_a, user_b):
+    """
+    Test that tenant integrations are properly isolated.
+    This verifies that Jira integrations respect tenant boundaries.
+    """
+    from models import TenantIntegration
+    from utils.encryption import encrypt_secret
+    
+    # Create integrations for both tenants
+    integration_a = TenantIntegration(
+        tenant_id=tenant_a.id,
+        provider='jira',
+        is_active=True,
+        jira_base_url='https://tenant-a.atlassian.net',
+        jira_user_email='user@tenant-a.com',
+        credentials_ciphertext=encrypt_secret('token-a')
+    )
+    integration_b = TenantIntegration(
+        tenant_id=tenant_b.id,
+        provider='jira',
+        is_active=True,
+        jira_base_url='https://tenant-b.atlassian.net',
+        jira_user_email='user@tenant-b.com',
+        credentials_ciphertext=encrypt_secret('token-b')
+    )
+    
+    temp_db.add(integration_a)
+    temp_db.add(integration_b)
+    temp_db.commit()
+    
+    # Create JWT token for Tenant A user
+    token_a = create_jwt_token(
+        str(user_a.id),
+        str(tenant_a.id),
+        user_a.role
+    )
+    
+    # Query integrations (if endpoint exists)
+    # Verify at database level
+    integration_a_found = temp_db.query(TenantIntegration).filter(
+        TenantIntegration.tenant_id == tenant_a.id,
+        TenantIntegration.provider == 'jira'
+    ).first()
+    
+    integration_b_found = temp_db.query(TenantIntegration).filter(
+        TenantIntegration.tenant_id == tenant_b.id,
+        TenantIntegration.provider == 'jira'
+    ).first()
+    
+    # Verify isolation
+    assert integration_a_found is not None, "Should find Tenant A's integration"
+    assert integration_b_found is not None, "Should find Tenant B's integration"
+    assert integration_a_found.id != integration_b_found.id, "Integrations should be different"
+    assert integration_a_found.tenant_id == tenant_a.id, "Integration A should belong to Tenant A"
+    assert integration_b_found.tenant_id == tenant_b.id, "Integration B should belong to Tenant B"

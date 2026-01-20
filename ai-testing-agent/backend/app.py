@@ -89,7 +89,6 @@ from auth.jwt import create_access_token, decode_and_verify_token
 # Import encryption utilities (will fail fast if INTEGRATION_SECRET_KEY is not set)
 from utils.encryption import decrypt_secret  # noqa: F401
 
-
 @app.before_request
 def check_auth():
     """
@@ -105,10 +104,13 @@ def check_auth():
     
     # Allow health check endpoints, auth endpoints, and public lead submission
     # Also allow check-slug (public) and tenant-first onboarding routes (no auth required)
+    # Phase 2.1: Allow password reset routes (public)
     public_routes = [
         "/health", "/health/db", "/", "/auth/login", 
         "/api/v1/leads", "/api/v1/tenants/check-slug",
-        "/api/v1/onboarding/tenant"  # Tenant creation is public (no auth required)
+        "/api/v1/onboarding/tenant",  # Tenant creation is public (no auth required)
+        "/api/v1/auth/forgot-password",  # Phase 2.1: Public password reset request
+        "/api/v1/auth/reset-password"  # Phase 2.1: Public password reset
     ]
     if request.path in public_routes or request.path.startswith("/api/v1/onboarding/tenant/"):
         return None
@@ -140,8 +142,19 @@ def check_auth():
     # This must happen BEFORE subscription gating or other logic
     try:
         from db import get_db
-        from models import Tenant, TenantUser
         import uuid as uuid_module
+        
+        # Import models safely - they should already be registered with Base.metadata
+        # Import at function level to avoid circular imports, but models are only defined once
+        try:
+            from models import Tenant, TenantUser
+        except Exception as import_error:
+            # If import fails due to metadata conflict, log and return 503
+            logger.error(f"Failed to import models in check_auth: {import_error}", exc_info=True)
+            return jsonify({
+                "code": "AUTH_UNAVAILABLE",
+                "detail": "Authentication temporarily unavailable. Please try again."
+            }), 503
         
         db = next(get_db())
         try:
@@ -154,13 +167,6 @@ def check_auth():
             if not tenant:
                 logger.error(f"Tenant {g.tenant_id} not found for authenticated request")
                 return jsonify({"detail": "Tenant not found"}), 404
-            
-            # Check if tenant is active
-            if not tenant.is_active:
-                return jsonify({
-                    "code": "TENANT_INACTIVE",
-                    "detail": "Workspace is inactive. Contact hello@scopetraceai.com"
-                }), 403
             
             # Load user
             user = db.query(TenantUser).filter(
@@ -177,6 +183,32 @@ def check_auth():
                     "code": "USER_INACTIVE",
                     "detail": "Your account is inactive. Contact hello@scopetraceai.com"
                 }), 403
+            
+            # Store user role on g for middleware checks
+            g.current_user = user
+            
+            # Ops Kill Switch: Check if tenant is suspended or inactive
+            # Block all non-public routes if tenant is suspended (subscription_status='suspended')
+            # Also block if tenant is inactive (is_active=false) for backward compatibility
+            # Public routes (login/forgot/reset) are already excluded above
+            # EXCEPTION: Allow /api/v1/admin/* for owner role even if tenant is suspended
+            is_admin_route = request.path.startswith("/api/v1/admin/")
+            is_owner = user.role == "owner"
+            
+            if not (is_admin_route and is_owner):
+                # Apply kill switch for non-admin routes or non-owner users
+                if tenant.subscription_status == 'suspended':
+                    return jsonify({
+                        "code": "TENANT_SUSPENDED",
+                        "detail": "Tenant is suspended"
+                    }), 403
+                
+                # Backward compatibility: also block if tenant is inactive (but not suspended)
+                if not tenant.is_active:
+                    return jsonify({
+                        "code": "TENANT_INACTIVE",
+                        "detail": "Workspace is inactive. Contact hello@scopetraceai.com"
+                    }), 403
             
         finally:
             db.close()
@@ -4267,8 +4299,8 @@ def login():
     """
     try:
         from db import get_db
-        from models import TenantUser, Tenant
         from sqlalchemy import func
+        # Models are imported at module level - no need to re-import
         
         # Get request data
         data = request.get_json()
@@ -4443,8 +4475,8 @@ def login_with_tenant():
     """
     try:
         from db import get_db
-        from models import TenantUser, Tenant
         import uuid as uuid_module
+        # Models are imported at module level - no need to re-import
         
         data = request.get_json()
         if not data:
@@ -4596,6 +4628,348 @@ def get_current_user():
             db.close()
     except Exception as e:
         logger.error(f"Error getting current user: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/users/me", methods=["GET"])
+def get_user_profile():
+    """
+    Get current user profile information (Phase 2.1).
+    Returns all profile fields including address and phone.
+    
+    Returns:
+        {
+            "id": "<user_id>",
+            "email": "<email>",
+            "role": "<role>",
+            "is_active": <bool>,
+            "first_name": "<first_name>" | null,
+            "last_name": "<last_name>" | null,
+            "address_1": "<address_1>" | null,
+            "address_2": "<address_2>" | null,
+            "city": "<city>" | null,
+            "state": "<state>" | null,
+            "zip": "<zip>" | null,
+            "phone": "<phone>" | null,
+            "tenant_id": "<tenant_id>"
+        }
+    """
+    if not hasattr(g, 'user_id') or not g.user_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    try:
+        from db import get_db
+        from models import TenantUser
+        
+        db = next(get_db())
+        try:
+            user = db.query(TenantUser).filter(TenantUser.id == g.user_id).first()
+            if not user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            response = {
+                "id": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "is_active": user.is_active,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "address_1": user.address_1,
+                "address_2": user.address_2,
+                "city": user.city,
+                "state": user.state,
+                "zip": user.zip,
+                "phone": user.phone,
+                "tenant_id": str(user.tenant_id)
+            }
+            
+            return jsonify(response), 200
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error getting user profile: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/users/me", methods=["PATCH"])
+def update_user_profile():
+    """
+    Update current user profile (Phase 2.1).
+    Only allows updating: first_name, last_name, address_1, address_2, city, state, zip, phone.
+    Explicitly rejects email, tenant_id, role changes.
+    
+    Request body:
+        {
+            "first_name": "<first_name>" | null,
+            "last_name": "<last_name>" | null,
+            "address_1": "<address_1>" | null,
+            "address_2": "<address_2>" | null,
+            "city": "<city>" | null,
+            "state": "<state>" | null,
+            "zip": "<zip>" | null,
+            "phone": "<phone>" | null
+        }
+    
+    Returns:
+        Updated user profile object
+    """
+    if not hasattr(g, 'user_id') or not g.user_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    try:
+        from db import get_db
+        from models import TenantUser
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        # Check for forbidden fields
+        forbidden_fields = ["email", "tenant_id", "role", "password_hash", "is_active", "id"]
+        for field in forbidden_fields:
+            if field in data:
+                return jsonify({
+                    "detail": f"Field '{field}' cannot be updated from user profile"
+                }), 400
+        
+        # Allowed fields
+        allowed_fields = [
+            "first_name", "last_name", "address_1", "address_2",
+            "city", "state", "zip", "phone"
+        ]
+        
+        db = next(get_db())
+        try:
+            user = db.query(TenantUser).filter(TenantUser.id == g.user_id).first()
+            if not user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            # Update allowed fields
+            updated = False
+            for field in allowed_fields:
+                if field in data:
+                    setattr(user, field, data[field] if data[field] else None)
+                    updated = True
+            
+            if updated:
+                user.updated_at = datetime.now(timezone.utc)
+                db.commit()
+            
+            # Return updated user
+            response = {
+                "id": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "is_active": user.is_active,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "address_1": user.address_1,
+                "address_2": user.address_2,
+                "city": user.city,
+                "state": user.state,
+                "zip": user.zip,
+                "phone": user.phone,
+                "tenant_id": str(user.tenant_id)
+            }
+            
+            return jsonify(response), 200
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error updating user profile: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/users/me/change-password", methods=["POST"])
+def change_password():
+    """
+    Change user password (Phase 2.1).
+    Requires current password verification.
+    
+    Request body:
+        {
+            "current_password": "<current_password>",
+            "new_password": "<new_password>"
+        }
+    
+    Returns:
+        204 No Content on success
+    """
+    if not hasattr(g, 'user_id') or not g.user_id:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    try:
+        from db import get_db
+        from models import TenantUser
+        from services.auth import verify_password, hash_password, validate_password_strength
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        current_password = data.get("current_password")
+        new_password = data.get("new_password")
+        
+        if not current_password or not new_password:
+            return jsonify({"detail": "current_password and new_password are required"}), 400
+        
+        # Validate new password strength
+        is_valid, error_msg = validate_password_strength(new_password)
+        if not is_valid:
+            return jsonify({"detail": error_msg}), 400
+        
+        db = next(get_db())
+        try:
+            user = db.query(TenantUser).filter(TenantUser.id == g.user_id).first()
+            if not user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            # Verify current password
+            if not verify_password(current_password, user.password_hash):
+                return jsonify({"detail": "Invalid current password"}), 400
+            
+            # Update password
+            user.password_hash = hash_password(new_password)
+            user.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            
+            return Response(status=204)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error changing password: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/auth/forgot-password", methods=["POST"])
+def forgot_password():
+    """
+    Request password reset (Phase 2.1).
+    Always returns 200 to prevent email enumeration.
+    If user exists and is active, creates reset token and sends email.
+    
+    Request body:
+        {
+            "email": "<email>"
+        }
+    
+    Returns:
+        {
+            "ok": true
+        }
+    """
+    # This is a public route - no auth required
+    try:
+        from db import get_db
+        from models import TenantUser
+        from sqlalchemy import func
+        from services.auth import (
+            create_reset_token, send_password_reset_email,
+            get_reset_url, check_rate_limit
+        )
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"ok": True}), 200  # Always return 200
+        
+        email = data.get("email", "").strip().lower()
+        if not email:
+            return jsonify({"ok": True}), 200  # Always return 200
+        
+        # Rate limiting
+        client_ip = request.remote_addr or "unknown"
+        is_allowed, error_msg = check_rate_limit(client_ip, email)
+        if not is_allowed:
+            # Still return 200 to prevent enumeration, but don't process
+            logger.warning(f"Rate limit exceeded for {email} from {client_ip}")
+            return jsonify({"ok": True}), 200
+        
+        db = next(get_db())
+        try:
+            # Find user by email (case-insensitive)
+            user = db.query(TenantUser).filter(
+                func.lower(TenantUser.email) == email,
+                TenantUser.is_active == True
+            ).first()
+            
+            if user:
+                # Create reset token
+                raw_token, token_model = create_reset_token(db, str(user.id))
+                db.commit()
+                
+                # Send reset email
+                reset_url = get_reset_url(raw_token)
+                send_password_reset_email(user.email, reset_url)
+            
+            # Always return 200 regardless of whether user exists
+            return jsonify({"ok": True}), 200
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error in forgot-password: {e}", exc_info=True)
+        # Still return 200 to prevent enumeration
+        return jsonify({"ok": True}), 200
+
+
+@app.route("/api/v1/auth/reset-password", methods=["POST"])
+def reset_password():
+    """
+    Reset password using token (Phase 2.1).
+    Token is one-time use and expires after 30 minutes.
+    
+    Request body:
+        {
+            "token": "<reset_token>",
+            "new_password": "<new_password>"
+        }
+    
+    Returns:
+        204 No Content on success
+    """
+    # This is a public route - no auth required
+    try:
+        from db import get_db
+        from models import TenantUser
+        from services.auth import (
+            consume_reset_token, hash_password, validate_password_strength
+        )
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        token = data.get("token", "").strip()
+        new_password = data.get("new_password")
+        
+        if not token or not new_password:
+            return jsonify({"detail": "token and new_password are required"}), 400
+        
+        # Validate new password strength
+        is_valid, error_msg = validate_password_strength(new_password)
+        if not is_valid:
+            return jsonify({"detail": error_msg}), 400
+        
+        db = next(get_db())
+        try:
+            # Consume token (one-time use)
+            user_id = consume_reset_token(db, token)
+            if not user_id:
+                return jsonify({"detail": "Invalid or expired token"}), 400
+            
+            # Update user password
+            user = db.query(TenantUser).filter(TenantUser.id == user_id).first()
+            if not user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            user.password_hash = hash_password(new_password)
+            user.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            
+            return Response(status=204)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error resetting password: {e}", exc_info=True)
         return jsonify({"detail": "Internal server error"}), 500
 
 
@@ -10802,28 +11176,115 @@ def check_admin_access():
         db.close()
 
 
+def require_owner():
+    """
+    Guard: requires current_user.role === "owner".
+    Owner can manage ALL tenants, not just their own.
+    
+    Uses the SAME tenant loading logic as check_auth() to ensure consistency.
+    
+    Returns:
+        tuple: (user, None) if access granted, (None, error_response) if denied
+    
+    Raises:
+        RuntimeError: If not in Flask request context
+    """
+    from db import get_db
+    from models import TenantUser
+    import uuid as uuid_module
+    
+    # Dev-only debug logging
+    is_dev = os.getenv("FLASK_ENV") == "development" or os.getenv("ENV") == "development" or not os.getenv("FLASK_ENV")
+    
+    if not hasattr(g, 'user_id') or not g.user_id:
+        if is_dev:
+            logger.warning(f"[OWNER_GUARD] Missing user_id in request context. Path: {request.path}")
+        return None, (jsonify({"detail": "Forbidden"}), 403)
+    
+    if not hasattr(g, 'tenant_id') or not g.tenant_id:
+        if is_dev:
+            logger.warning(f"[OWNER_GUARD] Missing tenant_id in request context. Path: {request.path}, user_id: {g.user_id}")
+        return None, (jsonify({"detail": "Forbidden"}), 403)
+    
+    db = next(get_db())
+    try:
+        # Convert IDs to UUID if needed (same logic as check_auth)
+        tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+        user_id_uuid = g.user_id if isinstance(g.user_id, uuid_module.UUID) else uuid_module.UUID(g.user_id)
+        
+        # Load user (must be in same tenant as JWT)
+        user = db.query(TenantUser).filter(
+            TenantUser.id == user_id_uuid,
+            TenantUser.tenant_id == tenant_id_uuid,
+            TenantUser.is_active == True
+        ).first()
+        
+        if not user:
+            if is_dev:
+                logger.warning(f"[OWNER_GUARD] User not found or inactive. user_id: {g.user_id}, tenant_id: {g.tenant_id}, path: {request.path}")
+            return None, (jsonify({"detail": "Forbidden"}), 403)
+        
+        # Dev-only debug logging
+        if is_dev:
+            logger.info(
+                f"[OWNER_GUARD] Evaluating access - "
+                f"user_id: {user.id}, user_email: {user.email}, user_role: {user.role}, "
+                f"path: {request.path}"
+            )
+        
+        # Check: role must be "owner"
+        if user.role != "owner":
+            if is_dev:
+                logger.warning(f"[OWNER_GUARD] Access denied: role mismatch. Expected 'owner', got '{user.role}'. Path: {request.path}")
+            return None, (jsonify({"detail": "Forbidden"}), 403)
+        
+        if is_dev:
+            logger.info(f"[OWNER_GUARD] Access granted for user {user.email} (owner). Path: {request.path}")
+        
+        return user, None
+    finally:
+        db.close()
+
+
 @app.route("/api/v1/admin/tenants", methods=["GET"])
 def list_tenants():
     """
-    List all tenants for admin selection.
-    Requires owner or superAdmin role.
+    List all tenants for owner admin.
+    Requires owner role.
     
     Returns:
-        List of tenant summaries with basic fields
+        {
+            "items": [
+                {
+                    "id": <str>,
+                    "name": <str>,
+                    "slug": <str>,
+                    "is_active": <bool>,
+                    "subscription_status": <str>,
+                    "plan_tier": <str>,  # Same as subscription_status for compatibility
+                    "trial_requirements_runs_remaining": <int>,
+                    "trial_testplan_runs_remaining": <int>,
+                    "trial_writeback_runs_remaining": <int>,
+                    "created_at": <str>,
+                    "updated_at": <str>
+                },
+                ...
+            ]
+        }
     """
     try:
         from db import get_db
         from models import Tenant
         
-        # Check admin access
-        user, error_response = check_admin_access()
+        # Owner only
+        user, error_response = require_owner()
         if error_response:
             return error_response
         
         db = next(get_db())
         try:
-            # Query all tenants, ordered by created_at DESC
-            tenants = db.query(Tenant).order_by(Tenant.created_at.desc()).all()
+            # Query all tenants, ordered by name ASC
+            tenants = db.query(Tenant).order_by(Tenant.name.asc()).all()
             
             # Format response
             tenants_list = []
@@ -10832,15 +11293,17 @@ def list_tenants():
                     "id": str(tenant.id),
                     "name": tenant.name,
                     "slug": tenant.slug,
-                    "subscription_status": getattr(tenant, "subscription_status", "unselected"),
-                    "req_remaining": getattr(tenant, "trial_requirements_runs_remaining", 0),
-                    "test_remaining": getattr(tenant, "trial_testplan_runs_remaining", 0),
-                    "wb_remaining": getattr(tenant, "trial_writeback_runs_remaining", 0),
                     "is_active": getattr(tenant, "is_active", True),
-                    "created_at": tenant.created_at.isoformat() + "Z" if tenant.created_at else None
+                    "subscription_status": getattr(tenant, "subscription_status", "unselected"),
+                    "plan_tier": getattr(tenant, "subscription_status", "unselected"),  # Alias for compatibility
+                    "trial_requirements_runs_remaining": getattr(tenant, "trial_requirements_runs_remaining", 0),
+                    "trial_testplan_runs_remaining": getattr(tenant, "trial_testplan_runs_remaining", 0),
+                    "trial_writeback_runs_remaining": getattr(tenant, "trial_writeback_runs_remaining", 0),
+                    "created_at": tenant.created_at.isoformat() + "Z" if tenant.created_at else None,
+                    "updated_at": tenant.updated_at.isoformat() + "Z" if tenant.updated_at else None
                 })
             
-            return jsonify(tenants_list), 200
+            return jsonify({"items": tenants_list}), 200
             
         finally:
             db.close()
@@ -11108,6 +11571,1108 @@ def set_tenant_trial(tenant_id: str):
             logger.error(f"Failed to record audit log: {str(audit_error)}", exc_info=True)
 
 
+# ============================================================================
+# TENANT-ADDRESSABLE ADMIN ENDPOINTS (Owner only, can manage ALL tenants)
+# ============================================================================
+
+@app.route("/api/v1/admin/tenants/<tenant_id>/status", methods=["POST"])
+def set_tenant_status(tenant_id: str):
+    """
+    Set tenant status (Active/Suspended).
+    Requires: owner role
+    
+    Body:
+        {
+            "status": "active" | "suspended"
+        }
+    
+    Returns:
+        204 No Content on success
+    """
+    try:
+        from db import get_db
+        from models import Tenant, AdminAuditLog
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Parse request body
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body is required"}), 400
+        
+        status = data.get("status")
+        if status not in ["active", "suspended"]:
+            return jsonify({"detail": "status must be 'active' or 'suspended'"}), 400
+        
+        # Convert tenant_id to UUID
+        try:
+            target_tenant_id_uuid = uuid_module.UUID(tenant_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id"}), 400
+        
+        db = next(get_db())
+        try:
+            # Get target tenant
+            target_tenant = db.query(Tenant).filter(Tenant.id == target_tenant_id_uuid).first()
+            if not target_tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Update tenant status
+            if status == "suspended":
+                target_tenant.is_active = False
+                target_tenant.subscription_status = 'suspended'
+                action = "ops.tenant.suspend"
+            else:  # active
+                target_tenant.is_active = True
+                target_tenant.subscription_status = 'active'
+                action = "ops.tenant.reactivate"
+            
+            db.commit()
+            
+            # Write audit log
+            try:
+                audit_log = AdminAuditLog(
+                    tenant_id=target_tenant_id_uuid,  # Target tenant
+                    user_id=current_user.id,
+                    action=action,
+                    target_type="tenant",
+                    target_id=target_tenant_id_uuid,
+                    metadata_json=json.dumps({"tenant_slug": target_tenant.slug, "status": status})
+                )
+                db.add(audit_log)
+                db.commit()
+            except Exception as audit_error:
+                logger.error(f"Failed to record audit log: {str(audit_error)}", exc_info=True)
+            
+            return jsonify(), 204
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error setting tenant status: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/tenants/<tenant_id>/users", methods=["GET"])
+def admin_list_tenant_users(tenant_id: str):
+    """
+    List users for a specific tenant.
+    Requires: owner role
+    
+    Returns:
+        List of users with: id, email, role, is_active, first_name, last_name, created_at, last_login_at
+    """
+    try:
+        from db import get_db
+        from models import TenantUser, Tenant
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Convert tenant_id to UUID
+        try:
+            target_tenant_id_uuid = uuid_module.UUID(tenant_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id"}), 400
+        
+        db = next(get_db())
+        try:
+            # Verify tenant exists
+            target_tenant = db.query(Tenant).filter(Tenant.id == target_tenant_id_uuid).first()
+            if not target_tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Query users in target tenant
+            users = db.query(TenantUser).filter(
+                TenantUser.tenant_id == target_tenant_id_uuid
+            ).order_by(TenantUser.created_at.desc()).all()
+            
+            users_list = []
+            for u in users:
+                users_list.append({
+                    "id": str(u.id),
+                    "email": u.email,
+                    "role": u.role,
+                    "is_active": u.is_active,
+                    "first_name": u.first_name,
+                    "last_name": u.last_name,
+                    "created_at": u.created_at.isoformat() + "Z" if u.created_at else None,
+                    "last_login_at": u.last_login_at.isoformat() + "Z" if u.last_login_at else None
+                })
+            
+            return jsonify(users_list), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error listing tenant users: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/tenants/<tenant_id>/users/<user_id>/deactivate", methods=["POST"])
+def admin_deactivate_tenant_user(tenant_id: str, user_id: str):
+    """
+    Deactivate a user in a specific tenant.
+    Requires: owner role
+    Cannot deactivate self.
+    
+    Returns:
+        204 No Content on success
+    """
+    try:
+        from db import get_db
+        from models import TenantUser, Tenant, AdminAuditLog
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Parse IDs
+        try:
+            target_tenant_id_uuid = uuid_module.UUID(tenant_id)
+            target_user_id_uuid = uuid_module.UUID(user_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id or user_id"}), 400
+        
+        # Cannot deactivate self
+        if str(current_user.id) == user_id:
+            return jsonify({"detail": "Cannot deactivate yourself"}), 400
+        
+        db = next(get_db())
+        try:
+            # Verify tenant exists
+            target_tenant = db.query(Tenant).filter(Tenant.id == target_tenant_id_uuid).first()
+            if not target_tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Get target user (must belong to target tenant)
+            target_user = db.query(TenantUser).filter(
+                TenantUser.id == target_user_id_uuid,
+                TenantUser.tenant_id == target_tenant_id_uuid
+            ).first()
+            
+            if not target_user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            # Deactivate
+            target_user.is_active = False
+            db.commit()
+            
+            # Write audit log
+            try:
+                audit_log = AdminAuditLog(
+                    tenant_id=target_tenant_id_uuid,  # Target tenant
+                    user_id=current_user.id,
+                    action="ops.user.deactivate",
+                    target_type="user",
+                    target_id=target_user_id_uuid,
+                    metadata_json=json.dumps({"target_email": target_user.email, "target_tenant_slug": target_tenant.slug})
+                )
+                db.add(audit_log)
+                db.commit()
+            except Exception as audit_error:
+                logger.error(f"Failed to record audit log: {str(audit_error)}", exc_info=True)
+            
+            return jsonify(), 204
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error deactivating tenant user: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/tenants/<tenant_id>/users/<user_id>/reactivate", methods=["POST"])
+def admin_reactivate_tenant_user(tenant_id: str, user_id: str):
+    """
+    Reactivate a user in a specific tenant.
+    Requires: owner role
+    
+    Returns:
+        204 No Content on success
+    """
+    try:
+        from db import get_db
+        from models import TenantUser, Tenant, AdminAuditLog
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Parse IDs
+        try:
+            target_tenant_id_uuid = uuid_module.UUID(tenant_id)
+            target_user_id_uuid = uuid_module.UUID(user_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id or user_id"}), 400
+        
+        db = next(get_db())
+        try:
+            # Verify tenant exists
+            target_tenant = db.query(Tenant).filter(Tenant.id == target_tenant_id_uuid).first()
+            if not target_tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Get target user (must belong to target tenant)
+            target_user = db.query(TenantUser).filter(
+                TenantUser.id == target_user_id_uuid,
+                TenantUser.tenant_id == target_tenant_id_uuid
+            ).first()
+            
+            if not target_user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            # Reactivate
+            target_user.is_active = True
+            db.commit()
+            
+            # Write audit log
+            try:
+                audit_log = AdminAuditLog(
+                    tenant_id=target_tenant_id_uuid,  # Target tenant
+                    user_id=current_user.id,
+                    action="ops.user.reactivate",
+                    target_type="user",
+                    target_id=target_user_id_uuid,
+                    metadata_json=json.dumps({"target_email": target_user.email, "target_tenant_slug": target_tenant.slug})
+                )
+                db.add(audit_log)
+                db.commit()
+            except Exception as audit_error:
+                logger.error(f"Failed to record audit log: {str(audit_error)}", exc_info=True)
+            
+            return jsonify(), 204
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error reactivating tenant user: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/tenants/<tenant_id>/usage/summary", methods=["GET"])
+def admin_tenant_usage_summary(tenant_id: str):
+    """
+    Get usage summary for a specific tenant.
+    Requires: owner role
+    
+    Query params:
+        days: int (default 30, clamp 1..365)
+    
+    Returns:
+        {
+            "days": <int>,
+            "totals": {
+                "events": <int>,
+                "success": <int>,
+                "failed": <int>,
+                "jira_ticket_count": <int>,
+                "input_char_count": <int>
+            },
+            "by_agent": [...]
+        }
+    """
+    try:
+        from db import get_db
+        from models import UsageEvent, Tenant
+        from datetime import datetime, timezone, timedelta
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Convert tenant_id to UUID
+        try:
+            target_tenant_id_uuid = uuid_module.UUID(tenant_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id"}), 400
+        
+        # Parse days param
+        days = request.args.get('days', 30, type=int)
+        days = max(1, min(365, days))  # Clamp 1..365
+        
+        db = next(get_db())
+        try:
+            # Verify tenant exists
+            target_tenant = db.query(Tenant).filter(Tenant.id == target_tenant_id_uuid).first()
+            if not target_tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Calculate cutoff date
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+            
+            # Query usage events for target tenant
+            events = db.query(UsageEvent).filter(
+                UsageEvent.tenant_id == target_tenant_id_uuid,
+                UsageEvent.created_at >= cutoff_date
+            ).all()
+            
+            # Calculate totals
+            totals = {
+                "events": len(events),
+                "success": sum(1 for e in events if e.success),
+                "failed": sum(1 for e in events if not e.success),
+                "jira_ticket_count": sum(e.jira_ticket_count or 0 for e in events),
+                "input_char_count": sum(e.input_char_count or 0 for e in events)
+            }
+            
+            # Group by agent
+            by_agent_dict = {}
+            for event in events:
+                agent = event.agent or "unknown"
+                if agent not in by_agent_dict:
+                    by_agent_dict[agent] = {
+                        "agent": agent,
+                        "events": 0,
+                        "success": 0,
+                        "failed": 0,
+                        "jira_ticket_count": 0,
+                        "input_char_count": 0
+                    }
+                
+                by_agent_dict[agent]["events"] += 1
+                if event.success:
+                    by_agent_dict[agent]["success"] += 1
+                else:
+                    by_agent_dict[agent]["failed"] += 1
+                by_agent_dict[agent]["jira_ticket_count"] += (event.jira_ticket_count or 0)
+                by_agent_dict[agent]["input_char_count"] += (event.input_char_count or 0)
+            
+            by_agent = list(by_agent_dict.values())
+            
+            return jsonify({
+                "days": days,
+                "totals": totals,
+                "by_agent": by_agent
+            }), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error getting tenant usage summary: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/tenants/<tenant_id>/runs/recent", methods=["GET"])
+def admin_tenant_recent_runs(tenant_id: str):
+    """
+    Get recent runs for a specific tenant.
+    Requires: owner role
+    
+    Query params:
+        limit: int (default 25, max 100)
+    
+    Returns:
+        List of runs with: run_id, created_at, agent, status, review_status, jira_issue_key, summary
+    """
+    try:
+        from db import get_db
+        from models import Run, Tenant
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Convert tenant_id to UUID
+        try:
+            target_tenant_id_uuid = uuid_module.UUID(tenant_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id"}), 400
+        
+        # Parse limit param
+        limit = request.args.get('limit', 25, type=int)
+        limit = max(1, min(100, limit))  # Clamp 1..100
+        
+        db = next(get_db())
+        try:
+            # Verify tenant exists
+            target_tenant = db.query(Tenant).filter(Tenant.id == target_tenant_id_uuid).first()
+            if not target_tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Query recent runs for target tenant
+            runs = db.query(Run).filter(
+                Run.tenant_id == target_tenant_id_uuid
+            ).order_by(Run.created_at.desc()).limit(limit).all()
+            
+            runs_list = []
+            for r in runs:
+                runs_list.append({
+                    "run_id": r.run_id,
+                    "created_at": r.created_at.isoformat() + "Z" if r.created_at else None,
+                    "agent": getattr(r, "agent", "unknown") or "unknown",
+                    "status": r.status,
+                    "review_status": r.review_status,
+                    "jira_issue_key": r.jira_issue_key,
+                    "summary": getattr(r, "summary", None)
+                })
+            
+            return jsonify(runs_list), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error getting tenant recent runs: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/tenants/<tenant_id>/audit", methods=["GET"])
+def admin_tenant_audit(tenant_id: str):
+    """
+    Get admin audit log for a specific tenant.
+    Requires: owner role
+    
+    Query params:
+        limit: int (default 50, max 200)
+    
+    Returns:
+        List of audit log entries ordered by created_at desc
+    """
+    try:
+        from db import get_db
+        from models import AdminAuditLog, Tenant
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Convert tenant_id to UUID
+        try:
+            target_tenant_id_uuid = uuid_module.UUID(tenant_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid tenant_id"}), 400
+        
+        # Parse limit param
+        limit = request.args.get('limit', 50, type=int)
+        limit = max(1, min(200, limit))  # Clamp 1..200
+        
+        db = next(get_db())
+        try:
+            # Verify tenant exists
+            target_tenant = db.query(Tenant).filter(Tenant.id == target_tenant_id_uuid).first()
+            if not target_tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Query audit log for target tenant
+            audit_logs = db.query(AdminAuditLog).filter(
+                AdminAuditLog.tenant_id == target_tenant_id_uuid
+            ).order_by(AdminAuditLog.created_at.desc()).limit(limit).all()
+            
+            logs_list = []
+            for log in audit_logs:
+                metadata = {}
+                if log.metadata_json:
+                    try:
+                        metadata = json.loads(log.metadata_json)
+                    except:
+                        pass
+                
+                logs_list.append({
+                    "id": str(log.id),
+                    "user_id": str(log.user_id),
+                    "action": log.action,
+                    "target_type": log.target_type,
+                    "target_id": str(log.target_id) if log.target_id else None,
+                    "metadata": metadata,
+                    "created_at": log.created_at.isoformat() + "Z" if log.created_at else None
+                })
+            
+            return jsonify(logs_list), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error getting tenant audit log: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+# ============================================================================
+# OPS SAFETY ENDPOINTS (Ultra-strict: owner + kerr-ai-studio only)
+# ============================================================================
+
+@app.route("/api/v1/admin/users", methods=["GET"])
+def admin_list_users():
+    """
+    List users in the current tenant.
+    Requires: owner role AND tenant slug === "kerr-ai-studio"
+    
+    Returns:
+        List of users with: id, email, role, is_active, first_name, last_name, created_at, last_login_at
+    """
+    try:
+        from db import get_db
+        from models import TenantUser
+        
+        # Owner only
+        user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        db = next(get_db())
+        try:
+            # Get current tenant from JWT
+            import uuid as uuid_module
+            tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Query users in this tenant only
+            users = db.query(TenantUser).filter(
+                TenantUser.tenant_id == tenant.id
+            ).order_by(TenantUser.created_at.desc()).all()
+            
+            users_list = []
+            for u in users:
+                users_list.append({
+                    "id": str(u.id),
+                    "email": u.email,
+                    "role": u.role,
+                    "is_active": u.is_active,
+                    "first_name": u.first_name,
+                    "last_name": u.last_name,
+                    "created_at": u.created_at.isoformat() + "Z" if u.created_at else None,
+                    "last_login_at": u.last_login_at.isoformat() + "Z" if u.last_login_at else None
+                })
+            
+            return jsonify(users_list), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error listing users: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/users/<user_id>/deactivate", methods=["POST"])
+def admin_deactivate_user(user_id: str):
+    """
+    Deactivate a user in the current tenant.
+    Requires: owner role AND tenant slug === "kerr-ai-studio"
+    Cannot deactivate self.
+    
+    Returns:
+        204 No Content on success
+    """
+    try:
+        from db import get_db
+        from models import TenantUser, AdminAuditLog
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Parse user_id
+        try:
+            target_user_id_uuid = uuid_module.UUID(user_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid user_id"}), 400
+        
+        # Cannot deactivate self
+        if str(current_user.id) == user_id:
+            return jsonify({"detail": "Cannot deactivate yourself"}), 400
+        
+        db = next(get_db())
+        try:
+            # Get current tenant from JWT
+            tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Get target user (must be in same tenant)
+            target_user = db.query(TenantUser).filter(
+                TenantUser.id == target_user_id_uuid,
+                TenantUser.tenant_id == tenant.id
+            ).first()
+            
+            if not target_user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            # Deactivate
+            target_user.is_active = False
+            db.commit()
+            
+            # Write audit log
+            try:
+                audit_log = AdminAuditLog(
+                    tenant_id=tenant.id,
+                    user_id=current_user.id,
+                    action="ops.user.deactivate",
+                    target_type="user",
+                    target_id=target_user_id_uuid,
+                    metadata_json=json.dumps({"target_email": target_user.email})
+                )
+                db.add(audit_log)
+                db.commit()
+            except Exception as audit_error:
+                logger.error(f"Failed to record audit log: {str(audit_error)}", exc_info=True)
+            
+            return jsonify(), 204
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error deactivating user: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/users/<user_id>/reactivate", methods=["POST"])
+def admin_reactivate_user(user_id: str):
+    """
+    Reactivate a user in the current tenant.
+    Requires: owner role AND tenant slug === "kerr-ai-studio"
+    
+    Returns:
+        204 No Content on success
+    """
+    try:
+        from db import get_db
+        from models import TenantUser, AdminAuditLog
+        import uuid as uuid_module
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Parse user_id
+        try:
+            target_user_id_uuid = uuid_module.UUID(user_id)
+        except ValueError:
+            return jsonify({"detail": "Invalid user_id"}), 400
+        
+        db = next(get_db())
+        try:
+            # Get current tenant from JWT
+            tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Get target user (must be in same tenant)
+            target_user = db.query(TenantUser).filter(
+                TenantUser.id == target_user_id_uuid,
+                TenantUser.tenant_id == tenant.id
+            ).first()
+            
+            if not target_user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            # Reactivate
+            target_user.is_active = True
+            db.commit()
+            
+            # Write audit log
+            try:
+                audit_log = AdminAuditLog(
+                    tenant_id=tenant.id,
+                    user_id=current_user.id,
+                    action="ops.user.reactivate",
+                    target_type="user",
+                    target_id=target_user_id_uuid,
+                    metadata_json=json.dumps({"target_email": target_user.email})
+                )
+                db.add(audit_log)
+                db.commit()
+            except Exception as audit_error:
+                logger.error(f"Failed to record audit log: {str(audit_error)}", exc_info=True)
+            
+            return jsonify(), 204
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error reactivating user: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/tenant/suspend", methods=["POST"])
+def admin_suspend_tenant():
+    """
+    Suspend the current tenant (kill switch).
+    Requires: owner role AND tenant slug === "kerr-ai-studio"
+    Sets: is_active=false AND subscription_status='suspended'
+    
+    Returns:
+        204 No Content on success
+    """
+    try:
+        from db import get_db
+        from models import AdminAuditLog
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        db = next(get_db())
+        try:
+            # Get current tenant from JWT
+            import uuid as uuid_module
+            tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Suspend tenant
+            tenant.is_active = False
+            tenant.subscription_status = 'suspended'
+            db.commit()
+            
+            # Write audit log
+            try:
+                audit_log = AdminAuditLog(
+                    tenant_id=tenant.id,
+                    user_id=current_user.id,
+                    action="ops.tenant.suspend",
+                    target_type="tenant",
+                    target_id=tenant.id,
+                    metadata_json=json.dumps({"tenant_slug": tenant.slug})
+                )
+                db.add(audit_log)
+                db.commit()
+            except Exception as audit_error:
+                logger.error(f"Failed to record audit log: {str(audit_error)}", exc_info=True)
+            
+            return jsonify(), 204
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error suspending tenant: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/tenant/reactivate", methods=["POST"])
+def admin_reactivate_tenant():
+    """
+    Reactivate the current tenant.
+    Requires: owner role AND tenant slug === "kerr-ai-studio"
+    Sets: is_active=true AND subscription_status='active'
+    
+    Returns:
+        204 No Content on success
+    """
+    try:
+        from db import get_db
+        from models import AdminAuditLog
+        
+        # Owner only
+        current_user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        db = next(get_db())
+        try:
+            # Get current tenant from JWT
+            import uuid as uuid_module
+            tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Reactivate tenant
+            tenant.is_active = True
+            tenant.subscription_status = 'active'
+            db.commit()
+            
+            # Write audit log
+            try:
+                audit_log = AdminAuditLog(
+                    tenant_id=tenant.id,
+                    user_id=current_user.id,
+                    action="ops.tenant.reactivate",
+                    target_type="tenant",
+                    target_id=tenant.id,
+                    metadata_json=json.dumps({"tenant_slug": tenant.slug})
+                )
+                db.add(audit_log)
+                db.commit()
+            except Exception as audit_error:
+                logger.error(f"Failed to record audit log: {str(audit_error)}", exc_info=True)
+            
+            return jsonify(), 204
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error reactivating tenant: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/usage/summary", methods=["GET"])
+def admin_usage_summary():
+    """
+    Get usage summary for the current tenant.
+    Requires: owner role AND tenant slug === "kerr-ai-studio"
+    
+    Query params:
+        days: int (default 30, clamp 1..365)
+    
+    Returns:
+        {
+            "days": <int>,
+            "totals": {
+                "events": <int>,
+                "success": <int>,
+                "failed": <int>,
+                "jira_ticket_count": <int>,
+                "input_char_count": <int>
+            },
+            "by_agent": [
+                {
+                    "agent": <str>,
+                    "events": <int>,
+                    "success": <int>,
+                    "failed": <int>,
+                    "jira_ticket_count": <int>,
+                    "input_char_count": <int>
+                },
+                ...
+            ]
+        }
+    """
+    try:
+        from db import get_db
+        from models import UsageEvent
+        from datetime import datetime, timezone, timedelta
+        
+        # Owner only
+        user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Parse days param
+        days = request.args.get('days', 30, type=int)
+        days = max(1, min(365, days))  # Clamp 1..365
+        
+        db = next(get_db())
+        try:
+            # Get current tenant from JWT
+            import uuid as uuid_module
+            tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Calculate cutoff date
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+            
+            # Query usage events for this tenant
+            events = db.query(UsageEvent).filter(
+                UsageEvent.tenant_id == tenant.id,
+                UsageEvent.created_at >= cutoff_date
+            ).all()
+            
+            # Calculate totals
+            totals = {
+                "events": len(events),
+                "success": sum(1 for e in events if e.success),
+                "failed": sum(1 for e in events if not e.success),
+                "jira_ticket_count": sum(e.jira_ticket_count or 0 for e in events),
+                "input_char_count": sum(e.input_char_count or 0 for e in events)
+            }
+            
+            # Group by agent
+            by_agent_dict = {}
+            for event in events:
+                agent = event.agent or "unknown"
+                if agent not in by_agent_dict:
+                    by_agent_dict[agent] = {
+                        "agent": agent,
+                        "events": 0,
+                        "success": 0,
+                        "failed": 0,
+                        "jira_ticket_count": 0,
+                        "input_char_count": 0
+                    }
+                
+                by_agent_dict[agent]["events"] += 1
+                if event.success:
+                    by_agent_dict[agent]["success"] += 1
+                else:
+                    by_agent_dict[agent]["failed"] += 1
+                by_agent_dict[agent]["jira_ticket_count"] += (event.jira_ticket_count or 0)
+                by_agent_dict[agent]["input_char_count"] += (event.input_char_count or 0)
+            
+            by_agent = list(by_agent_dict.values())
+            
+            return jsonify({
+                "days": days,
+                "totals": totals,
+                "by_agent": by_agent
+            }), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error getting usage summary: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/runs/recent", methods=["GET"])
+def admin_recent_runs():
+    """
+    Get recent runs for the current tenant.
+    Requires: owner role AND tenant slug === "kerr-ai-studio"
+    
+    Query params:
+        limit: int (default 25, max 100)
+    
+    Returns:
+        List of runs with: run_id, created_at, agent, status, review_status, jira_issue_key, summary
+    """
+    try:
+        from db import get_db
+        from models import Run
+        
+        # Owner only
+        user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Parse limit param
+        limit = request.args.get('limit', 25, type=int)
+        limit = max(1, min(100, limit))  # Clamp 1..100
+        
+        db = next(get_db())
+        try:
+            # Get current tenant from JWT
+            import uuid as uuid_module
+            tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Query recent runs for this tenant
+            runs = db.query(Run).filter(
+                Run.tenant_id == tenant.id
+            ).order_by(Run.created_at.desc()).limit(limit).all()
+            
+            runs_list = []
+            for r in runs:
+                runs_list.append({
+                    "run_id": r.run_id,
+                    "created_at": r.created_at.isoformat() + "Z" if r.created_at else None,
+                    "agent": r.agent or "unknown",
+                    "status": r.status,
+                    "review_status": r.review_status,
+                    "jira_issue_key": r.jira_issue_key,
+                    "summary": r.summary
+                })
+            
+            return jsonify(runs_list), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error getting recent runs: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/admin/audit", methods=["GET"])
+def admin_audit_log():
+    """
+    Get admin audit log for the current tenant.
+    Requires: owner role AND tenant slug === "kerr-ai-studio"
+    
+    Query params:
+        limit: int (default 50, max 200)
+    
+    Returns:
+        List of audit log entries ordered by created_at desc
+    """
+    try:
+        from db import get_db
+        from models import AdminAuditLog
+        
+        # Owner only
+        user, error_response = require_owner()
+        if error_response:
+            return error_response
+        
+        # Parse limit param
+        limit = request.args.get('limit', 50, type=int)
+        limit = max(1, min(200, limit))  # Clamp 1..200
+        
+        db = next(get_db())
+        try:
+            # Get current tenant from JWT
+            import uuid as uuid_module
+            tenant_id_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(g.tenant_id)
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
+            if not tenant:
+                return jsonify({"detail": "Tenant not found"}), 404
+            
+            # Query audit log for this tenant
+            audit_logs = db.query(AdminAuditLog).filter(
+                AdminAuditLog.tenant_id == tenant.id
+            ).order_by(AdminAuditLog.created_at.desc()).limit(limit).all()
+            
+            logs_list = []
+            for log in audit_logs:
+                logs_list.append({
+                    "id": str(log.id),
+                    "user_id": str(log.user_id),
+                    "action": log.action,
+                    "target_type": log.target_type,
+                    "target_id": str(log.target_id) if log.target_id else None,
+                    "metadata": json.loads(log.metadata_json) if log.metadata_json else None,
+                    "created_at": log.created_at.isoformat() + "Z" if log.created_at else None
+                })
+            
+            return jsonify(logs_list), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error getting audit log: {str(e)}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
 @app.route("/api/v1/tenant/bootstrap-status", methods=["GET"])
 def get_bootstrap_status():
     """
@@ -11202,14 +12767,29 @@ def get_bootstrap_status():
 @app.route("/api/v1/runs", methods=["GET"])
 def list_runs():
     """
-    List all test plan generation runs.
+    List test plan generation runs with pagination.
+    
+    Query parameters:
+        page: int = 1 (min 1, 1-based)
+        limit: int = 10 (min 1, max 50)
     
     Returns:
-        JSON array of runs ordered by created_at descending.
+        {
+            "items": [ ...runs... ],
+            "pagination": {
+                "total": <int>,
+                "page": <int>,
+                "limit": <int>,
+                "total_pages": <int>,
+                "has_prev": <bool>,
+                "has_next": <bool>
+            }
+        }
     """
     try:
         from db import get_db
         from models import Run
+        from sqlalchemy import func
         
         db = next(get_db())
         try:
@@ -11218,10 +12798,41 @@ def list_runs():
             if not tenant_id:
                 return jsonify({"detail": "Unauthorized"}), 401
             
-            # Query runs for this tenant only, ordered by created_at descending
-            runs = db.query(Run).filter(
-                Run.tenant_id == tenant_id
-            ).order_by(Run.created_at.desc()).all()
+            # Get pagination parameters
+            page = request.args.get('page', '1', type=int)
+            limit = request.args.get('limit', '10', type=int)
+            
+            # Validate and clamp pagination params
+            page = max(1, page)
+            limit = max(1, min(50, limit))  # Clamp between 1 and 50
+            
+            # Base query with tenant isolation
+            base_query = db.query(Run).filter(Run.tenant_id == tenant_id)
+            
+            # Get total count
+            total = base_query.count()
+            
+            # Calculate pagination metadata
+            total_pages = (total + limit - 1) // limit if total > 0 else 0
+            
+            # Clamp page to valid range (if page > total_pages and total_pages > 0, return empty)
+            if total_pages > 0 and page > total_pages:
+                # Return empty items with correct pagination metadata
+                return jsonify({
+                    "items": [],
+                    "pagination": {
+                        "total": total,
+                        "page": page,
+                        "limit": limit,
+                        "total_pages": total_pages,
+                        "has_prev": False,
+                        "has_next": False
+                    }
+                }), 200
+            
+            # Query paginated runs, ordered by created_at descending, then run_id descending for stability
+            offset = (page - 1) * limit
+            runs = base_query.order_by(Run.created_at.desc(), Run.run_id.desc()).offset(offset).limit(limit).all()
             
             # Format runs for JSON response
             runs_list = []
@@ -11265,7 +12876,18 @@ def list_runs():
                     "output_item_count": getattr(run, 'output_item_count', None)
                 })
             
-            return jsonify(runs_list), 200
+            # Return paginated response
+            return jsonify({
+                "items": runs_list,
+                "pagination": {
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": total_pages,
+                    "has_prev": page > 1,
+                    "has_next": page < total_pages if total_pages > 0 else False
+                }
+            }), 200
         finally:
             db.close()
     except Exception as e:
@@ -12779,7 +14401,9 @@ load_test_plan_from_file()
 # Initialize database on startup
 try:
     from db import init_db, get_db, engine, Base
-    from models import Run, Artifact
+    # Import ALL models at startup to ensure they're registered with Base.metadata
+    # This must happen before Flask-SQLAlchemy initialization to avoid metadata conflicts
+    from models import Run, Artifact, Tenant, TenantUser, TenantIntegration, UsageEvent, Lead, PasswordResetToken, AdminAuditLog  # noqa: F401
     from services.persistence import (
         write_json_artifact,
         save_run,
@@ -12803,6 +14427,7 @@ try:
         # Create Flask-SQLAlchemy db object for migrations
         # This uses the same database URL but creates its own engine
         # Note: Existing code should continue using get_db() from db.py, not this db object
+        # All models must be imported BEFORE this line to avoid metadata conflicts
         db = SQLAlchemy(app, metadata=Base.metadata)
         
         # Initialize Flask-Migrate

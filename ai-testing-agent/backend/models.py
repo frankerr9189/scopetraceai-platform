@@ -255,3 +255,56 @@ class Lead(Base):
     utm_campaign = Column(String(200), nullable=True)
     utm_term = Column(String(200), nullable=True)
     utm_content = Column(String(200), nullable=True)
+
+
+class PasswordResetToken(Base):
+    """
+    Model for storing password reset tokens (Phase 2.1).
+    Tokens are stored hashed in the database for security.
+    """
+    __tablename__ = "password_reset_tokens"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("tenant_users.id", ondelete="CASCADE"), nullable=False)
+    token_hash = Column(Text, nullable=False, unique=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, server_default=text('now()'))
+    
+    # Relationship to user
+    user = relationship("TenantUser")
+    
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_password_reset_user_id', 'user_id'),
+        Index('idx_password_reset_expires_at', 'expires_at'),
+    )
+
+
+class AdminAuditLog(Base):
+    """
+    Model for storing admin operations audit trail (ops safety).
+    Records all admin actions for compliance and security.
+    """
+    __tablename__ = "admin_audit_log"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("tenant_users.id", ondelete="SET NULL"), nullable=False)
+    action = Column(String(100), nullable=False)  # e.g., 'ops.user.deactivate', 'ops.tenant.suspend'
+    target_type = Column(String(50), nullable=True)  # 'user' | 'tenant' | 'usage' | 'run'
+    target_id = Column(UUID(as_uuid=True), nullable=True)  # ID of the target entity
+    metadata_json = Column('metadata', Text, nullable=True)  # JSON string for additional context (Python attr 'metadata_json' maps to DB column 'metadata' to avoid SQLAlchemy reserved name conflict)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, server_default=text('now()'))
+    
+    # Relationships
+    tenant = relationship("Tenant")
+    user = relationship("TenantUser")
+    
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_admin_audit_tenant_id', 'tenant_id'),
+        Index('idx_admin_audit_user_id', 'user_id'),
+        Index('idx_admin_audit_created_at', 'created_at'),
+        Index('idx_admin_audit_action', 'action'),
+    )

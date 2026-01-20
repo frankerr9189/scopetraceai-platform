@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, NavLink } from 'react-router-dom'
 import { 
   FileText, 
   ListChecks, 
@@ -15,7 +15,8 @@ import {
   Sparkles,
   History,
   LogOut,
-  Settings
+  Settings,
+  UserCircle
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { useTenantStatus } from '../contexts/TenantStatusContext'
@@ -284,9 +285,49 @@ export function Sidebar({
               className="relative z-10 mt-3 pt-3 border-t border-blue-500/20 space-y-2"
             >
               <div className="space-y-1">
-                <p className="text-xs text-blue-300/70 font-medium">
-                  Signed in as <span className="text-blue-200/90">{userDisplayName}</span>
-                </p>
+                <div className="flex items-center gap-2">
+                  <NavLink
+                    to="/profile"
+                    aria-label="Account"
+                    className={({ isActive }) =>
+                      `group relative inline-flex items-center justify-center
+                       text-blue-400
+                       hover:text-blue-300
+                       transition-colors duration-150`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {/* Always-on glow */}
+                        <span
+                          className={`relative inline-flex items-center justify-center rounded-full p-1
+                                     shadow-[0_0_10px_rgba(59,130,246,0.45)]
+                                     ring-1 ring-blue-400/40
+                                     transition-shadow duration-200
+                                     ${isActive
+                                       ? "shadow-[0_0_14px_rgba(59,130,246,0.65)] ring-blue-400/60"
+                                       : ""}`}
+                        >
+                          <UserCircle className="h-4 w-4" />
+                        </span>
+
+                        {/* Tooltip */}
+                        <span
+                          className="pointer-events-none absolute left-full ml-2 px-2 py-1 rounded-md text-xs
+                                     bg-blue-900/95 text-blue-200 opacity-0
+                                     group-hover:opacity-100 transition-opacity
+                                     whitespace-nowrap shadow-lg z-50 border border-blue-400/30"
+                        >
+                          Account
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+
+                  <p className="text-xs text-blue-300/70 font-medium">
+                    Signed in as <span className="text-blue-200/90">{userDisplayName}</span>
+                  </p>
+                </div>
                 <p className="text-xs text-blue-300/50 font-normal">
                   Client: <span className="text-blue-200/70">
                     {!isTenantContextReady || isTenantLoading 

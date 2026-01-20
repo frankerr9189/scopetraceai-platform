@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -16,15 +16,24 @@ import {
   markRunReviewed,
   approveRun,
   createJiraTicket,
-  refreshTenantStatus
+  refreshTenantStatus,
+  PaginationMeta
 } from '../services/api'
+import { Pagination } from './Pagination'
 
 export function RunHistoryPage() {
   const { runId } = useParams<{ runId?: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [runs, setRuns] = useState<Run[]>([])
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(() => {
+    const pageParam = searchParams.get('page')
+    return pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1
+  })
+  const limit = 10
   const [selectedRun, setSelectedRun] = useState<Run | null>(null)
   const [artifacts, setArtifacts] = useState<{
     testPlan: any | null
@@ -43,9 +52,20 @@ export function RunHistoryPage() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [transitionError, setTransitionError] = useState<string | null>(null)
 
+  // Sync URL to state on mount
+  useEffect(() => {
+    const currentPage = searchParams.get('page')
+    const pageNum = currentPage ? Math.max(1, parseInt(currentPage, 10)) : 1
+    if (pageNum !== page) {
+      setPage(pageNum)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run on mount
+
+  // Load runs when page changes
   useEffect(() => {
     loadRuns()
-  }, [])
+  }, [page])
 
   useEffect(() => {
     if (runId) {
@@ -77,13 +97,32 @@ export function RunHistoryPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await fetchRuns()
-      setRuns(data)
+      const response = await fetchRuns({ page, limit })
+      
+      // Auto-clamp: if page > total_pages and total_pages > 0, redirect to last valid page
+      if (response.pagination.total_pages > 0 && 
+          response.items.length === 0 && 
+          page > response.pagination.total_pages) {
+        const clampedPage = response.pagination.total_pages
+        setPage(clampedPage)
+        setSearchParams({ page: clampedPage.toString() }, { replace: true })
+        // Re-fetch with clamped page (will happen via useEffect dependency on page)
+        setIsLoading(false)
+        return
+      }
+      
+      setRuns(response.items)
+      setPagination(response.pagination)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load runs')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage)
+    setSearchParams({ page: newPage.toString() }, { replace: true })
   }
 
   const loadArtifacts = async (runId: string) => {
@@ -234,8 +273,8 @@ export function RunHistoryPage() {
     try {
       await createJiraTicket(selectedRun.run_id)
       await loadRuns()
-      const updatedRuns = await fetchRuns()
-      const updatedRun = updatedRuns.find(r => r.run_id === selectedRun.run_id)
+      const updatedResponse = await fetchRuns({ page, limit })
+      const updatedRun = updatedResponse.items.find(r => r.run_id === selectedRun.run_id)
       if (updatedRun) {
         setSelectedRun(updatedRun)
       }
@@ -648,6 +687,15 @@ export function RunHistoryPage() {
                 ))}
               </AnimatePresence>
             </div>
+            {pagination && (
+              <Pagination
+                page={pagination.page}
+                totalPages={pagination.total_pages}
+                onPageChange={handlePageChange}
+                total={pagination.total}
+                limit={pagination.limit}
+              />
+            )}
           </CardContent>
         </Card>
       )}
