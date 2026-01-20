@@ -1334,7 +1334,7 @@ export interface TenantSummary {
   id: string
   name: string
   slug: string
-  subscription_status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
+  subscription_status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled' | 'suspended' | 'active'
   req_remaining: number
   test_remaining: number
   wb_remaining: number

@@ -5,7 +5,6 @@ import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Loader2, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react'
 import { 
-  listTenants, 
   resetTenantTrial, 
   setTenantTrial, 
   type TenantSummary, 

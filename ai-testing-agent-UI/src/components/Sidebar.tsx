@@ -289,7 +289,7 @@ export function Sidebar({
                   <NavLink
                     to="/profile"
                     aria-label="Account"
-                    className={({ isActive }) =>
+                    className={() =>
                       `group relative inline-flex items-center justify-center
                        text-blue-400
                        hover:text-blue-300
