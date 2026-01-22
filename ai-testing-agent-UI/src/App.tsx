@@ -11,6 +11,7 @@ import { RegisterPage } from './components/RegisterPage'
 import { ProfilePage } from './components/ProfilePage'
 import { ForgotPasswordPage } from './components/ForgotPasswordPage'
 import { ResetPasswordPage } from './components/ResetPasswordPage'
+import { InvitePage } from './components/InvitePage'
 import { TenantOnboardingPage } from './components/TenantOnboardingPage'
 import { AdminOnboardingPage } from './components/AdminOnboardingPage'
 import { CompanyOnboardingPage } from './components/CompanyOnboardingPage'
@@ -34,6 +35,35 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!accessToken) {
     // Redirect to login, preserving the attempted route
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+  
+  return <>{children}</>
+}
+
+/**
+ * Owner-only route guard.
+ * Ensures user is authenticated and has owner role.
+ */
+function OwnerRoute({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
+  const accessToken = localStorage.getItem('access_token')
+  
+  if (!accessToken) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+  
+  const userStr = localStorage.getItem('user')
+  if (!userStr) {
+    return <Navigate to="/login" replace />
+  }
+  
+  try {
+    const user = JSON.parse(userStr)
+    if (user.role !== 'owner') {
+      return <Navigate to="/" replace />
+    }
+  } catch {
+    return <Navigate to="/login" replace />
   }
   
   return <>{children}</>
@@ -214,6 +244,7 @@ function AppContent() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/invite" element={<InvitePage />} />
             <Route path="/onboarding/tenant" element={<TenantOnboardingPage />} />
             <Route path="/onboarding/admin" element={<AdminOnboardingPage />} />
             <Route 
@@ -296,9 +327,9 @@ function AppContent() {
             <Route 
               path="/admin" 
               element={
-                <OnboardingGuard>
+                <OwnerRoute>
                   <AdminPage />
-                </OnboardingGuard>
+                </OwnerRoute>
               } 
             />
             <Route 

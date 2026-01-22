@@ -45,8 +45,11 @@ def check_entitlement(db: Session, tenant_id: str) -> Tuple[bool, Optional[str],
                 return True, None, None, None
             raise ValueError(error_msg)
         
-        subscription_status = getattr(tenant, "subscription_status", "unselected")
-        trial_remaining = getattr(tenant, "trial_testplan_runs_remaining", 0)
+        # Get billing data from tenant_billing (single source of truth)
+        from services.entitlements_centralized import get_tenant_billing
+        billing = get_tenant_billing(db, tenant_id)
+        subscription_status = billing.get("subscription_status", "unselected")
+        trial_remaining = billing.get("trial_testplan_runs_remaining", 0)
         
         # Block paywalled and canceled
         if subscription_status == "paywalled":
@@ -120,10 +123,13 @@ def consume_trial_run(db: Session, tenant_id: str, agent: str = "test_plan") -> 
         if not tenant:
             raise ValueError(f"Tenant not found: {tenant_id}")
         
-        subscription_status = getattr(tenant, "subscription_status", "unselected")
-        trial_requirements = getattr(tenant, "trial_requirements_runs_remaining", 0)
-        trial_testplan = getattr(tenant, "trial_testplan_runs_remaining", 0)
-        trial_writeback = getattr(tenant, "trial_writeback_runs_remaining", 0)
+        # Get billing data from tenant_billing (single source of truth)
+        from services.entitlements_centralized import get_tenant_billing
+        billing = get_tenant_billing(db, tenant_id)
+        subscription_status = billing.get("subscription_status", "unselected")
+        trial_requirements = billing.get("trial_requirements_runs_remaining", 0)
+        trial_testplan = billing.get("trial_testplan_runs_remaining", 0)
+        trial_writeback = billing.get("trial_writeback_runs_remaining", 0)
         
         # Only decrement if in trial status
         if subscription_status == "trial":
@@ -150,12 +156,18 @@ def consume_trial_run(db: Session, tenant_id: str, agent: str = "test_plan") -> 
                 
                 # Check if all three counters are now 0
                 if trial_requirements == 0 and trial_testplan == 0 and trial_writeback == 0:
-                    tenant.subscription_status = "paywalled"
-                    logger.info(
-                        f"Tenant {tenant_id}: All trial counters exhausted. "
-                        f"Set subscription_status=paywalled. "
-                        f"Remaining: requirements={trial_requirements}, testplan={trial_testplan}, writeback={trial_writeback}"
-                    )
+                    # Update tenant_billing.status (single source of truth for billing)
+                    from services.entitlements_centralized import update_tenant_billing_status
+                    try:
+                        update_tenant_billing_status(db, tenant_id, "paywalled")
+                        logger.info(
+                            f"Tenant {tenant_id}: All trial counters exhausted. "
+                            f"Set tenant_billing.status=paywalled. "
+                            f"Remaining: requirements={trial_requirements}, testplan={trial_testplan}, writeback={trial_writeback}"
+                        )
+                    except RuntimeError as e:
+                        logger.error(f"Failed to update tenant_billing.status to paywalled: {e}")
+                        # Continue - trial counters are already updated
                 else:
                     logger.info(
                         f"Tenant {tenant_id}: Decremented {counter_field} "

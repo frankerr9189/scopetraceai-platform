@@ -13,6 +13,17 @@ export interface TenantStatus {
   trial_writeback_runs_remaining: number
 }
 
+export interface BillingStatus {
+  ok: boolean
+  tenant_id?: string
+  plan_tier?: string
+  status?: string
+  current_period_start?: string | null
+  current_period_end?: string | null
+  cancel_at_period_end?: boolean
+  error?: string
+}
+
 export interface BootstrapStatus {
   tenant_id: string
   subscription_status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
@@ -62,6 +73,28 @@ export async function getBootstrapStatus(): Promise<BootstrapStatus> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
     throw new Error(error.detail || `Failed to fetch bootstrap status: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Get billing status (includes plan_tier)
+ */
+export async function getBillingStatus(): Promise<BillingStatus> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/billing/status`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ ok: false, error: 'Unknown error' }))
+    throw error
   }
 
   return response.json()
@@ -1499,6 +1532,7 @@ export interface UserProfile {
   zip: string | null
   phone: string | null
   tenant_id: string
+  tenant_name: string | null
 }
 
 export interface UpdateUserProfileRequest {
@@ -1596,18 +1630,34 @@ export async function changePassword(request: ChangePasswordRequest): Promise<vo
  * Request password reset (forgot password)
  */
 export async function forgotPassword(request: ForgotPasswordRequest): Promise<void> {
-  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/auth/forgot-password`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
-  })
+  try {
+    const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
 
-  // Always returns 200, even if email doesn't exist (security)
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-    throw new Error(error.detail || `Failed to request password reset: ${response.statusText}`)
+    // Always returns 200, even if email doesn't exist (security)
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+      throw new Error(error.detail || `Failed to request password reset: ${response.statusText}`)
+    }
+  } catch (error) {
+    // Handle network errors (DNS resolution, connection refused, etc.)
+    if (error instanceof TypeError && (
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('NetworkError') ||
+      error.message.includes('Network request failed') ||
+      error.message.includes('could not be found')
+    )) {
+      throw new Error(
+        `Unable to connect to the server. Please check that the backend is running at ${TEST_PLAN_API_BASE_URL}`
+      )
+    }
+    // Re-throw other errors
+    throw error
   }
 }
 
@@ -1615,17 +1665,202 @@ export async function forgotPassword(request: ForgotPasswordRequest): Promise<vo
  * Reset password using token
  */
 export async function resetPassword(request: ResetPasswordRequest): Promise<void> {
-  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/auth/reset-password`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
+  try {
+    const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/auth/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+      throw new Error(error.detail || `Failed to reset password: ${response.statusText}`)
+    }
+  } catch (error) {
+    // Handle network errors (DNS resolution, connection refused, etc.)
+    if (error instanceof TypeError && (
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('NetworkError') ||
+      error.message.includes('Network request failed') ||
+      error.message.includes('could not be found')
+    )) {
+      throw new Error(
+        `Unable to connect to the server. Please check that the backend is running at ${TEST_PLAN_API_BASE_URL}`
+      )
+    }
+    // Re-throw other errors
+    throw error
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tenant User Management (Phase B: Tenant-scoped user invites)
+// ---------------------------------------------------------------------------
+
+export interface TenantUser {
+  id: string
+  email: string
+  role: string
+  is_active: boolean
+  first_name: string | null
+  last_name: string | null
+  created_at: string | null
+  last_login_at: string | null
+  has_pending_invite?: boolean
+}
+
+export interface InviteUserRequest {
+  email: string
+  role: 'user' | 'admin'
+  first_name?: string
+  last_name?: string
+}
+
+export interface InviteUserResponse {
+  ok: boolean
+  user_id?: string
+  email?: string
+  error?: string
+  current_seats?: number
+  seat_cap?: number
+}
+
+export interface AcceptInviteRequest {
+  token: string
+  new_password: string
+}
+
+/**
+ * List users for the authenticated tenant
+ */
+export async function listTenantUsers(): Promise<TenantUser[]> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/tenant/users`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
   })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-    throw new Error(error.detail || `Failed to reset password: ${response.statusText}`)
+    throw new Error(error.detail || error.error || `Failed to list tenant users: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Invite a user to the authenticated tenant
+ */
+export async function inviteTenantUser(request: InviteUserRequest): Promise<InviteUserResponse> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/tenant/users/invite`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ ok: false, error: 'Unknown error' }))
+    // Return error object with structured error info
+    throw error
+  }
+
+  return response.json()
+}
+
+/**
+ * Accept invite and set password
+ */
+export async function acceptInvite(request: AcceptInviteRequest): Promise<void> {
+  try {
+    const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/auth/accept-invite`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+      throw new Error(error.detail || `Failed to accept invite: ${response.statusText}`)
+    }
+  } catch (error) {
+    // Handle network errors
+    if (error instanceof TypeError && (
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('NetworkError') ||
+      error.message.includes('Network request failed') ||
+      error.message.includes('could not be found')
+    )) {
+      throw new Error(
+        `Unable to connect to the server. Please check that the backend is running at ${TEST_PLAN_API_BASE_URL}`
+      )
+    }
+    // Re-throw other errors
+    throw error
+  }
+}
+
+/**
+ * Deactivate a user in the authenticated tenant
+ */
+export async function deactivateTenantUser(userId: string): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/tenant/users/${userId}/deactivate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ ok: false, error: 'Unknown error' }))
+    // Return error object with structured error info
+    throw error
+  }
+
+  const result = await response.json()
+  if (!result.ok) {
+    throw result
+  }
+}
+
+/**
+ * Reactivate a user in the authenticated tenant
+ */
+export async function reactivateTenantUser(userId: string): Promise<void> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/tenant/users/${userId}/reactivate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ ok: false, error: 'Unknown error' }))
+    // Return error object with structured error info
+    throw error
+  }
+
+  const result = await response.json()
+  if (!result.ok) {
+    throw result
   }
 }
 

@@ -1,9 +1,30 @@
 import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { User, Lock } from 'lucide-react'
-import { getUserProfile, updateUserProfile, changePassword, UserProfile } from '../services/api'
+import { Badge } from './ui/badge'
+import { User, Lock, Loader2, Users } from 'lucide-react'
+import { 
+  getUserProfile, 
+  updateUserProfile, 
+  changePassword, 
+  UserProfile,
+  listTenantUsers,
+  inviteTenantUser,
+  getBillingStatus,
+  deactivateTenantUser,
+  reactivateTenantUser,
+  type TenantUser,
+  type InviteUserRequest
+} from '../services/api'
 import { showToast } from './Toast'
+
+// Helper function to safely format dates
+function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return '—'
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString()
+}
 
 export function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -27,9 +48,180 @@ export function ProfilePage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   
+  // Team Management state (admin only)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([])
+  const [tenantUsersLoading, setTenantUsersLoading] = useState(false)
+  const [tenantUsersError, setTenantUsersError] = useState<string | null>(null)
+  const [seatCap, setSeatCap] = useState<number | null>(null)
+  const [isInviting, setIsInviting] = useState(false)
+  const [inviteForm, setInviteForm] = useState<InviteUserRequest>({
+    email: '',
+    role: 'user',
+    first_name: '',
+    last_name: ''
+  })
+  const [activatingUserId, setActivatingUserId] = useState<string | null>(null)
+  
   useEffect(() => {
     loadProfile()
   }, [])
+  
+  // Load user role and team management data if admin
+  useEffect(() => {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        setUserRole(user.role)
+        setCurrentUserId(user.id || null)
+        if (user.role === 'admin') {
+          loadTenantUsers()
+          loadSeatCap()
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, [])
+  
+  const loadTenantUsers = async () => {
+    setTenantUsersLoading(true)
+    setTenantUsersError(null)
+    try {
+      const users = await listTenantUsers()
+      setTenantUsers(users)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load tenant users'
+      setTenantUsersError(errorMessage)
+      if (errorMessage.includes('Unauthorized') || errorMessage.includes('FORBIDDEN')) {
+        showToast('Access denied', 'error')
+      }
+    } finally {
+      setTenantUsersLoading(false)
+    }
+  }
+  
+  const loadSeatCap = async () => {
+    try {
+      const billing = await getBillingStatus()
+      const planTier = billing.plan_tier || 'free'
+      // Map plan tier to seat cap
+      const seatCapMap: Record<string, number> = {
+        'free': 1,
+        'user': 5,
+        'team': 10
+      }
+      setSeatCap(seatCapMap[planTier] || 1)
+    } catch (err) {
+      // Silently fail - don't break page if billing status unavailable
+      console.warn('Failed to load seat cap:', err)
+    }
+  }
+  
+  const handleInviteUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsInviting(true)
+    setTenantUsersError(null)
+    
+    try {
+      const result = await inviteTenantUser(inviteForm)
+      if (result.ok) {
+        showToast('Invite sent', 'info')
+        // Reset form
+        setInviteForm({
+          email: '',
+          role: 'user',
+          first_name: '',
+          last_name: ''
+        })
+        // Reload users
+        await loadTenantUsers()
+      }
+    } catch (err: any) {
+      // Handle structured errors
+      if (err.error === 'SEAT_CAP_EXCEEDED') {
+        const message = `Seat limit reached (${err.current_seats || 0}/${err.seat_cap || 0}). Upgrade plan to add more users.`
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      } else if (err.error === 'BILLING_INACTIVE') {
+        const message = 'Billing inactive. Please complete billing to add users.'
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      } else if (err.error === 'USER_ALREADY_EXISTS') {
+        const message = 'User already exists.'
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      } else if (err.error === 'EMAIL_IN_USE') {
+        const message = 'Email is already used in another tenant.'
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      } else {
+        const message = err.message || err.error || 'Unable to invite user.'
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      }
+    } finally {
+      setIsInviting(false)
+    }
+  }
+  
+  const handleDeactivateUser = async (userId: string) => {
+    setActivatingUserId(userId)
+    setTenantUsersError(null)
+    
+    try {
+      await deactivateTenantUser(userId)
+      showToast('User deactivated', 'info')
+      await loadTenantUsers()
+    } catch (err: any) {
+      // Handle structured errors
+      if (err.error === 'SELF_DEACTIVATE_FORBIDDEN') {
+        const message = "You can't deactivate your own account."
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      } else if (err.error === 'LAST_ADMIN_FORBIDDEN') {
+        const message = "You can't deactivate the last admin on the account."
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      } else {
+        const message = err.message || err.error || 'Failed to deactivate user'
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      }
+    } finally {
+      setActivatingUserId(null)
+    }
+  }
+  
+  const handleReactivateUser = async (userId: string) => {
+    setActivatingUserId(userId)
+    setTenantUsersError(null)
+    
+    try {
+      await reactivateTenantUser(userId)
+      showToast('User reactivated', 'info')
+      await loadTenantUsers()
+    } catch (err: any) {
+      // Handle structured errors
+      if (err.error === 'SEAT_CAP_EXCEEDED') {
+        const message = `Seat limit reached (${err.current_seats || 0}/${err.seat_cap || 0}). Upgrade plan to add more users.`
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      } else if (err.error === 'BILLING_INACTIVE') {
+        const message = 'Billing inactive. Please complete billing to add users.'
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      } else {
+        const message = err.message || err.error || 'Failed to reactivate user'
+        setTenantUsersError(message)
+        showToast(message, 'error')
+      }
+    } finally {
+      setActivatingUserId(null)
+    }
+  }
   
   const loadProfile = async () => {
     try {
@@ -178,10 +370,10 @@ export function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground/70">Tenant ID</label>
+                  <label className="text-sm font-medium text-foreground/70">Client Name</label>
                   <input
                     type="text"
-                    value={profile.tenant_id}
+                    value={profile.tenant_name || '—'}
                     disabled
                     className="w-full px-4 py-2 bg-muted border border-input rounded-md text-foreground/50 cursor-not-allowed"
                   />
@@ -362,6 +554,193 @@ export function ProfilePage() {
             </form>
           </CardContent>
         </Card>
+        
+        {/* Team Management Section (admin only) */}
+        {userRole === 'admin' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Users className="h-6 w-6 text-foreground/80" />
+                <CardTitle>Team Management</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {tenantUsersError && (
+                <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <p className="text-sm text-destructive">{tenantUsersError}</p>
+                </div>
+              )}
+              
+              {/* Seat usage indicator */}
+              {seatCap !== null && (
+                <div className="mb-4 text-sm text-muted-foreground">
+                  Seats: {tenantUsers.filter(u => u.is_active).length} / {seatCap}
+                </div>
+              )}
+              
+              {/* Invite form */}
+              <form onSubmit={handleInviteUser} className="mb-6 space-y-4 border-b border-border pb-6">
+                <h3 className="text-sm font-semibold text-foreground">Invite User</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-foreground">Email <span className="text-destructive">*</span></label>
+                    <input
+                      type="email"
+                      value={inviteForm.email}
+                      onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                      required
+                      disabled={isInviting}
+                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="user@example.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-foreground">Role <span className="text-destructive">*</span></label>
+                    <select
+                      value={inviteForm.role}
+                      onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value as 'user' | 'admin' })}
+                      required
+                      disabled={isInviting}
+                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-foreground">First Name</label>
+                    <input
+                      type="text"
+                      value={inviteForm.first_name}
+                      onChange={(e) => setInviteForm({ ...inviteForm, first_name: e.target.value })}
+                      disabled={isInviting}
+                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-foreground">Last Name</label>
+                    <input
+                      type="text"
+                      value={inviteForm.last_name}
+                      onChange={(e) => setInviteForm({ ...inviteForm, last_name: e.target.value })}
+                      disabled={isInviting}
+                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={isInviting || !inviteForm.email}
+                  >
+                    {isInviting ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        Inviting...
+                      </>
+                    ) : (
+                      'Invite User'
+                    )}
+                  </Button>
+                </div>
+              </form>
+              
+              {/* Users list */}
+              {tenantUsersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-foreground/50" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {tenantUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No users found</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Email</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Role</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Status</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Created</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tenantUsers.map((user) => (
+                            <tr key={user.id} className="border-b border-border/50 hover:bg-secondary/20">
+                              <td className="px-4 py-3 text-sm">{user.email}</td>
+                              <td className="px-4 py-3 text-sm">
+                                {user.first_name || user.last_name 
+                                  ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                                  : '—'}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <Badge variant="outline">{user.role}</Badge>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {user.is_active ? (
+                                  <Badge variant="default">Active</Badge>
+                                ) : user.has_pending_invite ? (
+                                  <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">
+                                    Pending Activation
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary">Inactive</Badge>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                {formatDate(user.created_at)}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {user.is_active ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeactivateUser(user.id)}
+                                    disabled={activatingUserId === user.id || user.id === currentUserId}
+                                  >
+                                    {activatingUserId === user.id ? (
+                                      <>
+                                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                        Deactivating...
+                                      </>
+                                    ) : (
+                                      'Deactivate'
+                                    )}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleReactivateUser(user.id)}
+                                    disabled={activatingUserId === user.id}
+                                  >
+                                    {activatingUserId === user.id ? (
+                                      <>
+                                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                        Reactivating...
+                                      </>
+                                    ) : (
+                                      'Reactivate'
+                                    )}
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

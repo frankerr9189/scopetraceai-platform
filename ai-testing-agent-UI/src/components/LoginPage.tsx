@@ -98,9 +98,14 @@ export function LoginPage() {
           return
         }
       } catch (fetchError) {
-        // Network error (backend not running, CORS, etc.)
-        if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
-          setError(`Cannot connect to backend at ${TEST_PLAN_API_BASE_URL}. Please ensure the backend server is running and CORS is properly configured.`)
+        // Network error (backend not running, CORS, DNS resolution failure, etc.)
+        if (fetchError instanceof TypeError && (
+          fetchError.message.includes('Failed to fetch') ||
+          fetchError.message.includes('NetworkError') ||
+          fetchError.message.includes('Network request failed') ||
+          fetchError.message.includes('could not be found')
+        )) {
+          setError(`Unable to connect to the server at ${TEST_PLAN_API_BASE_URL}. Please check that the backend is running and the API URL is configured correctly.`)
         } else {
           setError(fetchError instanceof Error ? fetchError.message : 'Network error: Failed to connect to server')
         }

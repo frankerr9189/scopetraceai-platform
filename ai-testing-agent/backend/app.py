@@ -14,6 +14,7 @@ import io
 import tempfile
 import uuid
 import time
+import secrets
 from datetime import datetime, timezone
 from typing import Optional, Union
 from flask import Flask, request, jsonify, Response, g
@@ -75,10 +76,11 @@ if production_origins:
 
 # Enable CORS for all routes with Authorization header support
 # Note: supports_credentials=False because authentication uses JWT tokens in Authorization headers, not cookies
+# Stripe-Signature header is allowed for webhook endpoint (server-to-server, but defensive for local testing)
 CORS(
     app,
     origins=ALLOWED_ORIGINS,
-    allow_headers=["Content-Type", "Authorization", "X-Actor"],
+    allow_headers=["Content-Type", "Authorization", "X-Actor", "Stripe-Signature"],
     expose_headers=["Content-Type", "Content-Disposition"],
     supports_credentials=False
 )
@@ -105,12 +107,16 @@ def check_auth():
     # Allow health check endpoints, auth endpoints, and public lead submission
     # Also allow check-slug (public) and tenant-first onboarding routes (no auth required)
     # Phase 2.1: Allow password reset routes (public)
+    # Stripe webhook endpoint must bypass auth (verified via Stripe signature instead)
     public_routes = [
         "/health", "/health/db", "/", "/auth/login", 
         "/api/v1/leads", "/api/v1/tenants/check-slug",
         "/api/v1/onboarding/tenant",  # Tenant creation is public (no auth required)
         "/api/v1/auth/forgot-password",  # Phase 2.1: Public password reset request
-        "/api/v1/auth/reset-password"  # Phase 2.1: Public password reset
+        "/api/v1/auth/reset-password",  # Phase 2.1: Public password reset
+        "/api/v1/auth/accept-invite",  # Phase A: Public invite acceptance
+        "/api/v1/billing/webhook",  # Stripe webhook (auth via Stripe signature)
+        "/api/v1/billing/webhook/"  # Stripe webhook with trailing slash
     ]
     if request.path in public_routes or request.path.startswith("/api/v1/onboarding/tenant/"):
         return None
@@ -196,12 +202,41 @@ def check_auth():
             is_owner = user.role == "owner"
             
             if not (is_admin_route and is_owner):
-                # Apply kill switch for non-admin routes or non-owner users
-                if tenant.subscription_status == 'suspended':
-                    return jsonify({
-                        "code": "TENANT_SUSPENDED",
-                        "detail": "Tenant is suspended"
-                    }), 403
+                # Get billing data from tenant_billing (single source of truth)
+                from services.entitlements_centralized import get_tenant_billing, create_tenant_billing_row
+                try:
+                    billing = get_tenant_billing(db, str(tenant.id))
+                    subscription_status = billing.get("subscription_status")
+                    
+                    # Apply kill switch for non-admin routes or non-owner users
+                    if subscription_status == 'suspended':
+                        return jsonify({
+                            "code": "TENANT_SUSPENDED",
+                            "detail": "Tenant is suspended"
+                        }), 403
+                except RuntimeError as e:
+                    # tenant_billing row is missing - create it with defaults (plan_tier='trial', status='incomplete')
+                    logger.info(f"tenant_billing row missing for tenant {tenant.id}, creating with defaults")
+                    try:
+                        # Use "trial" as default plan_tier (database constraint allows: trial, user, team, enterprise)
+                        create_tenant_billing_row(db, str(tenant.id), "unselected", "trial")
+                        db.commit()
+                        # Re-fetch billing data after creation
+                        billing = get_tenant_billing(db, str(tenant.id))
+                        subscription_status = billing.get("subscription_status")
+                        # Check suspended status after creation (should be 'paywalled' for incomplete status)
+                        if subscription_status == 'suspended':
+                            return jsonify({
+                                "code": "TENANT_SUSPENDED",
+                                "detail": "Tenant is suspended"
+                            }), 403
+                    except Exception as create_error:
+                        db.rollback()
+                        logger.error(f"Failed to create tenant_billing row for tenant {tenant.id}: {create_error}", exc_info=True)
+                        return jsonify({
+                            "code": "BILLING_DATA_MISSING",
+                            "detail": "Billing data is required but could not be created"
+                        }), 500
                 
                 # Backward compatibility: also block if tenant is inactive (but not suspended)
                 if not tenant.is_active:
@@ -223,9 +258,11 @@ def check_auth():
     # PLAN SELECTION GATE: Check if tenant has selected a subscription plan
     # Allow access to specific routes even if plan is unselected
     # /api/v1/analyze is allowed to restore 1/14 behavior (requirements extraction always works)
+    # /api/v1/billing/checkout-session is allowed so users can create checkout for paid plans
     allowed_unselected_routes = [
         "/auth/me",
         "/api/v1/analyze",  # Requirements extraction - no subscription gating (matches 1/14 behavior)
+        "/api/v1/billing/checkout-session",  # Checkout creation - needed before plan selection
     ]
     # Also allow subscription update endpoint
     subscription_update_path = f"/api/v1/tenants/{g.tenant_id}/subscription"
@@ -235,26 +272,28 @@ def check_auth():
     )
     
     if not is_allowed_unselected_route:
-        # Check tenant subscription status
+        # Check tenant subscription status from tenant_billing (single source of truth)
         try:
             from db import get_db
-            from models import Tenant
+            from services.entitlements_centralized import get_tenant_billing
             
             db = next(get_db())
             try:
-                tenant = db.query(Tenant).filter(Tenant.id == g.tenant_id).first()
-                if tenant:
-                    # Refresh the tenant object to ensure we have the latest subscription_status from the database
-                    db.refresh(tenant)
-                    # Read subscription_status directly from the database column
-                    status = tenant.subscription_status if hasattr(tenant, "subscription_status") else None
-                    # Block if unselected or canceled
-                    if status == "unselected":
-                        return jsonify({"detail": "Subscription plan not selected."}), 403
-                    if status == "canceled":
-                        return jsonify({"detail": "Subscription canceled."}), 403
+                # Get billing data from tenant_billing table
+                billing = get_tenant_billing(db, str(g.tenant_id))
+                status = billing.get("subscription_status")
+                
+                # Block if unselected or canceled
+                if status == "unselected":
+                    return jsonify({"detail": "Subscription plan not selected."}), 403
+                if status == "canceled":
+                    return jsonify({"detail": "Subscription canceled."}), 403
             finally:
                 db.close()
+        except RuntimeError as e:
+            # Hard error if tenant_billing is missing
+            logger.error(f"tenant_billing missing in plan selection gate: {e}")
+            return jsonify({"detail": "Billing data is required but not found"}), 500
         except Exception as e:
             # If we can't check, allow the request (fail open for availability)
             logger.warning(f"Could not check subscription status: {e}")
@@ -4609,6 +4648,15 @@ def get_current_user():
                 logger.error(f"Tenant {user.tenant_id} not found for user {user.id}")
                 return jsonify({"detail": "Tenant not found"}), 500
             
+            # Get billing data from tenant_billing (single source of truth)
+            from services.entitlements_centralized import get_tenant_billing
+            try:
+                billing = get_tenant_billing(db, str(user.tenant_id))
+                subscription_status = billing.get("subscription_status", "unselected")
+            except RuntimeError as e:
+                logger.error(f"tenant_billing missing in /auth/me: {e}")
+                subscription_status = "unselected"  # Fallback for /auth/me to avoid breaking login
+            
             response = {
                 "user_id": str(user.id),
                 "email": user.email,
@@ -4616,7 +4664,7 @@ def get_current_user():
                 "tenant_id": str(user.tenant_id),
                 "tenant_slug": tenant.slug,
                 "tenant_name": tenant.name,
-                "subscription_status": getattr(tenant, "subscription_status", "unselected"),
+                "subscription_status": subscription_status,
                 "tenant_is_active": getattr(tenant, "is_active", True),
                 "user_is_active": getattr(user, "is_active", True),
                 "first_name": user.first_name,
@@ -4667,6 +4715,11 @@ def get_user_profile():
             if not user:
                 return jsonify({"detail": "User not found"}), 404
             
+            # Get tenant name
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+            tenant_name = tenant.name if tenant else None
+            
             response = {
                 "id": str(user.id),
                 "email": user.email,
@@ -4680,7 +4733,8 @@ def get_user_profile():
                 "state": user.state,
                 "zip": user.zip,
                 "phone": user.phone,
-                "tenant_id": str(user.tenant_id)
+                "tenant_id": str(user.tenant_id),
+                "tenant_name": tenant_name
             }
             
             return jsonify(response), 200
@@ -4755,6 +4809,11 @@ def update_user_profile():
                 user.updated_at = datetime.now(timezone.utc)
                 db.commit()
             
+            # Get tenant name
+            from models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+            tenant_name = tenant.name if tenant else None
+            
             # Return updated user
             response = {
                 "id": str(user.id),
@@ -4769,7 +4828,8 @@ def update_user_profile():
                 "state": user.state,
                 "zip": user.zip,
                 "phone": user.phone,
-                "tenant_id": str(user.tenant_id)
+                "tenant_id": str(user.tenant_id),
+                "tenant_name": tenant_name
             }
             
             return jsonify(response), 200
@@ -4973,6 +5033,69 @@ def reset_password():
         return jsonify({"detail": "Internal server error"}), 500
 
 
+@app.route("/api/v1/auth/accept-invite", methods=["POST"])
+def accept_invite():
+    """
+    Accept user invite and set password (Phase A: Tenant User Management).
+    Token is one-time use and expires after 7 days.
+    
+    Request body:
+        {
+            "token": "<invite_token>",
+            "new_password": "<new_password>"
+        }
+    
+    Returns:
+        204 No Content on success
+    """
+    # This is a public route - no auth required
+    try:
+        from db import get_db
+        from models import TenantUser
+        from services.auth import (
+            consume_invite_token, hash_password, validate_password_strength
+        )
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        token = data.get("token", "").strip()
+        new_password = data.get("new_password")
+        
+        if not token or not new_password:
+            return jsonify({"detail": "token and new_password are required"}), 400
+        
+        # Validate new password strength
+        is_valid, error_msg = validate_password_strength(new_password)
+        if not is_valid:
+            return jsonify({"detail": error_msg}), 400
+        
+        db = next(get_db())
+        try:
+            # Consume token (one-time use)
+            user_id = consume_invite_token(db, token)
+            if not user_id:
+                return jsonify({"detail": "Invalid or expired token"}), 400
+            
+            # Update user password and activate if needed
+            user = db.query(TenantUser).filter(TenantUser.id == user_id).first()
+            if not user:
+                return jsonify({"detail": "User not found"}), 404
+            
+            user.password_hash = hash_password(new_password)
+            user.is_active = True  # Activate user when they set password
+            user.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            
+            return Response(status=204)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error accepting invite: {e}", exc_info=True)
+        return jsonify({"detail": "Internal server error"}), 500
+
+
 @app.route("/api/v1/tenants/<tenant_id>/subscription", methods=["PATCH"])
 def update_tenant_subscription(tenant_id):
     """
@@ -5042,33 +5165,99 @@ def update_tenant_subscription(tenant_id):
                 return jsonify({"detail": "Tenant not found"}), 404
             
             # Update subscription status and trial counters based on plan
+            # Write to tenant_billing.status (single source of truth for billing)
+            from services.entitlements_centralized import update_tenant_billing_status
+            
+            # Determine plan_tier from subscription plan
+            plan_tier_map = {
+                "trial": "free",
+                "individual": "solo",
+                "team": "team",
+                "canceled": None  # Keep existing plan_tier
+            }
+            new_plan_tier = plan_tier_map.get(plan)
+            
+            # Update tenant_billing.status and plan_tier
+            # For trial: set plan_tier="free", status="trialing"
+            # For paid plans: set plan_tier accordingly, status="incomplete" until Stripe confirms
+            try:
+                from services.entitlements_centralized import STATUS_TRIALING, STATUS_INCOMPLETE
+                from sqlalchemy import text
+                import uuid as uuid_lib
+                
+                tenant_uuid = uuid_lib.UUID(tenant_id)
+                
+                if plan == "trial":
+                    # Trial plan: set plan_tier="free", status="trialing"
+                    db.execute(
+                        text("""
+                            UPDATE tenant_billing
+                            SET status = :status,
+                                plan_tier = :plan_tier,
+                                updated_at = NOW()
+                            WHERE tenant_id = :tenant_id
+                        """),
+                        {
+                            "status": STATUS_TRIALING,
+                            "plan_tier": "free",
+                            "tenant_id": str(tenant_uuid)
+                        }
+                    )
+                elif plan == "individual" or plan == "team":
+                    # Paid plan: set plan_tier, but keep status="incomplete" until Stripe confirms
+                    # (For now, we'll set status to "active" since we don't have Stripe integration yet)
+                    # TODO: When Stripe integration is added, set status="incomplete" here
+                    from services.entitlements_centralized import update_tenant_billing_status
+                    update_tenant_billing_status(db, str(tenant_id), plan, new_plan_tier)
+                else:
+                    # canceled or other: use existing update function
+                    from services.entitlements_centralized import update_tenant_billing_status
+                    update_tenant_billing_status(db, str(tenant_id), plan, new_plan_tier)
+                
+                db.commit()
+            except RuntimeError as e:
+                db.rollback()
+                logger.error(f"Failed to update tenant_billing.status: {e}")
+                return jsonify({"detail": "Failed to update billing status"}), 500
+            
+            # Update trial counters in tenants table (usage data, not billing)
             if plan == "trial":
-                tenant.subscription_status = "trial"
                 tenant.trial_requirements_runs_remaining = 3
                 tenant.trial_testplan_runs_remaining = 3
                 tenant.trial_writeback_runs_remaining = 3
             elif plan == "individual":
-                tenant.subscription_status = "individual"
-                # Individual plan: leave counters as-is (or set to 0)
+                # Individual plan: set counters to 0
                 tenant.trial_requirements_runs_remaining = 0
                 tenant.trial_testplan_runs_remaining = 0
                 tenant.trial_writeback_runs_remaining = 0
             elif plan == "team":
-                tenant.subscription_status = "team"
                 # Team plan: leave counters as-is (not used for team)
+                pass
             elif plan == "canceled":
-                tenant.subscription_status = "canceled"
                 # Canceled plan: leave counters as-is
+                pass
             
             db.commit()
             db.refresh(tenant)
             
+            # Read billing data from tenant_billing (single source of truth for reads)
+            from services.entitlements_centralized import get_tenant_billing
+            try:
+                billing = get_tenant_billing(db, str(tenant_id))
+                subscription_status = billing.get("subscription_status", "unselected")
+                trial_requirements = billing.get("trial_requirements_runs_remaining", 0)
+                trial_testplan = billing.get("trial_testplan_runs_remaining", 0)
+                trial_writeback = billing.get("trial_writeback_runs_remaining", 0)
+            except RuntimeError as e:
+                logger.error(f"tenant_billing missing after subscription update: {e}")
+                return jsonify({"detail": "Billing data is required but not found"}), 500
+            
             return jsonify({
                 "tenant_id": str(tenant.id),
-                "subscription_status": tenant.subscription_status,
-                "trial_requirements_runs_remaining": tenant.trial_requirements_runs_remaining,
-                "trial_testplan_runs_remaining": tenant.trial_testplan_runs_remaining,
-                "trial_writeback_runs_remaining": tenant.trial_writeback_runs_remaining
+                "subscription_status": subscription_status,
+                "trial_requirements_runs_remaining": trial_requirements,
+                "trial_testplan_runs_remaining": trial_testplan,
+                "trial_writeback_runs_remaining": trial_writeback
             }), 200
             
         except Exception as e:
@@ -5081,6 +5270,462 @@ def update_tenant_subscription(tenant_id):
     except Exception as e:
         logger.error(f"Error updating tenant subscription: {e}", exc_info=True)
         return jsonify({"detail": "Internal server error"}), 500
+
+
+@app.route("/api/v1/billing/webhook", methods=["POST"])
+def stripe_webhook():
+    """
+    Stripe webhook endpoint for receiving billing events.
+    
+    This endpoint:
+    - Bypasses app JWT auth (verified via Stripe signature instead)
+    - Verifies Stripe webhook signature
+    - Ingests events into stripe_events table with idempotency
+    - Enforces STRIPE_MODE guard (test vs live)
+    
+    Phase 2: Ingest-only (no billing updates).
+    
+    Returns:
+        200: Event received and ingested (or duplicate)
+        400: Invalid signature or malformed request
+        500: Server error
+    """
+    db = None
+    try:
+        from db import SessionLocal
+        from services.stripe_webhook_ingest import ingest_stripe_event
+        
+        # Get raw request body (required for Stripe signature verification)
+        raw_body = request.get_data()
+        if not raw_body:
+            app.logger.warning("Stripe webhook received empty body")
+            return jsonify({"ok": False, "error": "Empty request body"}), 400
+        
+        # Get Stripe signature header
+        signature = request.headers.get("Stripe-Signature", "")
+        if not signature:
+            app.logger.warning("Stripe webhook missing Stripe-Signature header")
+            return jsonify({"ok": False, "error": "Missing Stripe-Signature header"}), 400
+        
+        # Create DB session directly using SessionLocal (works for public routes)
+        db = SessionLocal()
+        try:
+            # Ingest event (verifies signature and inserts into database)
+            result = ingest_stripe_event(raw_body, signature, db)
+            
+            if result.get("success"):
+                # Event successfully ingested (new or duplicate)
+                response_data = {
+                    "received": True,
+                    "event_id": result.get("event_id")
+                }
+                if result.get("ignored"):
+                    response_data["ignored"] = True
+                    response_data["reason"] = "livemode_mismatch"
+                if result.get("duplicate"):
+                    response_data["duplicate"] = True
+                
+                return jsonify(response_data), 200
+            else:
+                # Should not happen (exceptions are raised), but handle gracefully
+                app.logger.error("Stripe webhook ingest returned success=False without exception")
+                return jsonify({"ok": False, "error": "Failed to process event"}), 500
+                
+        except ValueError as e:
+            # Signature verification failed
+            app.logger.warning(f"Stripe webhook signature verification failed: {e}")
+            return jsonify({"ok": False, "error": "Invalid webhook signature"}), 400
+        except RuntimeError as e:
+            # Database or other server error
+            app.logger.exception("Stripe webhook processing error")
+            return jsonify({"ok": False, "error": "Webhook handler error"}), 500
+        except Exception as e:
+            # Catch any other exceptions during ingestion
+            app.logger.exception("Unexpected error during Stripe webhook ingestion")
+            return jsonify({"ok": False, "error": "Webhook handler error"}), 500
+        finally:
+            if db:
+                try:
+                    db.close()
+                except Exception:
+                    pass  # Ignore errors during cleanup
+            
+    except Exception as e:
+        # Catch exceptions during DB session creation or imports
+        app.logger.exception("Stripe webhook failed")
+        if db:
+            try:
+                db.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
+        return jsonify({"ok": False, "error": "Webhook handler error"}), 500
+
+
+@app.route("/api/v1/billing/checkout-session", methods=["POST"])
+def create_checkout_session():
+    """
+    Create a Stripe Checkout Session for paid plans (user, team).
+    
+    This endpoint:
+    - Requires authentication (tenant_id from JWT)
+    - Creates a Stripe Checkout Session for subscription
+    - Returns checkout URL for redirect
+    
+    Phase 3A: Checkout creation only (no billing updates).
+    
+    Request body:
+        {
+            "plan_tier": "user" | "team"
+        }
+    
+    Returns:
+        200: {
+            "ok": true,
+            "url": "<checkout_url>",
+            "session_id": "<session_id>"
+        }
+        400: Invalid plan_tier or free plan
+        500: Server error (missing env vars, Stripe error)
+    """
+    try:
+        # Require authentication (tenant_id from JWT) - DO NOT accept from payload
+        if not hasattr(g, 'tenant_id') or not g.tenant_id:
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        
+        tenant_id = str(g.tenant_id)
+        
+        # Ensure tenant_billing row exists (create if missing with defaults)
+        from db import SessionLocal
+        from services.entitlements_centralized import get_tenant_billing, create_tenant_billing_row
+        
+        db = SessionLocal()
+        try:
+            try:
+                # Try to get billing data
+                billing = get_tenant_billing(db, tenant_id)
+            except RuntimeError:
+                # tenant_billing row is missing - create it with defaults
+                logger.info(f"tenant_billing row missing for tenant {tenant_id}, creating with defaults")
+                try:
+                    # Use "trial" as default plan_tier (database constraint allows: trial, user, team, enterprise)
+                    create_tenant_billing_row(db, tenant_id, "unselected", "trial")
+                    db.commit()
+                    # Refresh to get the newly created billing data
+                    billing = get_tenant_billing(db, tenant_id)
+                except Exception as create_error:
+                    db.rollback()
+                    logger.error(f"Failed to create tenant_billing row for tenant {tenant_id}: {create_error}", exc_info=True)
+                    return jsonify({
+                        "ok": False,
+                        "error": "TENANT_BILLING_MISSING",
+                        "detail": "Billing data is required but could not be created"
+                    }), 409
+        finally:
+            db.close()
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"ok": False, "error": "Request body must be JSON"}), 400
+        
+        plan_tier = data.get("plan_tier", "").strip().lower()
+        if not plan_tier:
+            return jsonify({"ok": False, "error": "plan_tier is required"}), 400
+        
+        # Validate plan_tier - only paid plans allowed
+        if plan_tier == "free":
+            return jsonify({"ok": False, "error": "Free plan does not require checkout"}), 400
+        
+        if plan_tier not in ("user", "team"):
+            return jsonify({"ok": False, "error": f"Invalid plan_tier: {plan_tier}. Must be 'user' or 'team'"}), 400
+        
+        # Check required environment variables
+        stripe_secret_key = os.getenv("STRIPE_SECRET_KEY")
+        app_base_url = os.getenv("APP_BASE_URL")
+        
+        # Price mapping (explicit, no magic)
+        PRICE_BY_PLAN = {
+            "user": os.getenv("STRIPE_PRICE_USER"),
+            "team": os.getenv("STRIPE_PRICE_TEAM"),
+        }
+        
+        price_id = PRICE_BY_PLAN.get(plan_tier)
+        
+        # Validate required env vars
+        missing_vars = []
+        if not stripe_secret_key:
+            missing_vars.append("STRIPE_SECRET_KEY")
+        if not app_base_url:
+            missing_vars.append("APP_BASE_URL")
+        if not price_id:
+            missing_vars.append(f"STRIPE_PRICE_{plan_tier.upper()}")
+        
+        if missing_vars:
+            app.logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
+            return jsonify({"ok": False, "error": "Server configuration error"}), 500
+        
+        # Initialize Stripe
+        try:
+            import stripe
+            stripe.api_key = stripe_secret_key
+        except ImportError:
+            app.logger.error("stripe package not installed")
+            return jsonify({"ok": False, "error": "Server configuration error"}), 500
+        
+        # Create Stripe Checkout Session
+        try:
+            session = stripe.checkout.Session.create(
+                mode="subscription",
+                line_items=[
+                    {
+                        "price": price_id,
+                        "quantity": 1
+                    }
+                ],
+                client_reference_id=tenant_id,
+                metadata={
+                    "tenant_id": tenant_id,
+                    "plan_tier": plan_tier
+                },
+                subscription_data={
+                    "metadata": {
+                        "tenant_id": tenant_id,
+                        "plan_tier": plan_tier
+                    }
+                },
+                success_url=f"{app_base_url}/onboarding/plan?success=1",
+                cancel_url=f"{app_base_url}/onboarding/plan?canceled=1"
+            )
+            
+            return jsonify({
+                "ok": True,
+                "url": session.url,
+                "session_id": session.id
+            }), 200
+            
+        except stripe.error.StripeError as e:
+            app.logger.exception(f"Stripe API error creating checkout session: {e}")
+            return jsonify({"ok": False, "error": "Failed to create checkout session"}), 500
+        except Exception as e:
+            app.logger.exception(f"Unexpected error creating checkout session: {e}")
+            return jsonify({"ok": False, "error": "Server error"}), 500
+            
+    except Exception as e:
+        app.logger.exception("Unexpected error in checkout session endpoint")
+        return jsonify({"ok": False, "error": "Server error"}), 500
+
+
+@app.route("/api/v1/billing/portal-session", methods=["POST"])
+def create_portal_session():
+    """
+    Create a Stripe Customer Portal session for billing management.
+    
+    This endpoint:
+    - Requires authentication (tenant_id from JWT)
+    - Creates a Stripe Customer Portal session
+    - Returns portal URL for redirect
+    
+    Request body:
+        None required (ignored if provided)
+    
+    Returns:
+        200: {
+            "ok": true,
+            "url": "<portal_url>"
+        }
+        409: Tenant billing missing or no Stripe customer
+        500: Server error (Stripe portal not configured, etc.)
+    """
+    try:
+        # Require authentication (tenant_id from JWT) - DO NOT accept from payload
+        if not hasattr(g, 'tenant_id') or not g.tenant_id:
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        
+        tenant_id = str(g.tenant_id)
+        
+        # Get tenant_billing to retrieve stripe_customer_id
+        from db import SessionLocal
+        from services.entitlements_centralized import get_tenant_billing
+        from sqlalchemy import text
+        
+        db = SessionLocal()
+        try:
+            try:
+                billing = get_tenant_billing(db, tenant_id)
+            except RuntimeError:
+                # tenant_billing row is missing
+                logger.error(f"tenant_billing row missing for tenant {tenant_id}")
+                return jsonify({
+                    "ok": False,
+                    "error": "TENANT_BILLING_MISSING"
+                }), 409
+            
+            # Query for stripe_customer_id directly from tenant_billing
+            result = db.execute(
+                text("""
+                    SELECT stripe_customer_id
+                    FROM tenant_billing
+                    WHERE tenant_id = :tenant_id
+                """),
+                {"tenant_id": tenant_id}
+            ).first()
+            
+            if not result:
+                return jsonify({
+                    "ok": False,
+                    "error": "TENANT_BILLING_MISSING"
+                }), 409
+            
+            stripe_customer_id = result.stripe_customer_id
+            
+            # Check if stripe_customer_id exists and is not empty
+            if not stripe_customer_id or not stripe_customer_id.strip():
+                logger.warning(f"No stripe_customer_id for tenant {tenant_id} (never completed paid checkout)")
+                return jsonify({
+                    "ok": False,
+                    "error": "NO_STRIPE_CUSTOMER"
+                }), 409
+                
+        finally:
+            db.close()
+        
+        # Check required environment variables
+        stripe_secret_key = os.getenv("STRIPE_SECRET_KEY")
+        app_base_url = os.getenv("APP_BASE_URL")
+        
+        if not stripe_secret_key:
+            app.logger.error("STRIPE_SECRET_KEY environment variable not set")
+            return jsonify({"ok": False, "error": "Server configuration error"}), 500
+        
+        if not app_base_url:
+            app.logger.error("APP_BASE_URL environment variable not set")
+            return jsonify({"ok": False, "error": "Server configuration error"}), 500
+        
+        # Initialize Stripe
+        try:
+            import stripe
+            stripe.api_key = stripe_secret_key
+        except ImportError:
+            app.logger.error("stripe package not installed")
+            return jsonify({"ok": False, "error": "Server configuration error"}), 500
+        
+        # Create Stripe Customer Portal Session
+        try:
+            portal_session = stripe.billing_portal.Session.create(
+                customer=stripe_customer_id,
+                return_url=f"{app_base_url}/settings/billing"
+            )
+            
+            return jsonify({
+                "ok": True,
+                "url": portal_session.url
+            }), 200
+            
+        except stripe.error.StripeError as e:
+            # Handle Stripe errors (portal not configured, etc.)
+            app.logger.exception(f"Stripe API error creating portal session: {e}")
+            # Check if it's a portal configuration error
+            error_code = getattr(e, 'code', None)
+            if error_code in ('portal_configuration_invalid', 'portal_configuration_not_found'):
+                return jsonify({"ok": False, "error": "STRIPE_PORTAL_NOT_CONFIGURED"}), 500
+            # Generic error for other Stripe errors
+            return jsonify({"ok": False, "error": "STRIPE_PORTAL_NOT_CONFIGURED"}), 500
+        except Exception as e:
+            app.logger.exception(f"Unexpected error creating portal session: {e}")
+            return jsonify({"ok": False, "error": "Server error"}), 500
+            
+    except Exception as e:
+        app.logger.exception("Unexpected error in portal session endpoint")
+        return jsonify({"ok": False, "error": "Server error"}), 500
+
+
+@app.route("/api/v1/billing/status", methods=["GET"])
+def get_billing_status():
+    """
+    Get the current billing status for the authenticated tenant.
+    
+    This endpoint:
+    - Requires authentication (tenant_id from JWT)
+    - Returns billing status from tenant_billing table
+    
+    Returns:
+        200: {
+            "ok": true,
+            "tenant_id": "<uuid>",
+            "plan_tier": "<string>",
+            "status": "<string>",
+            "current_period_start": "<iso or null>",
+            "current_period_end": "<iso or null>",
+            "cancel_at_period_end": <bool>
+        }
+        404: Tenant billing missing
+    """
+    try:
+        # Require authentication (tenant_id from JWT) - DO NOT accept from payload
+        if not hasattr(g, 'tenant_id') or not g.tenant_id:
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        
+        tenant_id = str(g.tenant_id)
+        
+        # Query tenant_billing for billing status
+        from db import SessionLocal
+        from sqlalchemy import text
+        
+        db = SessionLocal()
+        try:
+            result = db.execute(
+                text("""
+                    SELECT tenant_id, plan_tier, status,
+                           current_period_start, current_period_end,
+                           cancel_at_period_end
+                    FROM tenant_billing
+                    WHERE tenant_id = :tenant_id
+                """),
+                {"tenant_id": tenant_id}
+            ).first()
+            
+            if not result:
+                return jsonify({
+                    "ok": False,
+                    "error": "TENANT_BILLING_MISSING"
+                }), 404
+            
+            # Convert timestamps to ISO format (or null)
+            current_period_start_iso = None
+            if result.current_period_start:
+                if isinstance(result.current_period_start, datetime):
+                    current_period_start_iso = result.current_period_start.isoformat()
+                else:
+                    # If it's already a string, pass through
+                    current_period_start_iso = str(result.current_period_start)
+            
+            current_period_end_iso = None
+            if result.current_period_end:
+                if isinstance(result.current_period_end, datetime):
+                    current_period_end_iso = result.current_period_end.isoformat()
+                else:
+                    # If it's already a string, pass through
+                    current_period_end_iso = str(result.current_period_end)
+            
+            # Ensure cancel_at_period_end is boolean (default false if null)
+            cancel_at_period_end = bool(result.cancel_at_period_end) if result.cancel_at_period_end is not None else False
+            
+            return jsonify({
+                "ok": True,
+                "tenant_id": str(result.tenant_id),
+                "plan_tier": result.plan_tier or None,
+                "status": result.status or None,
+                "current_period_start": current_period_start_iso,
+                "current_period_end": current_period_end_iso,
+                "cancel_at_period_end": cancel_at_period_end
+            }), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        app.logger.exception("Unexpected error in billing status endpoint")
+        return jsonify({"ok": False, "error": "Server error"}), 500
 
 
 @app.route("/api/v1/tenants/check-slug", methods=["GET"])
@@ -5245,13 +5890,12 @@ def create_tenant():
                     "suggestions": suggestions
                 }), 409
             
-            # Create tenant with "unselected" subscription status (no defaults)
+            # Create tenant (billing data goes to tenant_billing table, not here)
             tenant = Tenant(
                 name=company_name,
                 slug=base_slug,
                 is_active=True,
-                subscription_status="unselected",
-                # Do NOT initialize trial counters - only set when plan is selected
+                # Trial counters initialized to 0 (only set when plan is selected)
                 trial_requirements_runs_remaining=0,
                 trial_testplan_runs_remaining=0,
                 trial_writeback_runs_remaining=0
@@ -5259,6 +5903,16 @@ def create_tenant():
             db.add(tenant)
             db.commit()
             db.refresh(tenant)
+            
+            # Create tenant_billing row (single source of truth for billing data)
+            # Initialize with plan_tier="trial", status="incomplete" (enforces onboarding gate)
+            from services.entitlements_centralized import create_tenant_billing_row
+            try:
+                create_tenant_billing_row(db, str(tenant.id), "unselected", "trial")  # Use "trial" as default (database constraint allows: trial, user, team, enterprise)
+            except RuntimeError as e:
+                logger.error(f"Failed to create tenant_billing row: {e}")
+                # Continue - tenant is created, billing row can be created later if needed
+                # But log the error for monitoring
             
             return jsonify({
                 "tenant_id": str(tenant.id),
@@ -8525,9 +9179,15 @@ def generate_test_plan():
                 
                 if not allowed:
                     # Build response with status and remaining
+                    # Special handling for onboarding incomplete
+                    if reason == "ONBOARDING_INCOMPLETE":
+                        message = "Complete onboarding: choose a plan"
+                    else:
+                        message = "Request blocked by subscription or plan limits."
+                    
                     response_detail = {
                         "error": reason or "PAYWALLED",
-                        "message": "Request blocked by subscription or plan limits."
+                        "message": message
                     }
                     if "subscription_status" in metadata:
                         response_detail["subscription_status"] = metadata["subscription_status"]
@@ -10729,9 +11389,15 @@ def jira_rewrite_execute():
             )
             
             if not allowed:
+                # Special handling for onboarding incomplete
+                if reason == "ONBOARDING_INCOMPLETE":
+                    message = "Complete onboarding: choose a plan"
+                else:
+                    message = "Request blocked by subscription or plan limits."
+                
                 response_detail = {
                     "error": reason or "PAYWALLED",
-                    "message": "Request blocked by subscription or plan limits."
+                    "message": message
                 }
                 if "subscription_status" in metadata:
                     response_detail["subscription_status"] = metadata["subscription_status"]
@@ -10856,9 +11522,15 @@ def jira_create_execute():
             )
             
             if not allowed:
+                # Special handling for onboarding incomplete
+                if reason == "ONBOARDING_INCOMPLETE":
+                    message = "Complete onboarding: choose a plan"
+                else:
+                    message = "Request blocked by subscription or plan limits."
+                
                 response_detail = {
                     "error": reason or "PAYWALLED",
-                    "message": "Request blocked by subscription or plan limits."
+                    "message": message
                 }
                 if "subscription_status" in metadata:
                     response_detail["subscription_status"] = metadata["subscription_status"]
@@ -10972,10 +11644,12 @@ def get_tenant_status():
     """
     Return tenant subscription and trial status for the authenticated tenant.
     Used by the UI to display Account Status (plan badge, trial remaining).
+    Reads from tenant_billing table (single source of truth).
     """
     try:
         from db import get_db
         from models import Tenant
+        from services.entitlements_centralized import get_tenant_billing
 
         db = next(get_db())
         try:
@@ -10987,19 +11661,438 @@ def get_tenant_status():
             if not tenant:
                 return jsonify({"detail": "Tenant not found"}), 404
 
+            # Get billing data from tenant_billing (single source of truth)
+            billing = get_tenant_billing(db, str(tenant_id))
+
             return jsonify({
                 "tenant_id": str(tenant.id),
                 "tenant_name": tenant.name,
-                "subscription_status": getattr(tenant, "subscription_status", "unselected"),
-                "trial_requirements_runs_remaining": getattr(tenant, "trial_requirements_runs_remaining", 0),
-                "trial_testplan_runs_remaining": getattr(tenant, "trial_testplan_runs_remaining", 0),
-                "trial_writeback_runs_remaining": getattr(tenant, "trial_writeback_runs_remaining", 0),
+                "subscription_status": billing.get("subscription_status", "unselected"),
+                "trial_requirements_runs_remaining": billing.get("trial_requirements_runs_remaining", 0),
+                "trial_testplan_runs_remaining": billing.get("trial_testplan_runs_remaining", 0),
+                "trial_writeback_runs_remaining": billing.get("trial_writeback_runs_remaining", 0),
             }), 200
         finally:
             db.close()
+    except RuntimeError as e:
+        logger.error(f"tenant_billing missing in get_tenant_status: {e}")
+        return jsonify({"detail": "Billing data is required but not found"}), 500
     except Exception as e:
         logger.error(f"Error fetching tenant status: {str(e)}")
         return jsonify({"detail": f"Failed to fetch tenant status: {str(e)}"}), 500
+
+
+@app.route("/api/v1/tenant/users", methods=["GET"])
+def list_tenant_users():
+    """
+    List users for the authenticated tenant.
+    Requires: owner or admin role
+    
+    Returns:
+        List of users with: id, email, role, is_active, first_name, last_name, created_at, last_login_at
+    """
+    try:
+        from db import get_db
+        from models import TenantUser
+        import uuid as uuid_module
+        
+        # Check auth and role (owner or admin)
+        if not hasattr(g, 'tenant_id') or not g.tenant_id:
+            return jsonify({"ok": False, "error": "UNAUTHORIZED"}), 401
+        
+        if not hasattr(g, 'role') or g.role not in ["owner", "admin"]:
+            return jsonify({"ok": False, "error": "FORBIDDEN", "message": "Admin access required"}), 403
+        
+        tenant_id = str(g.tenant_id)
+        tenant_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(tenant_id)
+        
+        db = next(get_db())
+        try:
+            # Query users in tenant
+            users = db.query(TenantUser).filter(
+                TenantUser.tenant_id == tenant_uuid
+            ).order_by(TenantUser.created_at.desc()).all()
+            
+            # Helper to format datetime for JSON (UTC with Z suffix)
+            def format_datetime_utc(dt):
+                if not dt:
+                    return None
+                # If timezone-aware, convert to UTC; if naive, assume UTC
+                if dt.tzinfo is not None:
+                    dt_utc = dt.astimezone(timezone.utc)
+                else:
+                    dt_utc = dt.replace(tzinfo=timezone.utc)
+                # Format as ISO 8601 with Z suffix (no timezone offset)
+                return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            
+            # Import UserInviteToken for checking pending invites
+            from models import UserInviteToken
+            
+            users_list = []
+            for u in users:
+                # Check if user has a pending (unused, non-expired) invite token
+                now = datetime.now(timezone.utc)
+                has_pending_invite = db.query(UserInviteToken).filter(
+                    UserInviteToken.user_id == u.id,
+                    UserInviteToken.used_at.is_(None),
+                    UserInviteToken.expires_at > now
+                ).first() is not None
+                
+                users_list.append({
+                    "id": str(u.id),
+                    "email": u.email,
+                    "role": u.role,
+                    "is_active": u.is_active,
+                    "first_name": u.first_name,
+                    "last_name": u.last_name,
+                    "created_at": format_datetime_utc(u.created_at),
+                    "last_login_at": format_datetime_utc(u.last_login_at),
+                    "has_pending_invite": has_pending_invite
+                })
+            
+            return jsonify(users_list), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error listing tenant users: {str(e)}", exc_info=True)
+        return jsonify({"ok": False, "error": "INTERNAL_ERROR"}), 500
+
+
+@app.route("/api/v1/tenant/users/invite", methods=["POST"])
+def invite_tenant_user():
+    """
+    Invite a user to the authenticated tenant.
+    Requires: owner or admin role
+    Enforces seat caps based on tenant billing plan tier.
+    
+    Request body:
+        {
+            "email": "user@example.com",
+            "role": "user" | "admin",
+            "first_name": "Optional",
+            "last_name": "Optional"
+        }
+    
+    Returns:
+        {
+            "ok": true,
+            "user_id": "<uuid>",
+            "email": "<email>"
+        }
+        Or error:
+        {
+            "ok": false,
+            "error": "SEAT_CAP_EXCEEDED" | "BILLING_INACTIVE" | "USER_ALREADY_EXISTS" | "EMAIL_IN_USE",
+            "current_seats": <int>,  # Only for SEAT_CAP_EXCEEDED
+            "seat_cap": <int>  # Only for SEAT_CAP_EXCEEDED
+        }
+    """
+    try:
+        from db import get_db
+        from models import TenantUser
+        from services.entitlements_centralized import check_seat_cap
+        from services.auth import (
+            create_invite_token, send_invite_email, get_invite_url, hash_password
+        )
+        from sqlalchemy import func
+        import uuid as uuid_module
+        
+        # Check auth and role (owner or admin)
+        if not hasattr(g, 'tenant_id') or not g.tenant_id:
+            return jsonify({"ok": False, "error": "UNAUTHORIZED"}), 401
+        
+        if not hasattr(g, 'role') or g.role not in ["owner", "admin"]:
+            return jsonify({"ok": False, "error": "FORBIDDEN", "message": "Admin access required"}), 403
+        
+        tenant_id = str(g.tenant_id)
+        tenant_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(tenant_id)
+        created_by_user_id = str(g.user_id) if hasattr(g, 'user_id') and g.user_id else None
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": "Request body must be JSON"}), 400
+        
+        email = data.get("email", "").strip().lower()
+        role = data.get("role", "user").strip().lower()
+        first_name = data.get("first_name", "").strip() if data.get("first_name") else None
+        last_name = data.get("last_name", "").strip() if data.get("last_name") else None
+        
+        # Validation
+        if not email:
+            return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": "email is required"}), 400
+        
+        if role not in ["user", "admin"]:
+            return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": "role must be 'user' or 'admin'"}), 400
+        
+        # Prevent inviting self (optional but good practice)
+        if hasattr(g, 'user_id') and g.user_id:
+            current_user_email = None
+            db_check = next(get_db())
+            try:
+                current_user = db_check.query(TenantUser).filter(
+                    TenantUser.id == (g.user_id if isinstance(g.user_id, uuid_module.UUID) else uuid_module.UUID(str(g.user_id)))
+                ).first()
+                if current_user and current_user.email.lower() == email:
+                    return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": "Cannot invite yourself"}), 400
+            finally:
+                db_check.close()
+        
+        db = next(get_db())
+        try:
+            # Check seat cap BEFORE creating user
+            seat_allowed, error_code, current_seats, seat_cap = check_seat_cap(db, tenant_id)
+            if not seat_allowed:
+                if error_code == "SEAT_CAP_EXCEEDED":
+                    return jsonify({
+                        "ok": False,
+                        "error": "SEAT_CAP_EXCEEDED",
+                        "current_seats": current_seats,
+                        "seat_cap": seat_cap
+                    }), 403
+                elif error_code == "BILLING_INACTIVE":
+                    return jsonify({"ok": False, "error": "BILLING_INACTIVE"}), 403
+                else:
+                    return jsonify({"ok": False, "error": error_code or "SEAT_CHECK_ERROR"}), 403
+            
+            # Check if user already exists in THIS tenant (tenant-scoped check)
+            existing_user = db.query(TenantUser).filter(
+                TenantUser.tenant_id == tenant_uuid,
+                func.lower(TenantUser.email) == email
+            ).first()
+            
+            if existing_user:
+                # User exists in same tenant
+                if existing_user.is_active:
+                    return jsonify({"ok": False, "error": "USER_ALREADY_EXISTS"}), 409
+                else:
+                    # User is inactive - allow re-invite
+                    # Create invite token and send email
+                    raw_token, token_model = create_invite_token(db, str(existing_user.id), created_by_user_id)
+                    invite_url = get_invite_url(raw_token)
+                    send_invite_email(existing_user.email, invite_url)
+                    db.commit()
+                    
+                    # Debug log (dev only)
+                    logger.info(f"INVITE_REINVITED tenant_id={tenant_id} user_id={existing_user.id} email={existing_user.email} is_active={existing_user.is_active}")
+                    
+                    return jsonify({
+                        "ok": True,
+                        "user_id": str(existing_user.id),
+                        "email": existing_user.email
+                    }), 200
+            
+            # Check if email is used in a different tenant (cross-tenant check)
+            email_in_other_tenant = db.query(TenantUser).filter(
+                TenantUser.tenant_id != tenant_uuid,
+                func.lower(TenantUser.email) == email
+            ).first()
+            
+            if email_in_other_tenant:
+                # User exists in different tenant
+                return jsonify({"ok": False, "error": "EMAIL_IN_USE"}), 409
+            
+            # Create new user
+            # Generate a temporary password (user will set via invite token)
+            temp_password = secrets.token_urlsafe(32)  # Random secure password
+            new_user = TenantUser(
+                tenant_id=tenant_uuid,
+                email=email,
+                password_hash=hash_password(temp_password),  # Temporary password
+                role=role,
+                is_active=False,  # Inactive until password is set via invite
+                first_name=first_name,
+                last_name=last_name
+            )
+            db.add(new_user)
+            db.flush()  # Flush to get user ID
+            
+            # Create invite token
+            raw_token, token_model = create_invite_token(db, str(new_user.id), created_by_user_id)
+            
+            # Send invite email
+            invite_url = get_invite_url(raw_token)
+            send_invite_email(new_user.email, invite_url)
+            
+            db.commit()
+            
+            # Debug log (dev only)
+            logger.info(f"INVITE_CREATED tenant_id={tenant_id} user_id={new_user.id} email={new_user.email} is_active={new_user.is_active}")
+            
+            return jsonify({
+                "ok": True,
+                "user_id": str(new_user.id),
+                "email": new_user.email
+            }), 201
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error inviting tenant user: {str(e)}", exc_info=True)
+        # Return more specific error message for debugging
+        error_message = str(e)
+        if "user_invite_tokens" in error_message.lower() or "does not exist" in error_message.lower():
+            return jsonify({"ok": False, "error": "INTERNAL_ERROR", "message": "Database table missing. Please run migration: db/sql/002_create_user_invite_tokens.sql"}), 500
+        return jsonify({"ok": False, "error": "INTERNAL_ERROR", "message": error_message}), 500
+
+
+@app.route("/api/v1/tenant/users/<user_id>/deactivate", methods=["POST"])
+def deactivate_tenant_user(user_id: str):
+    """
+    Deactivate a user in the authenticated tenant.
+    Requires: owner or admin role
+    Tenant-scoped: uses g.tenant_id
+    
+    Path parameters:
+        user_id: UUID of the user to deactivate
+    
+    Returns:
+        { "ok": true }
+        Or error:
+        { "ok": false, "error": "SELF_DEACTIVATE_FORBIDDEN" | "LAST_ADMIN_FORBIDDEN" | ... }
+    """
+    try:
+        from db import get_db
+        from models import TenantUser
+        import uuid as uuid_module
+        
+        # Check auth and role (owner or admin)
+        if not hasattr(g, 'tenant_id') or not g.tenant_id:
+            return jsonify({"ok": False, "error": "UNAUTHORIZED"}), 401
+        
+        if not hasattr(g, 'role') or g.role not in ["owner", "admin"]:
+            return jsonify({"ok": False, "error": "FORBIDDEN", "message": "Admin access required"}), 403
+        
+        tenant_id = str(g.tenant_id)
+        tenant_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(tenant_id)
+        current_user_id = g.user_id if isinstance(g.user_id, uuid_module.UUID) else uuid_module.UUID(str(g.user_id)) if hasattr(g, 'user_id') and g.user_id else None
+        
+        # Parse user_id
+        try:
+            target_user_id_uuid = uuid_module.UUID(user_id)
+        except ValueError:
+            return jsonify({"ok": False, "error": "INVALID_USER_ID"}), 400
+        
+        db = next(get_db())
+        try:
+            # Get target user and verify it belongs to tenant
+            target_user = db.query(TenantUser).filter(
+                TenantUser.id == target_user_id_uuid,
+                TenantUser.tenant_id == tenant_uuid
+            ).first()
+            
+            if not target_user:
+                return jsonify({"ok": False, "error": "USER_NOT_FOUND"}), 404
+            
+            # Prevent self-deactivation
+            if current_user_id and target_user.id == current_user_id:
+                return jsonify({"ok": False, "error": "SELF_DEACTIVATE_FORBIDDEN"}), 400
+            
+            # Prevent deactivating last active admin in tenant
+            if target_user.role == 'admin' and target_user.is_active:
+                active_admin_count = db.query(TenantUser).filter(
+                    TenantUser.tenant_id == tenant_uuid,
+                    TenantUser.role == 'admin',
+                    TenantUser.is_active == True
+                ).count()
+                
+                if active_admin_count <= 1:
+                    return jsonify({"ok": False, "error": "LAST_ADMIN_FORBIDDEN"}), 400
+            
+            # Deactivate user
+            target_user.is_active = False
+            target_user.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            
+            return jsonify({"ok": True}), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error deactivating tenant user: {str(e)}", exc_info=True)
+        return jsonify({"ok": False, "error": "INTERNAL_ERROR"}), 500
+
+
+@app.route("/api/v1/tenant/users/<user_id>/reactivate", methods=["POST"])
+def reactivate_tenant_user(user_id: str):
+    """
+    Reactivate a user in the authenticated tenant.
+    Requires: owner or admin role
+    Tenant-scoped: uses g.tenant_id
+    Enforces seat cap BEFORE reactivating.
+    
+    Path parameters:
+        user_id: UUID of the user to reactivate
+    
+    Returns:
+        { "ok": true }
+        Or error:
+        { "ok": false, "error": "SEAT_CAP_EXCEEDED", "current_seats": <int>, "seat_cap": <int> }
+    """
+    try:
+        from db import get_db
+        from models import TenantUser
+        from services.entitlements_centralized import check_seat_cap
+        import uuid as uuid_module
+        
+        # Check auth and role (owner or admin)
+        if not hasattr(g, 'tenant_id') or not g.tenant_id:
+            return jsonify({"ok": False, "error": "UNAUTHORIZED"}), 401
+        
+        if not hasattr(g, 'role') or g.role not in ["owner", "admin"]:
+            return jsonify({"ok": False, "error": "FORBIDDEN", "message": "Admin access required"}), 403
+        
+        tenant_id = str(g.tenant_id)
+        tenant_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(tenant_id)
+        
+        # Parse user_id
+        try:
+            target_user_id_uuid = uuid_module.UUID(user_id)
+        except ValueError:
+            return jsonify({"ok": False, "error": "INVALID_USER_ID"}), 400
+        
+        db = next(get_db())
+        try:
+            # Get target user and verify it belongs to tenant
+            target_user = db.query(TenantUser).filter(
+                TenantUser.id == target_user_id_uuid,
+                TenantUser.tenant_id == tenant_uuid
+            ).first()
+            
+            if not target_user:
+                return jsonify({"ok": False, "error": "USER_NOT_FOUND"}), 404
+            
+            # Enforce seat cap BEFORE reactivating
+            seat_allowed, error_code, current_seats, seat_cap = check_seat_cap(db, tenant_id)
+            if not seat_allowed:
+                if error_code == "SEAT_CAP_EXCEEDED":
+                    return jsonify({
+                        "ok": False,
+                        "error": "SEAT_CAP_EXCEEDED",
+                        "current_seats": current_seats,
+                        "seat_cap": seat_cap
+                    }), 403
+                elif error_code == "BILLING_INACTIVE":
+                    return jsonify({"ok": False, "error": "BILLING_INACTIVE"}), 403
+                else:
+                    return jsonify({"ok": False, "error": error_code or "SEAT_CHECK_ERROR"}), 403
+            
+            # Reactivate user
+            target_user.is_active = True
+            target_user.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            
+            return jsonify({"ok": True}), 200
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error reactivating tenant user: {str(e)}", exc_info=True)
+        return jsonify({"ok": False, "error": "INTERNAL_ERROR"}), 500
 
 
 @app.route("/api/v1/integrations/jira", methods=["POST"])
@@ -11260,8 +12353,9 @@ def list_tenants():
                     "name": <str>,
                     "slug": <str>,
                     "is_active": <bool>,
-                    "subscription_status": <str>,
-                    "plan_tier": <str>,  # Same as subscription_status for compatibility
+                    "subscription_status": <str>,  # Mapped subscription status
+                    "plan_tier": <str>,  # Plan tier (unselected, free, solo, team, business)
+                    "billing_status": <str>,  # Raw billing status from tenant_billing.status (Stripe status)
                     "trial_requirements_runs_remaining": <int>,
                     "trial_testplan_runs_remaining": <int>,
                     "trial_writeback_runs_remaining": <int>,
@@ -11283,22 +12377,45 @@ def list_tenants():
         
         db = next(get_db())
         try:
+            from services.entitlements_centralized import get_tenant_billing
+            
             # Query all tenants, ordered by name ASC
             tenants = db.query(Tenant).order_by(Tenant.name.asc()).all()
             
             # Format response
             tenants_list = []
             for tenant in tenants:
+                # Get billing data from tenant_billing (single source of truth)
+                try:
+                    billing = get_tenant_billing(db, str(tenant.id))
+                    subscription_status = billing.get("subscription_status", "unselected")
+                    plan_tier = billing.get("plan_tier") or "unselected"
+                    billing_status = billing.get("status") or "unknown"  # Raw billing status (Stripe status)
+                    trial_requirements = billing.get("trial_requirements_runs_remaining", 0)
+                    trial_testplan = billing.get("trial_testplan_runs_remaining", 0)
+                    trial_writeback = billing.get("trial_writeback_runs_remaining", 0)
+                except RuntimeError as e:
+                    # Hard error - tenant_billing is required
+                    logger.error(f"tenant_billing missing for tenant {tenant.id} in admin list: {e}")
+                    # Skip this tenant or use error values - for admin UI, we'll use error values
+                    subscription_status = "ERROR"
+                    plan_tier = "ERROR"
+                    billing_status = "ERROR"
+                    trial_requirements = 0
+                    trial_testplan = 0
+                    trial_writeback = 0
+                
                 tenants_list.append({
                     "id": str(tenant.id),
                     "name": tenant.name,
                     "slug": tenant.slug,
                     "is_active": getattr(tenant, "is_active", True),
-                    "subscription_status": getattr(tenant, "subscription_status", "unselected"),
-                    "plan_tier": getattr(tenant, "subscription_status", "unselected"),  # Alias for compatibility
-                    "trial_requirements_runs_remaining": getattr(tenant, "trial_requirements_runs_remaining", 0),
-                    "trial_testplan_runs_remaining": getattr(tenant, "trial_testplan_runs_remaining", 0),
-                    "trial_writeback_runs_remaining": getattr(tenant, "trial_writeback_runs_remaining", 0),
+                    "subscription_status": subscription_status,
+                    "plan_tier": plan_tier,
+                    "billing_status": billing_status,  # Raw billing status (Stripe status)
+                    "trial_requirements_runs_remaining": trial_requirements,
+                    "trial_testplan_runs_remaining": trial_testplan,
+                    "trial_writeback_runs_remaining": trial_writeback,
                     "created_at": tenant.created_at.isoformat() + "Z" if tenant.created_at else None,
                     "updated_at": tenant.updated_at.isoformat() + "Z" if tenant.updated_at else None
                 })
@@ -11376,8 +12493,15 @@ def reset_tenant_trial(tenant_id: str):
             if not target_tenant:
                 return jsonify({"error": "TENANT_NOT_FOUND", "message": f"Tenant not found: {tenant_id}"}), 404
             
-            # Update tenant
-            target_tenant.subscription_status = status_value
+            # Update tenant_billing.status (single source of truth for billing)
+            from services.entitlements_centralized import update_tenant_billing_status
+            try:
+                update_tenant_billing_status(db, tenant_id, status_value)
+            except RuntimeError as e:
+                logger.error(f"Failed to update tenant_billing.status: {e}")
+                return jsonify({"error": "BILLING_UPDATE_FAILED", "message": "Failed to update billing status"}), 500
+            
+            # Update trial counters in tenants table (usage data, not billing)
             target_tenant.trial_requirements_runs_remaining = req_value
             target_tenant.trial_testplan_runs_remaining = test_value
             target_tenant.trial_writeback_runs_remaining = writeback_value
@@ -11385,6 +12509,18 @@ def reset_tenant_trial(tenant_id: str):
             
             db.commit()
             db.refresh(target_tenant)
+            
+            # Read billing data from tenant_billing (single source of truth for reads)
+            from services.entitlements_centralized import get_tenant_billing
+            try:
+                billing = get_tenant_billing(db, tenant_id)
+                subscription_status = billing.get("subscription_status", "unselected")
+                trial_requirements = billing.get("trial_requirements_runs_remaining", 0)
+                trial_testplan = billing.get("trial_testplan_runs_remaining", 0)
+                trial_writeback = billing.get("trial_writeback_runs_remaining", 0)
+            except RuntimeError as e:
+                logger.error(f"tenant_billing missing after trial reset: {e}")
+                return jsonify({"error": "BILLING_DATA_MISSING", "message": "Billing data is required but not found"}), 500
             
             success = True
             error_code = "TRIAL_RESET"
@@ -11394,10 +12530,10 @@ def reset_tenant_trial(tenant_id: str):
                 "id": str(target_tenant.id),
                 "name": target_tenant.name,
                 "slug": target_tenant.slug,
-                "subscription_status": target_tenant.subscription_status,
-                "req_remaining": target_tenant.trial_requirements_runs_remaining,
-                "test_remaining": target_tenant.trial_testplan_runs_remaining,
-                "wb_remaining": target_tenant.trial_writeback_runs_remaining,
+                "subscription_status": subscription_status,
+                "req_remaining": trial_requirements,
+                "test_remaining": trial_testplan,
+                "wb_remaining": trial_writeback,
                 "is_active": target_tenant.is_active
             }), 200
             
@@ -11514,14 +12650,33 @@ def set_tenant_trial(tenant_id: str):
             if not target_tenant:
                 return jsonify({"error": "TENANT_NOT_FOUND", "message": f"Tenant not found: {tenant_id}"}), 404
             
-            # Update tenant with exact values
-            target_tenant.subscription_status = status_value
+            # Update tenant_billing.status (single source of truth for billing)
+            from services.entitlements_centralized import update_tenant_billing_status
+            try:
+                update_tenant_billing_status(db, tenant_id, status_value)
+            except RuntimeError as e:
+                logger.error(f"Failed to update tenant_billing.status: {e}")
+                return jsonify({"error": "BILLING_UPDATE_FAILED", "message": "Failed to update billing status"}), 500
+            
+            # Update trial counters in tenants table (usage data, not billing)
             target_tenant.trial_requirements_runs_remaining = req_value
             target_tenant.trial_testplan_runs_remaining = test_value
             target_tenant.trial_writeback_runs_remaining = writeback_value
             
             db.commit()
             db.refresh(target_tenant)
+            
+            # Read billing data from tenant_billing (single source of truth for reads)
+            from services.entitlements_centralized import get_tenant_billing
+            try:
+                billing = get_tenant_billing(db, tenant_id)
+                subscription_status = billing.get("subscription_status", "unselected")
+                trial_requirements = billing.get("trial_requirements_runs_remaining", 0)
+                trial_testplan = billing.get("trial_testplan_runs_remaining", 0)
+                trial_writeback = billing.get("trial_writeback_runs_remaining", 0)
+            except RuntimeError as e:
+                logger.error(f"tenant_billing missing after trial set: {e}")
+                return jsonify({"error": "BILLING_DATA_MISSING", "message": "Billing data is required but not found"}), 500
             
             success = True
             error_code = "TRIAL_SET"
@@ -11531,10 +12686,10 @@ def set_tenant_trial(tenant_id: str):
                 "id": str(target_tenant.id),
                 "name": target_tenant.name,
                 "slug": target_tenant.slug,
-                "subscription_status": target_tenant.subscription_status,
-                "req_remaining": target_tenant.trial_requirements_runs_remaining,
-                "test_remaining": target_tenant.trial_testplan_runs_remaining,
-                "wb_remaining": target_tenant.trial_writeback_runs_remaining,
+                "subscription_status": subscription_status,
+                "req_remaining": trial_requirements,
+                "test_remaining": trial_testplan,
+                "wb_remaining": trial_writeback,
                 "is_active": target_tenant.is_active
             }), 200
             
@@ -11621,14 +12776,21 @@ def set_tenant_status(tenant_id: str):
             if not target_tenant:
                 return jsonify({"detail": "Tenant not found"}), 404
             
-            # Update tenant status
+            # Update tenant_billing.status (single source of truth for billing)
+            from services.entitlements_centralized import update_tenant_billing_status
+            billing_status = "suspended" if status == "suspended" else "active"
+            try:
+                update_tenant_billing_status(db, tenant_id, billing_status)
+            except RuntimeError as e:
+                logger.error(f"Failed to update tenant_billing.status: {e}")
+                return jsonify({"detail": "Failed to update billing status"}), 500
+            
+            # Update tenant is_active flag
             if status == "suspended":
                 target_tenant.is_active = False
-                target_tenant.subscription_status = 'suspended'
                 action = "ops.tenant.suspend"
             else:  # active
                 target_tenant.is_active = True
-                target_tenant.subscription_status = 'active'
                 action = "ops.tenant.reactivate"
             
             db.commit()
@@ -11695,8 +12857,31 @@ def admin_list_tenant_users(tenant_id: str):
                 TenantUser.tenant_id == target_tenant_id_uuid
             ).order_by(TenantUser.created_at.desc()).all()
             
+            # Import UserInviteToken for checking pending invites
+            from models import UserInviteToken
+            
+            # Helper to format datetime for JSON (UTC with Z suffix)
+            def format_datetime_utc(dt):
+                if not dt:
+                    return None
+                # If timezone-aware, convert to UTC; if naive, assume UTC
+                if dt.tzinfo is not None:
+                    dt_utc = dt.astimezone(timezone.utc)
+                else:
+                    dt_utc = dt.replace(tzinfo=timezone.utc)
+                # Format as ISO 8601 with Z suffix (no timezone offset)
+                return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            
             users_list = []
             for u in users:
+                # Check if user has a pending (unused, non-expired) invite token
+                now = datetime.now(timezone.utc)
+                has_pending_invite = db.query(UserInviteToken).filter(
+                    UserInviteToken.user_id == u.id,
+                    UserInviteToken.used_at.is_(None),
+                    UserInviteToken.expires_at > now
+                ).first() is not None
+                
                 users_list.append({
                     "id": str(u.id),
                     "email": u.email,
@@ -11704,8 +12889,9 @@ def admin_list_tenant_users(tenant_id: str):
                     "is_active": u.is_active,
                     "first_name": u.first_name,
                     "last_name": u.last_name,
-                    "created_at": u.created_at.isoformat() + "Z" if u.created_at else None,
-                    "last_login_at": u.last_login_at.isoformat() + "Z" if u.last_login_at else None
+                    "created_at": format_datetime_utc(u.created_at),
+                    "last_login_at": format_datetime_utc(u.last_login_at),
+                    "has_pending_invite": has_pending_invite
                 })
             
             return jsonify(users_list), 200
@@ -12147,8 +13333,31 @@ def admin_list_users():
                 TenantUser.tenant_id == tenant.id
             ).order_by(TenantUser.created_at.desc()).all()
             
+            # Import UserInviteToken for checking pending invites
+            from models import UserInviteToken
+            
+            # Helper to format datetime for JSON (UTC with Z suffix)
+            def format_datetime_utc(dt):
+                if not dt:
+                    return None
+                # If timezone-aware, convert to UTC; if naive, assume UTC
+                if dt.tzinfo is not None:
+                    dt_utc = dt.astimezone(timezone.utc)
+                else:
+                    dt_utc = dt.replace(tzinfo=timezone.utc)
+                # Format as ISO 8601 with Z suffix (no timezone offset)
+                return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            
             users_list = []
             for u in users:
+                # Check if user has a pending (unused, non-expired) invite token
+                now = datetime.now(timezone.utc)
+                has_pending_invite = db.query(UserInviteToken).filter(
+                    UserInviteToken.user_id == u.id,
+                    UserInviteToken.used_at.is_(None),
+                    UserInviteToken.expires_at > now
+                ).first() is not None
+                
                 users_list.append({
                     "id": str(u.id),
                     "email": u.email,
@@ -12156,8 +13365,9 @@ def admin_list_users():
                     "is_active": u.is_active,
                     "first_name": u.first_name,
                     "last_name": u.last_name,
-                    "created_at": u.created_at.isoformat() + "Z" if u.created_at else None,
-                    "last_login_at": u.last_login_at.isoformat() + "Z" if u.last_login_at else None
+                    "created_at": format_datetime_utc(u.created_at),
+                    "last_login_at": format_datetime_utc(u.last_login_at),
+                    "has_pending_invite": has_pending_invite
                 })
             
             return jsonify(users_list), 200
@@ -12348,9 +13558,16 @@ def admin_suspend_tenant():
             if not tenant:
                 return jsonify({"detail": "Tenant not found"}), 404
             
+            # Update tenant_billing.status (single source of truth for billing)
+            from services.entitlements_centralized import update_tenant_billing_status
+            try:
+                update_tenant_billing_status(db, str(tenant_id_uuid), "suspended")
+            except RuntimeError as e:
+                logger.error(f"Failed to update tenant_billing.status: {e}")
+                return jsonify({"detail": "Failed to update billing status"}), 500
+            
             # Suspend tenant
             tenant.is_active = False
-            tenant.subscription_status = 'suspended'
             db.commit()
             
             # Write audit log
@@ -12408,8 +13625,15 @@ def admin_reactivate_tenant():
                 return jsonify({"detail": "Tenant not found"}), 404
             
             # Reactivate tenant
+            # Update tenant_billing.status (single source of truth for billing)
+            from services.entitlements_centralized import update_tenant_billing_status
+            try:
+                update_tenant_billing_status(db, str(tenant_id_uuid), "active")
+            except RuntimeError as e:
+                logger.error(f"Failed to update tenant_billing.status: {e}")
+                return jsonify({"detail": "Failed to update billing status"}), 500
+            
             tenant.is_active = True
-            tenant.subscription_status = 'active'
             db.commit()
             
             # Write audit log
@@ -12745,13 +13969,25 @@ def get_bootstrap_status():
                 "jira_user_email": jira_integration.jira_user_email if jira_integration else None
             }
 
+            # Get billing data from tenant_billing (single source of truth)
+            from services.entitlements_centralized import get_tenant_billing
+            try:
+                billing = get_tenant_billing(db, str(tenant_uuid))
+                subscription_status = billing.get("subscription_status", "unselected")
+                trial_requirements = billing.get("trial_requirements_runs_remaining", 0)
+                trial_testplan = billing.get("trial_testplan_runs_remaining", 0)
+                trial_writeback = billing.get("trial_writeback_runs_remaining", 0)
+            except RuntimeError as e:
+                logger.error(f"tenant_billing missing in get_bootstrap_status: {e}")
+                return jsonify({"detail": "Billing data is required but not found"}), 500
+            
             return jsonify({
                 "tenant_id": str(tenant.id),
-                "subscription_status": getattr(tenant, "subscription_status", "unselected"),
+                "subscription_status": subscription_status,
                 "trial": {
-                    "requirements": getattr(tenant, "trial_requirements_runs_remaining", 0),
-                    "testplan": getattr(tenant, "trial_testplan_runs_remaining", 0),
-                    "writeback": getattr(tenant, "trial_writeback_runs_remaining", 0)
+                    "requirements": trial_requirements,
+                    "testplan": trial_testplan,
+                    "writeback": trial_writeback
                 },
                 "jira": jira_status
             }), 200
@@ -14062,9 +15298,15 @@ def create_jira_ticket(run_id: str):
                 
                 if not allowed:
                     # Build response with status and remaining
+                    # Special handling for onboarding incomplete
+                    if reason == "ONBOARDING_INCOMPLETE":
+                        message = "Complete onboarding: choose a plan"
+                    else:
+                        message = "Request blocked by subscription or plan limits."
+                    
                     response_detail = {
                         "error": reason or "PAYWALLED",
-                        "message": "Request blocked by subscription or plan limits."
+                        "message": message
                     }
                     if "subscription_status" in metadata:
                         response_detail["subscription_status"] = metadata["subscription_status"]

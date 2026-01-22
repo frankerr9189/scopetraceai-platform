@@ -99,10 +99,9 @@ class Tenant(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, server_default=text('now()'))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False, server_default=text('now()'))
     
-    # Subscription and trial (onboarding gating Step 1)
-    # subscription_status: 'unselected' | 'trial' | 'individual' | 'team' | 'paywalled' | 'canceled'
-    # No default - must be explicitly set during onboarding
-    subscription_status = Column(String, nullable=False)
+    # Trial counters (usage data, not billing data)
+    # Billing data (subscription_status, plan_tier) is stored in tenant_billing table
+    # DO NOT add subscription_status or plan_tier here - they are in tenant_billing only
     trial_requirements_runs_remaining = Column(Integer, nullable=False, server_default=text("0"))
     trial_testplan_runs_remaining = Column(Integer, nullable=False, server_default=text("0"))
     trial_writeback_runs_remaining = Column(Integer, nullable=False, server_default=text("0"))
@@ -278,6 +277,33 @@ class PasswordResetToken(Base):
     __table_args__ = (
         Index('idx_password_reset_user_id', 'user_id'),
         Index('idx_password_reset_expires_at', 'expires_at'),
+    )
+
+
+class UserInviteToken(Base):
+    """
+    Model for storing user invite tokens (Phase A: Tenant User Management).
+    Tokens are stored hashed in the database for security.
+    """
+    __tablename__ = "user_invite_tokens"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("tenant_users.id", ondelete="CASCADE"), nullable=False)
+    token_hash = Column(Text, nullable=False, unique=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, server_default=text('now()'))
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("tenant_users.id", ondelete="SET NULL"), nullable=True)
+    
+    # Relationships
+    user = relationship("TenantUser", foreign_keys=[user_id])
+    created_by = relationship("TenantUser", foreign_keys=[created_by_user_id])
+    
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_user_invite_tokens_user_id', 'user_id'),
+        Index('idx_user_invite_tokens_expires_at', 'expires_at'),
+        Index('idx_user_invite_tokens_token_hash', 'token_hash'),
     )
 
 

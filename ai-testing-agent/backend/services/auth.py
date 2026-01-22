@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 import bcrypt
 from sqlalchemy.orm import Session
-from models import TenantUser, PasswordResetToken
+from models import TenantUser, PasswordResetToken, UserInviteToken
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,9 @@ if not SERVER_SECRET:
 
 # Password reset token expiration (30 minutes)
 PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = 30
+
+# User invite token expiration (7 days - longer than password reset since it's for new users)
+USER_INVITE_TOKEN_EXPIRY_DAYS = 7
 
 # Password policy: minimum 12 characters
 MIN_PASSWORD_LENGTH = 12
@@ -263,3 +266,120 @@ def get_reset_url(token: str) -> str:
     """
     base_url = os.getenv("APP_PUBLIC_BASE_URL", "http://localhost:5173")
     return f"{base_url}/reset-password?token={token}"
+
+
+# ============================================================================
+# USER INVITE TOKEN FUNCTIONS (Phase A: Tenant User Management)
+# ============================================================================
+
+def create_invite_token(db: Session, user_id: str, created_by_user_id: Optional[str] = None) -> Tuple[str, UserInviteToken]:
+    """
+    Create a new user invite token for a user.
+    Does NOT invalidate existing unused tokens (allows re-invites).
+    
+    Args:
+        db: Database session
+        user_id: UUID string of the user being invited
+        created_by_user_id: Optional UUID string of the user who created the invite
+        
+    Returns:
+        tuple: (raw_token, token_model)
+        - raw_token: The token to send to user
+        - token_model: The UserInviteToken database model
+    """
+    import uuid as uuid_module
+    
+    # Generate new token
+    raw_token, token_hash = generate_reset_token()  # Reuse same token generation logic
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=USER_INVITE_TOKEN_EXPIRY_DAYS)
+    
+    # Convert user_id and created_by_user_id to UUID if they're strings
+    user_id_uuid = user_id if isinstance(user_id, uuid_module.UUID) else uuid_module.UUID(user_id)
+    created_by_uuid = None
+    if created_by_user_id:
+        created_by_uuid = created_by_user_id if isinstance(created_by_user_id, uuid_module.UUID) else uuid_module.UUID(created_by_user_id)
+    
+    token_model = UserInviteToken(
+        user_id=user_id_uuid,
+        token_hash=token_hash,
+        expires_at=expires_at,
+        created_by_user_id=created_by_uuid
+    )
+    db.add(token_model)
+    db.flush()  # Flush to get ID, but don't commit yet
+    
+    return raw_token, token_model
+
+
+def consume_invite_token(db: Session, raw_token: str) -> Optional[str]:
+    """
+    Consume a user invite token (one-time use).
+    Checks expiration and marks token as used.
+    
+    Args:
+        db: Database session
+        raw_token: Raw token string from user
+        
+    Returns:
+        Optional[str]: User ID (UUID string) if token is valid, None otherwise
+    """
+    token_hash = hash_token(raw_token)
+    now = datetime.now(timezone.utc)
+    
+    # Find token
+    token = db.query(UserInviteToken).filter(
+        UserInviteToken.token_hash == token_hash,
+        UserInviteToken.used_at.is_(None),
+        UserInviteToken.expires_at > now
+    ).first()
+    
+    if not token:
+        return None
+    
+    # Mark as used
+    token.used_at = now
+    db.flush()
+    
+    return str(token.user_id)
+
+
+def send_invite_email(to_email: str, invite_url: str) -> None:
+    """
+    Send user invite email.
+    
+    In development: logs the invite URL to server logs.
+    In production: should integrate with email provider (SendGrid, SES, etc.).
+    
+    Args:
+        to_email: Recipient email address
+        invite_url: Full URL to accept invite page with token
+    """
+    # For now, log to server logs (development mode)
+    # In production, integrate with email service
+    # Use WARNING level so it always shows (default log level is WARNING)
+    logger.warning(
+        f"[USER_INVITE] Invite link for {to_email}: {invite_url}\n"
+        f"NOTE: In production, this should be sent via email service."
+    )
+    
+    # TODO: Integrate with email provider when available
+    # Example:
+    # if os.getenv("EMAIL_PROVIDER") == "sendgrid":
+    #     sendgrid_send_email(to_email, "You're invited to ScopeTraceAI", f"Click here to accept: {invite_url}")
+    # elif os.getenv("EMAIL_PROVIDER") == "ses":
+    #     ses_send_email(to_email, "You're invited to ScopeTraceAI", f"Click here to accept: {invite_url}")
+
+
+def get_invite_url(token: str) -> str:
+    """
+    Build user invite URL from token.
+    
+    Args:
+        token: Raw invite token
+        
+    Returns:
+        str: Full URL to accept invite page
+    """
+    base_url = os.getenv("APP_BASE_URL") or os.getenv("APP_PUBLIC_BASE_URL", "http://localhost:5173")
+    return f"{base_url}/invite?token={token}"

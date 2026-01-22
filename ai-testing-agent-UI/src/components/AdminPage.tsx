@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
@@ -36,15 +36,15 @@ export function AdminPage() {
   const [isSaving, setIsSaving] = useState<string | null>(null)
   const [expandedTenantId, setExpandedTenantId] = useState<string | null>(null)
   
-  // Tenant-specific data (loaded when tenant is expanded)
-  const [tenantUsers, setTenantUsers] = useState<Record<string, AdminUser[]>>({})
+  // Tenant-specific data (loaded when tenant is expanded) - for owner platform admin
+  const [tenantUsersByTenant, setTenantUsers] = useState<Record<string, AdminUser[]>>({})
   const [tenantDataLoading, setTenantDataLoading] = useState<Record<string, boolean>>({})
   
   // Current user info
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [authReady, setAuthReady] = useState(false)
 
-  // Check if user has admin role and get current user/tenant info
+  // Check if user has owner role and get current user/tenant info
   // This must complete BEFORE any admin API calls
   useEffect(() => {
     const accessToken = localStorage.getItem('access_token')
@@ -323,7 +323,7 @@ export function AdminPage() {
                 <tr className="border-b border-border">
                   <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Tenant Name</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Slug</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Status</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Plan</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Req</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Test</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Writeback</th>
@@ -335,9 +335,8 @@ export function AdminPage() {
                   const isExpanded = expandedTenantId === tenant.id
                   const isSuspended = tenant.subscription_status === 'suspended' || !tenant.is_active
                   return (
-                    <>
+                    <Fragment key={tenant.id}>
                       <tr 
-                        key={tenant.id} 
                         className="border-b border-border/50 hover:bg-secondary/20"
                       >
                         <td className="px-4 py-3 text-sm">
@@ -511,10 +510,10 @@ export function AdminPage() {
                                   </CardHeader>
                                   <CardContent>
                                     <div className="space-y-2">
-                                      {tenantUsers[tenant.id]?.length === 0 ? (
+                                      {tenantUsersByTenant[tenant.id]?.length === 0 ? (
                                         <p className="text-sm text-muted-foreground">No users found</p>
                                       ) : (
-                                        tenantUsers[tenant.id]?.map((user) => (
+                                        tenantUsersByTenant[tenant.id]?.map((user) => (
                                           <div key={user.id} className="flex items-center justify-between p-2 border border-border rounded-md">
                                             <div>
                                               <p className="text-sm font-medium">{user.email}</p>
@@ -553,7 +552,7 @@ export function AdminPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   )
                 })}
               </tbody>

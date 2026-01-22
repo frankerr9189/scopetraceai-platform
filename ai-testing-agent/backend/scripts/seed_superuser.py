@@ -191,6 +191,16 @@ def find_or_create_tenant_with_collision_handling(db, tenant_name: str):
             db.add(tenant)
             db.commit()
             db.refresh(tenant)
+            
+            # Create tenant_billing row (single source of truth for billing data)
+            # Initialize with plan_tier="unselected", status="incomplete" (enforces onboarding gate)
+            try:
+                from services.entitlements_centralized import create_tenant_billing_row
+                create_tenant_billing_row(db, str(tenant.id), "unselected", None)  # None -> defaults to "unselected"
+            except Exception as e:
+                print(f"Warning: Failed to create tenant_billing row: {e}")
+                # Continue - tenant is created, billing row can be created later if needed
+            
             return tenant, True, final_slug
         
         # Slug is taken, try next variant
