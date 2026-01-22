@@ -93,6 +93,32 @@ def call_ba_agent(endpoint: str, payload: Dict[str, Any], tenant_id: Optional[st
         response = requests.post(url, json=payload, headers=headers, timeout=300)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.HTTPError as e:
+        # Try to extract error details from response body
+        error_detail = str(e)
+        try:
+            if e.response is not None:
+                error_body = e.response.json()
+                if isinstance(error_body, dict) and "detail" in error_body:
+                    error_detail = error_body["detail"]
+                elif isinstance(error_body, dict) and "error" in error_body:
+                    error_detail = error_body["error"]
+                else:
+                    error_detail = str(error_body)
+        except (ValueError, AttributeError):
+            # If response body is not JSON, use text or default message
+            try:
+                if e.response is not None:
+                    error_detail = e.response.text[:500]  # Limit length
+            except:
+                pass
+        
+        logger.error(f"BA agent HTTP error: {endpoint} - Status {e.response.status_code if e.response else 'unknown'}: {error_detail}")
+        # Create a more informative exception
+        raise requests.exceptions.HTTPError(
+            f"500 Server Error: Internal Server Error for url: {url}. BA Agent returned: {error_detail}",
+            response=e.response
+        ) from e
     except requests.exceptions.RequestException as e:
         logger.error(f"BA agent call failed: {endpoint} - {str(e)}")
         raise

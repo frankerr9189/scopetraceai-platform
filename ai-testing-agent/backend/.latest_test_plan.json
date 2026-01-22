@@ -3,13 +3,13 @@
   "metadata": {
     "source": "jira",
     "source_id": "MANUAL",
-    "generated_at": "2026-01-19T02:48:37Z"
+    "generated_at": "2026-01-22T02:55:15Z"
   },
   "requirements": [
     {
-      "id": "ATA-41-REQ-001",
+      "id": "ATA-36-REQ-001",
       "source": "jira",
-      "description": "[1]) Secure storage of base_url",
+      "description": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
       "quality": {
         "clarity_score": 0.8,
         "testability_score": 0.4,
@@ -37,99 +37,9 @@
       }
     },
     {
-      "id": "ATA-41-REQ-002",
+      "id": "ATA-36-REQ-002",
       "source": "inferred",
-      "description": "This capability shall securely store the base_url for a third-party API.",
-      "quality": {
-        "clarity_score": 0.8,
-        "testability_score": 0.5,
-        "issues": [
-          "Missing explicit action verb",
-          "Outcome not directly observable",
-          "Depends on external system behavior"
-        ]
-      },
-      "coverage_expectations": {
-        "happy_path": "covered",
-        "negative": "covered",
-        "boundary": "not_applicable",
-        "authorization": "not_applicable",
-        "data_validation": "not_applicable",
-        "stateful": "not_applicable"
-      },
-      "testable": true,
-      "coverage_confidence": {
-        "score": 0.8,
-        "level": "high",
-        "reasons": [
-          "Low requirement testability"
-        ]
-      }
-    },
-    {
-      "id": "ATA-41-REQ-003",
-      "source": "inferred",
-      "description": "This capability shall mask or omit the api_token in any responses returned from the API.",
-      "quality": {
-        "clarity_score": 0.6,
-        "testability_score": 1.0,
-        "issues": [
-          "Missing explicit action verb",
-          "Multiple behaviors combined in one requirement"
-        ]
-      },
-      "coverage_expectations": {
-        "happy_path": "covered",
-        "negative": "covered",
-        "boundary": "not_applicable",
-        "authorization": "expected",
-        "data_validation": "not_applicable",
-        "stateful": "not_applicable"
-      },
-      "testable": true,
-      "coverage_confidence": {
-        "score": 0.65,
-        "level": "medium",
-        "reasons": [
-          "Low requirement clarity",
-          "Expected authorization testing not covered"
-        ]
-      }
-    },
-    {
-      "id": "ATA-41-REQ-004",
-      "source": "inferred",
-      "description": "This capability shall restrict access to the POST endpoint for credential storage to admin users only.",
-      "quality": {
-        "clarity_score": 0.8,
-        "testability_score": 0.7,
-        "issues": [
-          "Missing explicit action verb",
-          "Outcome not directly observable"
-        ]
-      },
-      "coverage_expectations": {
-        "happy_path": "covered",
-        "negative": "covered",
-        "boundary": "not_applicable",
-        "authorization": "expected",
-        "data_validation": "not_applicable",
-        "stateful": "not_applicable"
-      },
-      "testable": true,
-      "coverage_confidence": {
-        "score": 0.65,
-        "level": "medium",
-        "reasons": [
-          "Low requirement testability",
-          "Expected authorization testing not covered"
-        ]
-      }
-    },
-    {
-      "id": "ATA-41-REQ-005",
-      "source": "inferred",
-      "description": "Service-to-service access for the GET endpoint to retrieve API credentials.",
+      "description": "Identification of uncovered requirements in RTM.",
       "quality": {
         "clarity_score": 0.8,
         "testability_score": 0.4,
@@ -143,481 +53,428 @@
         "happy_path": "covered",
         "negative": "not_applicable",
         "boundary": "not_applicable",
-        "authorization": "expected",
+        "authorization": "not_applicable",
         "data_validation": "not_applicable",
         "stateful": "not_applicable"
       },
       "testable": false,
       "coverage_confidence": {
-        "score": 0.55,
-        "level": "medium",
+        "score": 0.8,
+        "level": "high",
         "reasons": [
-          "Low requirement testability",
-          "Expected authorization testing not covered",
-          "All coverage is inferred"
+          "Low requirement testability"
+        ]
+      }
+    },
+    {
+      "id": "ATA-36-REQ-003",
+      "source": "inferred",
+      "description": "Inclusion of associated test case ID(s) in RTM.",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "testable": false,
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      }
+    },
+    {
+      "id": "ATA-36-REQ-004",
+      "source": "inferred",
+      "description": "Inclusion of coverage status in RTM.",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "testable": false,
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      }
+    },
+    {
+      "id": "ATA-36-REQ-005",
+      "source": "inferred",
+      "description": "Deriving RTM directly from test plan.",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "testable": false,
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      }
+    },
+    {
+      "id": "ATA-36-REQ-006",
+      "source": "inferred",
+      "description": "Ensuring each requirement appears once in RTM.",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "testable": false,
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      }
+    },
+    {
+      "id": "ATA-36-REQ-007",
+      "source": "inferred",
+      "description": "Non-blocking RTM generation for test plan creation.",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "testable": false,
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
         ]
       }
     }
   ],
-  "business_intent": "To implement secure storage for third-party API credentials to prevent unauthorized access and exposure of sensitive information.",
-  "assumptions": [
-    "Generated 2 inferred authorization test(s) based on coverage expectations. These tests assume standard authorization error handling."
-  ],
+  "business_intent": "To enhance the test planning process by automating the generation of a Requirement Traceability Matrix (RTM) that meets ISO audit standards.",
+  "assumptions": [],
   "gaps_detected": [],
   "test_plan": {
-    "api_tests": [
+    "api_tests": [],
+    "ui_tests": [
       {
-        "id": "API-001",
-        "title": "Happy path: Secure storage of base_url",
-        "source_requirement_id": "ATA-41-REQ-001",
+        "id": "UI-001",
+        "title": "Happy path: Automatic generation of Requirement Traceability Matrix (RTM)",
+        "source_requirement_id": "ATA-36-REQ-001",
         "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-001"
+          "ATA-36-REQ-001"
         ],
         "steps": [
-          "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
-          "Verify the response status code indicates success (201)",
-          "Validate the response structure matches expected format from the requirement"
+          "Navigate to the test plan creation page.",
+          "Click the 'Generate RTM' button.",
+          "Observe the system response indicating that the RTM is being generated.",
+          "Verify that the RTM is generated successfully and is displayed to the user."
         ],
         "steps_explanation": "",
         "steps_origin": "requirement-derived",
-        "expected_result": "The base_url is securely stored and the response does not include the api_token.",
+        "expected_result": "The Requirement Traceability Matrix (RTM) is generated and displayed correctly.",
         "priority": "medium",
         "confidence": "explicit"
       },
       {
-        "id": "API-002",
-        "title": "Negative: Invalid access for POST endpoint",
-        "source_requirement_id": "ATA-41-REQ-003",
-        "intent_type": "negative",
+        "id": "UI-003",
+        "title": "Happy path: Inclusion of Requirement ID in RTM",
+        "source_requirement_id": "ATA-36-REQ-002",
+        "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-003"
+          "ATA-36-REQ-002"
         ],
         "steps": [
-          "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
-          "Verify the response status code indicates an error (403)",
-          "Validate the error response structure and error message",
-          "Confirm the error message indicates unauthorized access"
+          "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+          "Locate the section of the RTM that lists the requirements.",
+          "Verify that each requirement listed in the RTM includes its corresponding Requirement ID."
         ],
         "steps_explanation": "",
         "steps_origin": "requirement-derived",
-        "expected_result": "The response indicates that access is forbidden for non-admin users.",
+        "expected_result": "Each requirement in the RTM displays its corresponding Requirement ID.",
         "priority": "medium",
         "confidence": "explicit"
       },
       {
-        "id": "API-003",
-        "title": "Authorization: Admin-only access for POST endpoint",
-        "source_requirement_id": "ATA-41-REQ-003",
-        "intent_type": "authorization",
+        "id": "UI-004",
+        "title": "Happy path: Inclusion of Requirement description in RTM",
+        "source_requirement_id": "ATA-36-REQ-003",
+        "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-003"
+          "ATA-36-REQ-003"
         ],
         "steps": [
-          "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
-          "Verify the response status code indicates success (201)",
-          "Validate the response structure matches expected format from the requirement"
+          "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+          "Locate the section of the RTM that lists the requirements.",
+          "Verify that each requirement listed in the RTM includes its corresponding description."
         ],
         "steps_explanation": "",
         "steps_origin": "requirement-derived",
-        "expected_result": "The request is successful and the base_url is stored.",
+        "expected_result": "Each requirement in the RTM displays its corresponding description.",
         "priority": "medium",
         "confidence": "explicit"
       },
       {
-        "id": "API-004",
-        "title": "Happy path: Masking api_token in responses",
-        "source_requirement_id": "ATA-41-REQ-002",
+        "id": "UI-005",
+        "title": "Happy path: Identification of uncovered requirements in RTM",
+        "source_requirement_id": "ATA-36-REQ-004",
         "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-002"
+          "ATA-36-REQ-004"
         ],
         "steps": [
-          "Send a valid GET request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
-          "Verify the response status code indicates success (200)",
-          "Validate the response structure matches expected format from the requirement"
+          "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+          "Verify that the RTM identifies any requirements that are not covered by test cases."
         ],
         "steps_explanation": "",
         "steps_origin": "requirement-derived",
-        "expected_result": "The response includes base_url and client_id, but not the api_token.",
+        "expected_result": "The RTM correctly identifies uncovered requirements.",
         "priority": "medium",
         "confidence": "explicit"
       },
       {
-        "id": "API-005",
-        "title": "Negative: Attempt to access GET endpoint from frontend",
-        "source_requirement_id": "ATA-41-REQ-004",
-        "intent_type": "negative",
+        "id": "UI-006",
+        "title": "Happy path: Inclusion of associated test case ID(s) in RTM",
+        "source_requirement_id": "ATA-36-REQ-005",
+        "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-004"
+          "ATA-36-REQ-005"
         ],
         "steps": [
-          "Send the request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
-          "Verify the response status code indicates an error (403)",
-          "Validate the error response structure and error message",
-          "Confirm the error message indicates unauthorized access from frontend"
+          "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+          "Locate the section of the RTM that lists the requirements.",
+          "Verify that each requirement includes its associated test case ID(s)."
         ],
         "steps_explanation": "",
         "steps_origin": "requirement-derived",
-        "expected_result": "The response indicates that access is forbidden for frontend sessions.",
+        "expected_result": "Each requirement in the RTM displays its associated test case ID(s).",
         "priority": "medium",
         "confidence": "explicit"
       },
       {
-        "id": "API-006",
-        "title": "Authorization: Service-to-service access for GET endpoint",
-        "source_requirement_id": "ATA-41-REQ-004",
-        "intent_type": "authorization",
+        "id": "UI-007",
+        "title": "Happy path: Inclusion of coverage status in RTM",
+        "source_requirement_id": "ATA-36-REQ-006",
+        "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-004"
+          "ATA-36-REQ-006"
         ],
         "steps": [
-          "Send the request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
-          "Verify the response status code indicates success (200)",
-          "Validate the response structure matches expected format from the requirement"
+          "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+          "Locate the section of the RTM that indicates coverage status.",
+          "Verify that the coverage status for each requirement is displayed correctly."
         ],
         "steps_explanation": "",
         "steps_origin": "requirement-derived",
-        "expected_result": "The request is successful and the response includes base_url and client_id, but not the api_token.",
+        "expected_result": "The RTM displays the coverage status for each requirement.",
         "priority": "medium",
         "confidence": "explicit"
       },
       {
-        "id": "API-007",
-        "title": "Happy Path: This capability shall mask or omit the api_token in any responses returned from the API.",
-        "source_requirement_id": "ATA-41-REQ-003",
+        "id": "UI-008",
+        "title": "Happy path: Deriving RTM directly from test plan",
+        "source_requirement_id": "ATA-36-REQ-007",
         "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-003"
+          "ATA-36-REQ-007"
         ],
         "steps": [
-          "Prepare a valid request with all required fields as specified in the requirement",
-          "Send the request to the system",
-          "Observe the response and verify it contains the expected data and status"
+          "Create a new test plan with defined requirements.",
+          "Generate the Requirement Traceability Matrix (RTM) from the test plan.",
+          "Verify that the RTM is derived directly from the test plan requirements."
         ],
-        "steps_origin": "inferred",
-        "expected_result": "Happy Path behavior validated",
-        "confidence": "inferred",
-        "priority": "medium"
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "expected_result": "The RTM is correctly derived from the test plan.",
+        "priority": "medium",
+        "confidence": "explicit"
       },
       {
-        "id": "API-008",
-        "title": "Happy Path: This capability shall restrict access to the POST endpoint for credential storage to admin users onl",
-        "source_requirement_id": "ATA-41-REQ-004",
+        "id": "UI-009",
+        "title": "Happy path: Ensuring each requirement appears once in RTM",
+        "source_requirement_id": "REQ-008",
         "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-004"
+          "REQ-008"
         ],
         "steps": [
-          "Prepare a valid request with all required fields as specified in the requirement",
-          "Send the request to the system",
-          "Observe the response and verify it contains the expected data and status"
+          "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+          "Verify that each requirement appears only once in the RTM."
         ],
-        "steps_origin": "inferred",
-        "expected_result": "Happy Path behavior validated",
-        "confidence": "inferred",
-        "priority": "medium"
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "expected_result": "Each requirement appears only once in the RTM.",
+        "priority": "medium",
+        "confidence": "explicit"
       },
       {
-        "id": "API-009",
-        "title": "Happy Path: Service-to-service access for the GET endpoint to retrieve API credentials.",
-        "source_requirement_id": "ATA-41-REQ-005",
+        "id": "UI-010",
+        "title": "Happy path: Non-blocking RTM generation for test plan creation",
+        "source_requirement_id": "REQ-009",
         "intent_type": "happy_path",
         "requirements_covered": [
-          "ATA-41-REQ-005"
+          "REQ-009"
         ],
         "steps": [
-          "Prepare a valid request with all required fields as specified in the requirement",
-          "Send the request to the system",
-          "Observe the response and verify it contains the expected data and status"
+          "Navigate to the test plan creation page.",
+          "Add requirements to the test plan.",
+          "Click the 'Generate RTM' button.",
+          "Verify that the RTM is generated without blocking the test plan creation process."
         ],
-        "steps_origin": "inferred",
-        "expected_result": "Happy Path behavior validated",
-        "confidence": "inferred",
-        "priority": "medium"
-      },
-      {
-        "id": "API_POST__api_v1_integrations_thirdparty_credentials_201",
-        "title": "Happy path: POST /api/v1/integrations/thirdparty/credentials returns 201",
-        "source_requirement_id": "ATA-41-REQ-001",
-        "intent_type": "happy_path",
-        "requirements_covered": [
-          "ATA-41-REQ-001"
-        ],
-        "steps": [
-          "Send POST request to /api/v1/integrations/thirdparty/credentials",
-          "Verify response status code is 201",
-          "Verify response body does NOT contain 'api_token' field",
-          "Verify response body does NOT contain 'token' field",
-          "Verify response body does NOT contain 'secret' field",
-          "Verify response body contains expected data"
-        ],
-        "steps_origin": "deterministic-postpass",
-        "expected_result": "Response status 201 with valid response body and api_token/token/secret NOT included",
+        "steps_explanation": "",
+        "steps_origin": "requirement-derived",
+        "expected_result": "The RTM is generated without blocking the test plan creation.",
         "priority": "medium",
         "confidence": "explicit"
       }
     ],
-    "ui_tests": [],
     "data_validation_tests": [],
     "edge_cases": [],
-    "negative_tests": [
-      {
-        "id": "NEG-002",
-        "title": "Negative: This capability shall securely store the base_url for a third-party API.",
-        "source_requirement_id": "ATA-41-REQ-002",
-        "intent_type": "negative",
-        "requirements_covered": [
-          "ATA-41-REQ-002"
-        ],
-        "steps": [
-          "Prepare a request with invalid or missing required fields",
-          "Send the request to the system",
-          "Observe the response and verify appropriate error handling is returned"
-        ],
-        "steps_origin": "inferred",
-        "expected_result": "Negative behavior validated",
-        "confidence": "inferred",
-        "priority": "medium"
-      },
-      {
-        "id": "AUTH-004",
-        "title": "Authorization: Service-to-service access for the GET endpoint to retrieve API credentials.",
-        "source_requirement_id": "ATA-41-REQ-005",
-        "intent_type": "authorization",
-        "requirements_covered": [
-          "ATA-41-REQ-005"
-        ],
-        "steps": [
-          "Prepare a request without proper authentication or authorization",
-          "Send the request to the system",
-          "Observe the response and verify access is denied with appropriate status code"
-        ],
-        "steps_origin": "inferred",
-        "expected_result": "Authorization behavior validated",
-        "confidence": "inferred",
-        "priority": "medium",
-        "dimension": "authorization"
-      },
-      {
-        "id": "AUTH-001",
-        "title": "Inferred authorization test for ATA-41-REQ-003",
-        "steps": [
-          "Prepare a valid request with all required fields as specified in the requirement",
-          "Send the request to the system",
-          "Observe the response and verify it contains the expected data and status"
-        ],
-        "steps_origin": "inferred",
-        "expected_result": "Unauthorized access is properly rejected",
-        "requirements_covered": [
-          "ATA-41-REQ-003"
-        ],
-        "confidence": "inferred",
-        "priority": "medium",
-        "dimension": "authorization"
-      },
-      {
-        "id": "AUTH-002",
-        "title": "Inferred authorization test for ATA-41-REQ-004",
-        "steps": [
-          "Prepare a valid request with all required fields as specified in the requirement",
-          "Send the request to the system",
-          "Observe the response and verify it contains the expected data and status"
-        ],
-        "steps_origin": "inferred",
-        "expected_result": "Unauthorized access is properly rejected",
-        "requirements_covered": [
-          "ATA-41-REQ-004"
-        ],
-        "confidence": "inferred",
-        "priority": "medium",
-        "dimension": "authorization"
-      },
-      {
-        "id": "AUTHZ_GET__api_v1_integrations_thirdparty_credentials_403",
-        "title": "Authorization required: GET /api/v1/integrations/thirdparty/credentials returns 403 when not authorized",
-        "source_requirement_id": "ATA-41-REQ-001",
-        "intent_type": "authorization",
-        "requirements_covered": [
-          "ATA-41-REQ-001"
-        ],
-        "steps": [
-          "Authenticate as non-admin user",
-          "Send GET request to /api/v1/integrations/thirdparty/credentials",
-          "Verify response status code is 403",
-          "Verify response indicates insufficient permissions"
-        ],
-        "steps_origin": "deterministic-postpass",
-        "expected_result": "Response status 403 Forbidden",
-        "priority": "high",
-        "confidence": "explicit"
-      },
-      {
-        "id": "AUTHZ_POST__api_v1_integrations_thirdparty_credentials_FRONTEND_403",
-        "title": "Frontend session forbidden: POST /api/v1/integrations/thirdparty/credentials returns 403 for frontend session",
-        "source_requirement_id": "ATA-41-REQ-001",
-        "intent_type": "authorization",
-        "requirements_covered": [
-          "ATA-41-REQ-001"
-        ],
-        "steps": [
-          "Authenticate as frontend session user",
-          "Send POST request to /api/v1/integrations/thirdparty/credentials",
-          "Verify response status code is 403",
-          "Verify response indicates access is forbidden for frontend sessions"
-        ],
-        "steps_origin": "deterministic-postpass",
-        "expected_result": "Response status 403 Forbidden",
-        "priority": "high",
-        "confidence": "explicit"
-      },
-      {
-        "id": "SEC_POST__api_v1_integrations_thirdparty_credentials_NO_SECRET",
-        "title": "Secret not returned: POST /api/v1/integrations/thirdparty/credentials response excludes api_token",
-        "source_requirement_id": "ATA-41-REQ-001",
-        "intent_type": "security",
-        "requirements_covered": [
-          "ATA-41-REQ-001"
-        ],
-        "steps": [
-          "Send POST request to /api/v1/integrations/thirdparty/credentials",
-          "Verify response status code is 200 or 201",
-          "Verify response body does not contain 'api_token' field",
-          "Verify response body does not contain 'token' field",
-          "Verify response body does not contain 'secret' field"
-        ],
-        "steps_origin": "deterministic-postpass",
-        "expected_result": "Response does not contain api_token, token, or secret fields",
-        "priority": "high",
-        "confidence": "explicit"
-      },
-      {
-        "id": "SEC_GET__api_v1_integrations_thirdparty_credentials_MASKED",
-        "title": "Secret masked: GET /api/v1/integrations/thirdparty/credentials response masks or omits api_token",
-        "source_requirement_id": "ATA-41-REQ-001",
-        "intent_type": "security",
-        "requirements_covered": [
-          "ATA-41-REQ-001"
-        ],
-        "steps": [
-          "Send GET request to /api/v1/integrations/thirdparty/credentials",
-          "Verify response status code is 200",
-          "If response contains 'api_token' field, verify it is masked (e.g., '***' or 'REDACTED')",
-          "If response contains 'token' field, verify it is masked or omitted",
-          "Verify no secret values are exposed in plain text"
-        ],
-        "steps_origin": "deterministic-postpass",
-        "expected_result": "Response masks or omits api_token and token fields",
-        "priority": "high",
-        "confidence": "explicit"
-      },
-      {
-        "id": "SEC_LOG_REDACTION",
-        "title": "Log redaction: Verify logs do not contain secrets",
-        "source_requirement_id": "ATA-41-REQ-001",
-        "intent_type": "security",
-        "requirements_covered": [
-          "ATA-41-REQ-001"
-        ],
-        "steps": [
-          "Perform operations that generate log entries",
-          "Inspect application logs",
-          "Verify logs do not contain 'api_token' in plain text",
-          "Verify logs do not contain 'token' in plain text",
-          "Verify logs do not contain 'secret' in plain text",
-          "Verify any secret values are redacted (e.g., '***' or 'REDACTED')"
-        ],
-        "steps_origin": "deterministic-postpass",
-        "expected_result": "Logs do not contain api_token, token, or secret in plain text",
-        "priority": "high",
-        "confidence": "explicit"
-      },
-      {
-        "id": "SEC_ENCRYPTION_AT_REST",
-        "title": "Encryption at rest: Verify data is encrypted in storage",
-        "source_requirement_id": "ATA-41-REQ-001",
-        "intent_type": "security",
-        "requirements_covered": [
-          "ATA-41-REQ-001"
-        ],
-        "steps": [
-          "Store sensitive data through the application",
-          "Inspect storage layer (database, file system, etc.)",
-          "Verify stored data is encrypted",
-          "Verify encryption keys are properly managed",
-          "Verify plain text data is not accessible in storage"
-        ],
-        "steps_origin": "deterministic-postpass",
-        "expected_result": "Data is encrypted at rest and plain text is not accessible",
-        "priority": "high",
-        "confidence": "explicit"
-      }
-    ]
+    "negative_tests": []
   },
-  "summary": "Test cases generated for secure storage of API credentials, including happy path, negative, and authorization scenarios.",
+  "summary": "Test plan generated for the automatic generation of Requirement Traceability Matrix (RTM) and its components, including coverage of happy path scenarios and negative scenarios where applicable.",
   "_has_numbered_acceptance_criteria": true,
   "rtm": [
     {
-      "requirement_id": "ATA-41-REQ-001",
-      "requirement_description": "[1]) Secure storage of base_url",
+      "requirement_id": "ATA-36-REQ-001",
+      "requirement_description": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
       "covered_by_tests": [
-        "API-001"
+        "UI-001"
       ],
       "coverage_status": "COVERED",
       "trace_type": "testable",
       "testability": "testable"
     },
     {
-      "requirement_id": "ATA-41-REQ-002",
-      "requirement_description": "This capability shall securely store the base_url for a third-party API.",
+      "requirement_id": "ATA-36-REQ-002",
+      "requirement_description": "Identification of uncovered requirements in RTM.",
       "covered_by_tests": [
-        "API-004",
-        "NEG-002"
+        "UI-003"
       ],
       "coverage_status": "COVERED",
       "trace_type": "testable",
       "testability": "testable"
     },
     {
-      "requirement_id": "ATA-41-REQ-003",
-      "requirement_description": "This capability shall mask or omit the api_token in any responses returned from the API.",
+      "requirement_id": "ATA-36-REQ-003",
+      "requirement_description": "Inclusion of associated test case ID(s) in RTM.",
       "covered_by_tests": [
-        "API-002",
-        "API-003",
-        "API-007",
-        "AUTH-001"
+        "UI-004"
       ],
       "coverage_status": "COVERED",
       "trace_type": "testable",
       "testability": "testable"
     },
     {
-      "requirement_id": "ATA-41-REQ-004",
-      "requirement_description": "This capability shall restrict access to the POST endpoint for credential storage to admin users only.",
+      "requirement_id": "ATA-36-REQ-004",
+      "requirement_description": "Inclusion of coverage status in RTM.",
       "covered_by_tests": [
-        "API-005",
-        "API-006",
-        "API-008",
-        "AUTH-002"
+        "UI-005"
       ],
       "coverage_status": "COVERED",
       "trace_type": "testable",
       "testability": "testable"
     },
     {
-      "requirement_id": "ATA-41-REQ-005",
-      "requirement_description": "Service-to-service access for the GET endpoint to retrieve API credentials.",
+      "requirement_id": "ATA-36-REQ-005",
+      "requirement_description": "Deriving RTM directly from test plan.",
       "covered_by_tests": [
-        "API-009",
-        "AUTH-004"
+        "UI-006"
       ],
       "coverage_status": "COVERED",
       "trace_type": "testable",
       "testability": "testable"
     },
     {
-      "requirement_id": "ATA-41-ITEM-001",
-      "requirement_description": "Secure storage of base_url",
+      "requirement_id": "ATA-36-REQ-006",
+      "requirement_description": "Ensuring each requirement appears once in RTM.",
+      "covered_by_tests": [
+        "UI-007"
+      ],
+      "coverage_status": "COVERED",
+      "trace_type": "testable",
+      "testability": "testable"
+    },
+    {
+      "requirement_id": "ATA-36-REQ-007",
+      "requirement_description": "Non-blocking RTM generation for test plan creation.",
+      "covered_by_tests": [
+        "UI-008"
+      ],
+      "coverage_status": "COVERED",
+      "trace_type": "testable",
+      "testability": "testable"
+    },
+    {
+      "requirement_id": "ATA-36-ITEM-004",
+      "requirement_description": "Identification of uncovered requirements",
       "covered_by_tests": [],
       "coverage_status": "N/A",
       "trace_type": "informational",
@@ -626,8 +483,8 @@
       "source_section": "description"
     },
     {
-      "requirement_id": "ATA-41-ITEM-002",
-      "requirement_description": "Masking or omitting api_token in responses",
+      "requirement_id": "ATA-36-ITEM-011",
+      "requirement_description": "Editing test cases against requirements within Jira",
       "covered_by_tests": [],
       "coverage_status": "N/A",
       "trace_type": "informational",
@@ -636,58 +493,8 @@
       "source_section": "description"
     },
     {
-      "requirement_id": "ATA-41-ITEM-003",
-      "requirement_description": "Admin-only access for POST endpoint",
-      "covered_by_tests": [],
-      "coverage_status": "N/A",
-      "trace_type": "informational",
-      "testability": "not_testable",
-      "rationale": "Informational content; not independently testable",
-      "source_section": "description"
-    },
-    {
-      "requirement_id": "ATA-41-ITEM-004",
-      "requirement_description": "Service-to-service access for GET endpoint",
-      "covered_by_tests": [],
-      "coverage_status": "N/A",
-      "trace_type": "informational",
-      "testability": "not_testable",
-      "rationale": "Informational content; not independently testable",
-      "source_section": "description"
-    },
-    {
-      "requirement_id": "ATA-41-ITEM-005",
-      "requirement_description": "Credential validation against the third-party service",
-      "covered_by_tests": [],
-      "coverage_status": "N/A",
-      "trace_type": "informational",
-      "testability": "not_testable",
-      "rationale": "Informational content; not independently testable",
-      "source_section": "description"
-    },
-    {
-      "requirement_id": "ATA-41-ITEM-006",
-      "requirement_description": "Rotation of credentials",
-      "covered_by_tests": [],
-      "coverage_status": "N/A",
-      "trace_type": "informational",
-      "testability": "not_testable",
-      "rationale": "Informational content; not independently testable",
-      "source_section": "description"
-    },
-    {
-      "requirement_id": "ATA-41-ITEM-007",
-      "requirement_description": "Potential exposure of sensitive credentials if not properly secured.",
-      "covered_by_tests": [],
-      "coverage_status": "N/A",
-      "trace_type": "informational",
-      "testability": "not_testable",
-      "rationale": "Informational content; not independently testable",
-      "source_section": "description"
-    },
-    {
-      "requirement_id": "ATA-41-ITEM-008",
-      "requirement_description": "[security] Potential exposure of sensitive credentials if not properly secured. (Severity: high)",
+      "requirement_id": "ATA-36-ITEM-012",
+      "requirement_description": "Editing of test plans",
       "covered_by_tests": [],
       "coverage_status": "N/A",
       "trace_type": "informational",
@@ -709,15 +516,15 @@
     "tickets_analyzed": 1,
     "tickets_requested": 1,
     "tickets_failed": 0,
-    "requirements_total": 5,
-    "requirements_covered": 5,
+    "requirements_total": 7,
+    "requirements_covered": 7,
     "requirements_uncovered": 0,
     "ticket_details": [
       {
-        "ticket_id": "ATA-41",
-        "summary": "BA Package PKG-CC887003: Secure storage for third-party API credentials",
-        "description": "Normalized Requirements:\n1) Secure storage of base_url\n   This capability shall securely store the base_url for a third-party API.\nScope (In):\n- Secure storage of base_url\n- Masking or omitting api_to...",
-        "requirements_count": 5,
+        "ticket_id": "ATA-36",
+        "summary": "Add Requirement Traceability Matrix (RTM) Generation for Test Plans",
+        "description": "Normalized Requirements:\n1) Automatic generation of Requirement Traceability Matrix (RTM)\n   This capability shall automatically generate a Requirement Traceability Matrix (RTM) for each test plan to ...",
+        "requirements_count": 7,
         "has_explicit_requirements": true,
         "has_acceptance_criteria": true,
         "explanation": null,
@@ -728,145 +535,284 @@
   },
   "ticket_traceability": [
     {
-      "ticket_id": "ATA-41",
+      "ticket_id": "ATA-36",
       "items": [
         {
-          "item_id": "ATA-41-ITEM-001",
-          "text": "Secure storage of base_url",
+          "item_id": "ATA-36-ITEM-001",
+          "text": "Automatic generation of Requirement Traceability Matrix (RTM)",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-001",
+          "validated_by_tests": [
+            "UI-001"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-002",
+          "text": "Ensuring each requirement appears once in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-006",
+          "validated_by_tests": [
+            "UI-007"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-003",
+          "text": "Inclusion of Requirement ID in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-003",
+          "validated_by_tests": [
+            "UI-004"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-004",
+          "text": "Identification of uncovered requirements",
           "classification": "informational_only",
           "source_section": "description",
           "testable": false,
           "note": "Informational content; not independently testable"
         },
         {
-          "item_id": "ATA-41-ITEM-002",
-          "text": "Masking or omitting api_token in responses",
+          "item_id": "ATA-36-ITEM-005",
+          "text": "Non-blocking RTM generation for test plan creation",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-007",
+          "validated_by_tests": [
+            "UI-008"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-006",
+          "text": "Inclusion of associated test case ID(s) in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-003",
+          "validated_by_tests": [
+            "UI-004"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-007",
+          "text": "Inclusion of coverage status in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-004",
+          "validated_by_tests": [
+            "UI-005"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-008",
+          "text": "Deriving RTM directly from test plan",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-005",
+          "validated_by_tests": [
+            "UI-006"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-009",
+          "text": "Inclusion of Requirement description in RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-003",
+          "validated_by_tests": [
+            "UI-004"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-010",
+          "text": "Manual input of requirements into RTM",
+          "classification": "system_behavior",
+          "source_section": "description",
+          "mapped_requirement_id": "ATA-36-REQ-002",
+          "validated_by_tests": [
+            "UI-003"
+          ],
+          "testable": true
+        },
+        {
+          "item_id": "ATA-36-ITEM-011",
+          "text": "Editing test cases against requirements within Jira",
           "classification": "informational_only",
           "source_section": "description",
           "testable": false,
           "note": "Informational content; not independently testable"
         },
         {
-          "item_id": "ATA-41-ITEM-003",
-          "text": "Admin-only access for POST endpoint",
+          "item_id": "ATA-36-ITEM-012",
+          "text": "Editing of test plans",
           "classification": "informational_only",
           "source_section": "description",
           "testable": false,
           "note": "Informational content; not independently testable"
         },
         {
-          "item_id": "ATA-41-ITEM-004",
-          "text": "Service-to-service access for GET endpoint",
-          "classification": "informational_only",
+          "item_id": "ATA-36-ITEM-013",
+          "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured.",
+          "classification": "system_behavior",
           "source_section": "description",
-          "testable": false,
-          "note": "Informational content; not independently testable"
+          "testable": true
         },
         {
-          "item_id": "ATA-41-ITEM-005",
-          "text": "Credential validation against the third-party service",
-          "classification": "informational_only",
+          "item_id": "ATA-36-ITEM-014",
+          "text": "[Scope Risk] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)",
+          "classification": "system_behavior",
           "source_section": "description",
-          "testable": false,
-          "note": "Informational content; not independently testable"
-        },
-        {
-          "item_id": "ATA-41-ITEM-006",
-          "text": "Rotation of credentials",
-          "classification": "informational_only",
-          "source_section": "description",
-          "testable": false,
-          "note": "Informational content; not independently testable"
-        },
-        {
-          "item_id": "ATA-41-ITEM-007",
-          "text": "Potential exposure of sensitive credentials if not properly secured.",
-          "classification": "informational_only",
-          "source_section": "description",
-          "testable": false,
-          "note": "Informational content; not independently testable"
-        },
-        {
-          "item_id": "ATA-41-ITEM-008",
-          "text": "[security] Potential exposure of sensitive credentials if not properly secured. (Severity: high)",
-          "classification": "informational_only",
-          "source_section": "description",
-          "testable": false,
-          "note": "Informational content; not independently testable"
+          "testable": true
         }
       ]
     }
   ],
   "ticket_item_coverage": [
     {
-      "item_id": "ATA-41-ITEM-001",
-      "text": "Secure storage of base_url",
+      "item_id": "ATA-36-ITEM-001",
+      "text": "Automatic generation of Requirement Traceability Matrix (RTM)",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-001"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-002",
+      "text": "Ensuring each requirement appears once in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-007"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-003",
+      "text": "Inclusion of Requirement ID in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-004"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-004",
+      "text": "Identification of uncovered requirements",
       "classification": "informational_only",
       "testable": false,
       "coverage_method": "not_independently_testable",
       "non_testable_reason": "Informational content; not independently testable"
     },
     {
-      "item_id": "ATA-41-ITEM-002",
-      "text": "Masking or omitting api_token in responses",
+      "item_id": "ATA-36-ITEM-005",
+      "text": "Non-blocking RTM generation for test plan creation",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-008"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-006",
+      "text": "Inclusion of associated test case ID(s) in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-004"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-007",
+      "text": "Inclusion of coverage status in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-005"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-008",
+      "text": "Deriving RTM directly from test plan",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-006"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-009",
+      "text": "Inclusion of Requirement description in RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-004"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-010",
+      "text": "Manual input of requirements into RTM",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "direct_test",
+      "test_ids": [
+        "UI-003"
+      ]
+    },
+    {
+      "item_id": "ATA-36-ITEM-011",
+      "text": "Editing test cases against requirements within Jira",
       "classification": "informational_only",
       "testable": false,
       "coverage_method": "not_independently_testable",
       "non_testable_reason": "Informational content; not independently testable"
     },
     {
-      "item_id": "ATA-41-ITEM-003",
-      "text": "Admin-only access for POST endpoint",
+      "item_id": "ATA-36-ITEM-012",
+      "text": "Editing of test plans",
       "classification": "informational_only",
       "testable": false,
       "coverage_method": "not_independently_testable",
       "non_testable_reason": "Informational content; not independently testable"
     },
     {
-      "item_id": "ATA-41-ITEM-004",
-      "text": "Service-to-service access for GET endpoint",
-      "classification": "informational_only",
-      "testable": false,
-      "coverage_method": "not_independently_testable",
-      "non_testable_reason": "Informational content; not independently testable"
+      "item_id": "ATA-36-ITEM-013",
+      "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured.",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
     },
     {
-      "item_id": "ATA-41-ITEM-005",
-      "text": "Credential validation against the third-party service",
-      "classification": "informational_only",
-      "testable": false,
-      "coverage_method": "not_independently_testable",
-      "non_testable_reason": "Informational content; not independently testable"
-    },
-    {
-      "item_id": "ATA-41-ITEM-006",
-      "text": "Rotation of credentials",
-      "classification": "informational_only",
-      "testable": false,
-      "coverage_method": "not_independently_testable",
-      "non_testable_reason": "Informational content; not independently testable"
-    },
-    {
-      "item_id": "ATA-41-ITEM-007",
-      "text": "Potential exposure of sensitive credentials if not properly secured.",
-      "classification": "informational_only",
-      "testable": false,
-      "coverage_method": "not_independently_testable",
-      "non_testable_reason": "Informational content; not independently testable"
-    },
-    {
-      "item_id": "ATA-41-ITEM-008",
-      "text": "[security] Potential exposure of sensitive credentials if not properly secured. (Severity: high)",
-      "classification": "informational_only",
-      "testable": false,
-      "coverage_method": "not_independently_testable",
-      "non_testable_reason": "Informational content; not independently testable"
+      "item_id": "ATA-36-ITEM-014",
+      "text": "[Scope Risk] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)",
+      "classification": "system_behavior",
+      "testable": true,
+      "coverage_method": "inherited_via_parent_requirement",
+      "parent_requirement_id": null
     }
   ],
   "test_plan_by_requirement": [
     {
-      "requirement_id": "ATA-41-REQ-001",
-      "requirement_text": "[1]) Secure storage of base_url",
+      "requirement_id": "ATA-36-REQ-001",
+      "requirement_text": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
       "requirement_source": "jira",
       "quality": {
         "clarity_score": 0.8,
@@ -895,21 +841,22 @@
       "tests": {
         "happy_path": [
           {
-            "id": "API-001",
-            "title": "Happy path: Secure storage of base_url",
-            "source_requirement_id": "ATA-41-REQ-001",
+            "id": "UI-001",
+            "title": "Happy path: Automatic generation of Requirement Traceability Matrix (RTM)",
+            "source_requirement_id": "ATA-36-REQ-001",
             "intent_type": "happy_path",
             "requirements_covered": [
-              "ATA-41-REQ-001"
+              "ATA-36-REQ-001"
             ],
             "steps": [
-              "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
-              "Verify the response status code indicates success (201)",
-              "Validate the response structure matches expected format from the requirement"
+              "Navigate to the test plan creation page.",
+              "Click the 'Generate RTM' button.",
+              "Observe the system response indicating that the RTM is being generated.",
+              "Verify that the RTM is generated successfully and is displayed to the user."
             ],
             "steps_explanation": "",
             "steps_origin": "requirement-derived",
-            "expected_result": "The base_url is securely stored and the response does not include the api_token.",
+            "expected_result": "The Requirement Traceability Matrix (RTM) is generated and displayed correctly.",
             "priority": "medium",
             "confidence": "explicit"
           }
@@ -921,309 +868,8 @@
       }
     },
     {
-      "requirement_id": "ATA-41-REQ-002",
-      "requirement_text": "This capability shall securely store the base_url for a third-party API.",
-      "requirement_source": "inferred",
-      "quality": {
-        "clarity_score": 0.8,
-        "testability_score": 0.5,
-        "issues": [
-          "Missing explicit action verb",
-          "Outcome not directly observable",
-          "Depends on external system behavior"
-        ]
-      },
-      "coverage_confidence": {
-        "score": 0.8,
-        "level": "high",
-        "reasons": [
-          "Low requirement testability"
-        ]
-      },
-      "coverage_expectations": {
-        "happy_path": "covered",
-        "negative": "covered",
-        "boundary": "not_applicable",
-        "authorization": "not_applicable",
-        "data_validation": "not_applicable",
-        "stateful": "not_applicable"
-      },
-      "tests": {
-        "happy_path": [
-          {
-            "id": "API-004",
-            "title": "Happy path: Masking api_token in responses",
-            "source_requirement_id": "ATA-41-REQ-002",
-            "intent_type": "happy_path",
-            "requirements_covered": [
-              "ATA-41-REQ-002"
-            ],
-            "steps": [
-              "Send a valid GET request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
-              "Verify the response status code indicates success (200)",
-              "Validate the response structure matches expected format from the requirement"
-            ],
-            "steps_explanation": "",
-            "steps_origin": "requirement-derived",
-            "expected_result": "The response includes base_url and client_id, but not the api_token.",
-            "priority": "medium",
-            "confidence": "explicit"
-          }
-        ],
-        "negative": [
-          {
-            "id": "NEG-002",
-            "title": "Negative: This capability shall securely store the base_url for a third-party API.",
-            "source_requirement_id": "ATA-41-REQ-002",
-            "intent_type": "negative",
-            "requirements_covered": [
-              "ATA-41-REQ-002"
-            ],
-            "steps": [
-              "Prepare a request with invalid or missing required fields",
-              "Send the request to the system",
-              "Observe the response and verify appropriate error handling is returned"
-            ],
-            "steps_origin": "inferred",
-            "expected_result": "Negative behavior validated",
-            "confidence": "inferred",
-            "priority": "medium"
-          }
-        ],
-        "boundary": [],
-        "authorization": [],
-        "other": []
-      }
-    },
-    {
-      "requirement_id": "ATA-41-REQ-003",
-      "requirement_text": "This capability shall mask or omit the api_token in any responses returned from the API.",
-      "requirement_source": "inferred",
-      "quality": {
-        "clarity_score": 0.6,
-        "testability_score": 1.0,
-        "issues": [
-          "Missing explicit action verb",
-          "Multiple behaviors combined in one requirement"
-        ]
-      },
-      "coverage_confidence": {
-        "score": 0.65,
-        "level": "medium",
-        "reasons": [
-          "Low requirement clarity",
-          "Expected authorization testing not covered"
-        ]
-      },
-      "coverage_expectations": {
-        "happy_path": "covered",
-        "negative": "covered",
-        "boundary": "not_applicable",
-        "authorization": "expected",
-        "data_validation": "not_applicable",
-        "stateful": "not_applicable"
-      },
-      "tests": {
-        "happy_path": [
-          {
-            "id": "API-007",
-            "title": "Happy Path: This capability shall mask or omit the api_token in any responses returned from the API.",
-            "source_requirement_id": "ATA-41-REQ-003",
-            "intent_type": "happy_path",
-            "requirements_covered": [
-              "ATA-41-REQ-003"
-            ],
-            "steps": [
-              "Prepare a valid request with all required fields as specified in the requirement",
-              "Send the request to the system",
-              "Observe the response and verify it contains the expected data and status"
-            ],
-            "steps_origin": "inferred",
-            "expected_result": "Happy Path behavior validated",
-            "confidence": "inferred",
-            "priority": "medium"
-          }
-        ],
-        "negative": [
-          {
-            "id": "API-002",
-            "title": "Negative: Invalid access for POST endpoint",
-            "source_requirement_id": "ATA-41-REQ-003",
-            "intent_type": "negative",
-            "requirements_covered": [
-              "ATA-41-REQ-003"
-            ],
-            "steps": [
-              "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
-              "Verify the response status code indicates an error (403)",
-              "Validate the error response structure and error message",
-              "Confirm the error message indicates unauthorized access"
-            ],
-            "steps_explanation": "",
-            "steps_origin": "requirement-derived",
-            "expected_result": "The response indicates that access is forbidden for non-admin users.",
-            "priority": "medium",
-            "confidence": "explicit"
-          }
-        ],
-        "boundary": [],
-        "authorization": [
-          {
-            "id": "API-003",
-            "title": "Authorization: Admin-only access for POST endpoint",
-            "source_requirement_id": "ATA-41-REQ-003",
-            "intent_type": "authorization",
-            "requirements_covered": [
-              "ATA-41-REQ-003"
-            ],
-            "steps": [
-              "Send the request to the endpoint POST /api/v1/integrations/thirdparty/credentials",
-              "Verify the response status code indicates success (201)",
-              "Validate the response structure matches expected format from the requirement"
-            ],
-            "steps_explanation": "",
-            "steps_origin": "requirement-derived",
-            "expected_result": "The request is successful and the base_url is stored.",
-            "priority": "medium",
-            "confidence": "explicit"
-          },
-          {
-            "id": "AUTH-001",
-            "title": "Inferred authorization test for ATA-41-REQ-003",
-            "steps": [
-              "Prepare a valid request with all required fields as specified in the requirement",
-              "Send the request to the system",
-              "Observe the response and verify it contains the expected data and status"
-            ],
-            "steps_origin": "inferred",
-            "expected_result": "Unauthorized access is properly rejected",
-            "requirements_covered": [
-              "ATA-41-REQ-003"
-            ],
-            "confidence": "inferred",
-            "priority": "medium",
-            "dimension": "authorization"
-          }
-        ],
-        "other": []
-      }
-    },
-    {
-      "requirement_id": "ATA-41-REQ-004",
-      "requirement_text": "This capability shall restrict access to the POST endpoint for credential storage to admin users only.",
-      "requirement_source": "inferred",
-      "quality": {
-        "clarity_score": 0.8,
-        "testability_score": 0.7,
-        "issues": [
-          "Missing explicit action verb",
-          "Outcome not directly observable"
-        ]
-      },
-      "coverage_confidence": {
-        "score": 0.65,
-        "level": "medium",
-        "reasons": [
-          "Low requirement testability",
-          "Expected authorization testing not covered"
-        ]
-      },
-      "coverage_expectations": {
-        "happy_path": "covered",
-        "negative": "covered",
-        "boundary": "not_applicable",
-        "authorization": "expected",
-        "data_validation": "not_applicable",
-        "stateful": "not_applicable"
-      },
-      "tests": {
-        "happy_path": [
-          {
-            "id": "API-008",
-            "title": "Happy Path: This capability shall restrict access to the POST endpoint for credential storage to admin users onl",
-            "source_requirement_id": "ATA-41-REQ-004",
-            "intent_type": "happy_path",
-            "requirements_covered": [
-              "ATA-41-REQ-004"
-            ],
-            "steps": [
-              "Prepare a valid request with all required fields as specified in the requirement",
-              "Send the request to the system",
-              "Observe the response and verify it contains the expected data and status"
-            ],
-            "steps_origin": "inferred",
-            "expected_result": "Happy Path behavior validated",
-            "confidence": "inferred",
-            "priority": "medium"
-          }
-        ],
-        "negative": [
-          {
-            "id": "API-005",
-            "title": "Negative: Attempt to access GET endpoint from frontend",
-            "source_requirement_id": "ATA-41-REQ-004",
-            "intent_type": "negative",
-            "requirements_covered": [
-              "ATA-41-REQ-004"
-            ],
-            "steps": [
-              "Send the request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
-              "Verify the response status code indicates an error (403)",
-              "Validate the error response structure and error message",
-              "Confirm the error message indicates unauthorized access from frontend"
-            ],
-            "steps_explanation": "",
-            "steps_origin": "requirement-derived",
-            "expected_result": "The response indicates that access is forbidden for frontend sessions.",
-            "priority": "medium",
-            "confidence": "explicit"
-          }
-        ],
-        "boundary": [],
-        "authorization": [
-          {
-            "id": "API-006",
-            "title": "Authorization: Service-to-service access for GET endpoint",
-            "source_requirement_id": "ATA-41-REQ-004",
-            "intent_type": "authorization",
-            "requirements_covered": [
-              "ATA-41-REQ-004"
-            ],
-            "steps": [
-              "Send the request to the endpoint GET /api/v1/integrations/thirdparty/credentials",
-              "Verify the response status code indicates success (200)",
-              "Validate the response structure matches expected format from the requirement"
-            ],
-            "steps_explanation": "",
-            "steps_origin": "requirement-derived",
-            "expected_result": "The request is successful and the response includes base_url and client_id, but not the api_token.",
-            "priority": "medium",
-            "confidence": "explicit"
-          },
-          {
-            "id": "AUTH-002",
-            "title": "Inferred authorization test for ATA-41-REQ-004",
-            "steps": [
-              "Prepare a valid request with all required fields as specified in the requirement",
-              "Send the request to the system",
-              "Observe the response and verify it contains the expected data and status"
-            ],
-            "steps_origin": "inferred",
-            "expected_result": "Unauthorized access is properly rejected",
-            "requirements_covered": [
-              "ATA-41-REQ-004"
-            ],
-            "confidence": "inferred",
-            "priority": "medium",
-            "dimension": "authorization"
-          }
-        ],
-        "other": []
-      }
-    },
-    {
-      "requirement_id": "ATA-41-REQ-005",
-      "requirement_text": "Service-to-service access for the GET endpoint to retrieve API credentials.",
+      "requirement_id": "ATA-36-REQ-002",
+      "requirement_text": "Identification of uncovered requirements in RTM.",
       "requirement_source": "inferred",
       "quality": {
         "clarity_score": 0.8,
@@ -1235,73 +881,331 @@
         ]
       },
       "coverage_confidence": {
-        "score": 0.55,
-        "level": "medium",
+        "score": 0.8,
+        "level": "high",
         "reasons": [
-          "Low requirement testability",
-          "Expected authorization testing not covered",
-          "All coverage is inferred"
+          "Low requirement testability"
         ]
       },
       "coverage_expectations": {
         "happy_path": "covered",
         "negative": "not_applicable",
         "boundary": "not_applicable",
-        "authorization": "expected",
+        "authorization": "not_applicable",
         "data_validation": "not_applicable",
         "stateful": "not_applicable"
       },
       "tests": {
         "happy_path": [
           {
-            "id": "API-009",
-            "title": "Happy Path: Service-to-service access for the GET endpoint to retrieve API credentials.",
-            "source_requirement_id": "ATA-41-REQ-005",
+            "id": "UI-003",
+            "title": "Happy path: Inclusion of Requirement ID in RTM",
+            "source_requirement_id": "ATA-36-REQ-002",
             "intent_type": "happy_path",
             "requirements_covered": [
-              "ATA-41-REQ-005"
+              "ATA-36-REQ-002"
             ],
             "steps": [
-              "Prepare a valid request with all required fields as specified in the requirement",
-              "Send the request to the system",
-              "Observe the response and verify it contains the expected data and status"
+              "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+              "Locate the section of the RTM that lists the requirements.",
+              "Verify that each requirement listed in the RTM includes its corresponding Requirement ID."
             ],
-            "steps_origin": "inferred",
-            "expected_result": "Happy Path behavior validated",
-            "confidence": "inferred",
-            "priority": "medium"
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "expected_result": "Each requirement in the RTM displays its corresponding Requirement ID.",
+            "priority": "medium",
+            "confidence": "explicit"
           }
         ],
         "negative": [],
         "boundary": [],
-        "authorization": [
+        "authorization": [],
+        "other": []
+      }
+    },
+    {
+      "requirement_id": "ATA-36-REQ-003",
+      "requirement_text": "Inclusion of associated test case ID(s) in RTM.",
+      "requirement_source": "inferred",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "tests": {
+        "happy_path": [
           {
-            "id": "AUTH-004",
-            "title": "Authorization: Service-to-service access for the GET endpoint to retrieve API credentials.",
-            "source_requirement_id": "ATA-41-REQ-005",
-            "intent_type": "authorization",
+            "id": "UI-004",
+            "title": "Happy path: Inclusion of Requirement description in RTM",
+            "source_requirement_id": "ATA-36-REQ-003",
+            "intent_type": "happy_path",
             "requirements_covered": [
-              "ATA-41-REQ-005"
+              "ATA-36-REQ-003"
             ],
             "steps": [
-              "Prepare a request without proper authentication or authorization",
-              "Send the request to the system",
-              "Observe the response and verify access is denied with appropriate status code"
+              "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+              "Locate the section of the RTM that lists the requirements.",
+              "Verify that each requirement listed in the RTM includes its corresponding description."
             ],
-            "steps_origin": "inferred",
-            "expected_result": "Authorization behavior validated",
-            "confidence": "inferred",
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "expected_result": "Each requirement in the RTM displays its corresponding description.",
             "priority": "medium",
-            "dimension": "authorization"
+            "confidence": "explicit"
           }
         ],
+        "negative": [],
+        "boundary": [],
+        "authorization": [],
+        "other": []
+      }
+    },
+    {
+      "requirement_id": "ATA-36-REQ-004",
+      "requirement_text": "Inclusion of coverage status in RTM.",
+      "requirement_source": "inferred",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "tests": {
+        "happy_path": [
+          {
+            "id": "UI-005",
+            "title": "Happy path: Identification of uncovered requirements in RTM",
+            "source_requirement_id": "ATA-36-REQ-004",
+            "intent_type": "happy_path",
+            "requirements_covered": [
+              "ATA-36-REQ-004"
+            ],
+            "steps": [
+              "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+              "Verify that the RTM identifies any requirements that are not covered by test cases."
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "expected_result": "The RTM correctly identifies uncovered requirements.",
+            "priority": "medium",
+            "confidence": "explicit"
+          }
+        ],
+        "negative": [],
+        "boundary": [],
+        "authorization": [],
+        "other": []
+      }
+    },
+    {
+      "requirement_id": "ATA-36-REQ-005",
+      "requirement_text": "Deriving RTM directly from test plan.",
+      "requirement_source": "inferred",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "tests": {
+        "happy_path": [
+          {
+            "id": "UI-006",
+            "title": "Happy path: Inclusion of associated test case ID(s) in RTM",
+            "source_requirement_id": "ATA-36-REQ-005",
+            "intent_type": "happy_path",
+            "requirements_covered": [
+              "ATA-36-REQ-005"
+            ],
+            "steps": [
+              "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+              "Locate the section of the RTM that lists the requirements.",
+              "Verify that each requirement includes its associated test case ID(s)."
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "expected_result": "Each requirement in the RTM displays its associated test case ID(s).",
+            "priority": "medium",
+            "confidence": "explicit"
+          }
+        ],
+        "negative": [],
+        "boundary": [],
+        "authorization": [],
+        "other": []
+      }
+    },
+    {
+      "requirement_id": "ATA-36-REQ-006",
+      "requirement_text": "Ensuring each requirement appears once in RTM.",
+      "requirement_source": "inferred",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "tests": {
+        "happy_path": [
+          {
+            "id": "UI-007",
+            "title": "Happy path: Inclusion of coverage status in RTM",
+            "source_requirement_id": "ATA-36-REQ-006",
+            "intent_type": "happy_path",
+            "requirements_covered": [
+              "ATA-36-REQ-006"
+            ],
+            "steps": [
+              "Generate the Requirement Traceability Matrix (RTM) for the test plan.",
+              "Locate the section of the RTM that indicates coverage status.",
+              "Verify that the coverage status for each requirement is displayed correctly."
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "expected_result": "The RTM displays the coverage status for each requirement.",
+            "priority": "medium",
+            "confidence": "explicit"
+          }
+        ],
+        "negative": [],
+        "boundary": [],
+        "authorization": [],
+        "other": []
+      }
+    },
+    {
+      "requirement_id": "ATA-36-REQ-007",
+      "requirement_text": "Non-blocking RTM generation for test plan creation.",
+      "requirement_source": "inferred",
+      "quality": {
+        "clarity_score": 0.8,
+        "testability_score": 0.4,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ]
+      },
+      "coverage_confidence": {
+        "score": 0.8,
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ]
+      },
+      "coverage_expectations": {
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "boundary": "not_applicable",
+        "authorization": "not_applicable",
+        "data_validation": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "tests": {
+        "happy_path": [
+          {
+            "id": "UI-008",
+            "title": "Happy path: Deriving RTM directly from test plan",
+            "source_requirement_id": "ATA-36-REQ-007",
+            "intent_type": "happy_path",
+            "requirements_covered": [
+              "ATA-36-REQ-007"
+            ],
+            "steps": [
+              "Create a new test plan with defined requirements.",
+              "Generate the Requirement Traceability Matrix (RTM) from the test plan.",
+              "Verify that the RTM is derived directly from the test plan requirements."
+            ],
+            "steps_explanation": "",
+            "steps_origin": "requirement-derived",
+            "expected_result": "The RTM is correctly derived from the test plan.",
+            "priority": "medium",
+            "confidence": "explicit"
+          }
+        ],
+        "negative": [],
+        "boundary": [],
+        "authorization": [],
         "other": []
       }
     }
   ],
   "audit_metadata": {
-    "run_id": "853b15f2-3322-4088-9725-076909939961",
-    "generated_at": "2026-01-19T02:48:37Z",
+    "run_id": "c268cdf4-ba9f-42f0-8b69-e13e38d2e73f",
+    "generated_at": "2026-01-22T02:55:15Z",
     "agent_version": "1.0.0",
     "model": {
       "name": "gpt-4o-mini",

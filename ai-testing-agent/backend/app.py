@@ -59,6 +59,7 @@ ALLOWED_ORIGINS = [
     # Production frontend domains
     "https://app.scopetraceai.com",
     "https://scopetraceai-platform.vercel.app",
+    "https://scopetraceai-platform.onrender.com",  # Render deployment
     # Marketing site domains
     "https://scopetraceai.com",
     "https://www.scopetraceai.com",
@@ -82,7 +83,9 @@ CORS(
     origins=ALLOWED_ORIGINS,
     allow_headers=["Content-Type", "Authorization", "X-Actor", "Stripe-Signature"],
     expose_headers=["Content-Type", "Content-Disposition"],
-    supports_credentials=False
+    supports_credentials=False,
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    max_age=3600
 )
 
 # Import JWT utilities (will fail fast if JWT_SECRET is not set)
@@ -9209,10 +9212,20 @@ def generate_test_plan():
             else:
                 # Fail closed: return 503
                 logger.error(f"Entitlement check failed for tenant {tenant_id}: {str(e)}", exc_info=True)
-                return jsonify({
+                response = jsonify({
                     "error": "ENTITLEMENT_UNAVAILABLE",
                     "message": "Unable to verify subscription status. Please try again."
-                }), 503
+                })
+                response.status_code = 503
+                
+                # Ensure CORS headers are included
+                origin = request.headers.get("Origin", "")
+                if origin in ALLOWED_ORIGINS:
+                    response.headers["Access-Control-Allow-Origin"] = origin
+                elif ALLOWED_ORIGINS:
+                    response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+                
+                return response
     
     try:
         
@@ -11089,9 +11102,20 @@ def generate_test_plan():
         except Exception as persist_error:
             logger.warning(f"Failed to persist error state: {str(persist_error)}")
         
-        return jsonify({
+        # Create response with CORS headers explicitly included
+        response = jsonify({
             "error": f"Internal server error: {str(e)}"
-        }), 500
+        })
+        response.status_code = 500
+        
+        # Ensure CORS headers are included (Flask-CORS should handle this, but explicit for safety)
+        origin = request.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        elif ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+        
+        return response
 
 
 @app.route("/api/v1/analyze", methods=["POST"])
@@ -11173,15 +11197,36 @@ def analyze_requirements():
                 form_data_to_send["context"] = form_data.get("context")
             
             # Forward request to BA agent
-            response = req_lib.post(
-                url,
-                headers=headers,
-                data=form_data_to_send,
-                files=files_to_send if files_to_send else None,
-                timeout=300
-            )
-            response.raise_for_status()
-            result = response.json()
+            try:
+                response = req_lib.post(
+                    url,
+                    headers=headers,
+                    data=form_data_to_send,
+                    files=files_to_send if files_to_send else None,
+                    timeout=300
+                )
+                response.raise_for_status()
+                result = response.json()
+            except req_lib.exceptions.HTTPError as e:
+                # Extract error details from BA agent response
+                error_detail = f"500 Server Error: Internal Server Error for url: {url}"
+                try:
+                    if e.response is not None:
+                        error_body = e.response.json()
+                        if isinstance(error_body, dict) and "detail" in error_body:
+                            error_detail = error_body["detail"]
+                        elif isinstance(error_body, dict):
+                            error_detail = str(error_body)
+                        else:
+                            error_detail = e.response.text[:500] if e.response.text else error_detail
+                except (ValueError, AttributeError):
+                    try:
+                        if e.response is not None and e.response.text:
+                            error_detail = e.response.text[:500]
+                    except:
+                        pass
+                logger.error(f"BA agent HTTP error (multipart): {error_detail}")
+                raise Exception(error_detail) from e
         else:
             # Handle JSON request (no attachments)
             data = request.get_json() or {}
@@ -11298,10 +11343,22 @@ def analyze_requirements():
             error_code = "SERVICE_ERROR"
         
         logger.error(f"Error analyzing requirements: {error_detail}", exc_info=True)
-        return jsonify({
+        
+        # Create response with CORS headers explicitly included
+        response = jsonify({
             "detail": error_detail,
             "error": error_code
-        }), 500
+        })
+        response.status_code = 500
+        
+        # Ensure CORS headers are included (Flask-CORS should handle this, but explicit for safety)
+        origin = request.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        elif ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+        
+        return response
 
 
 @app.route("/api/v1/jira/rewrite/dry-run", methods=["POST"])

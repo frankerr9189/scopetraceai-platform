@@ -96,6 +96,7 @@ ALLOWED_ORIGINS = [
     # Production frontend domains
     "https://app.scopetraceai.com",
     "https://scopetraceai-platform.vercel.app",
+    "https://scopetraceai-platform.onrender.com",  # Render deployment
     # Marketing site domains
     "https://scopetraceai.com",
     "https://www.scopetraceai.com",
