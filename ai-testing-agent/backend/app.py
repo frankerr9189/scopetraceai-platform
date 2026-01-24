@@ -9199,7 +9199,18 @@ def generate_test_plan():
                     if "plan_tier" in metadata:
                         response_detail["plan_tier"] = metadata["plan_tier"]
                     
-                    return jsonify(response_detail), 403
+                    # Create response with CORS headers explicitly included
+                    response = jsonify(response_detail)
+                    response.status_code = 403
+                    
+                    # Ensure CORS headers are included
+                    origin = request.headers.get("Origin", "")
+                    if origin in ALLOWED_ORIGINS:
+                        response.headers["Access-Control-Allow-Origin"] = origin
+                    elif ALLOWED_ORIGINS:
+                        response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+                    
+                    return response
             finally:
                 db.close()
         except Exception as e:
