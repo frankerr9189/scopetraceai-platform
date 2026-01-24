@@ -352,8 +352,13 @@ openai_client = None
 openai_api_key = os.getenv('OPENAI_API_KEY')
 if openai_api_key:
     try:
-        openai_client = OpenAI(api_key=openai_api_key)
-        logger.info("OpenAI client initialized successfully")
+        # Set timeout to 240 seconds (4 minutes) to prevent hanging
+        # Gunicorn timeout is 300 seconds, so this gives us buffer
+        openai_client = OpenAI(
+            api_key=openai_api_key,
+            timeout=240.0  # 4 minutes timeout for API calls
+        )
+        logger.info("OpenAI client initialized successfully with 240s timeout")
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI client: {e}")
         openai_client = None
