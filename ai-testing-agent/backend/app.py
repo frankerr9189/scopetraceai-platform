@@ -94,6 +94,26 @@ from auth.jwt import create_access_token, decode_and_verify_token
 # Import encryption utilities (will fail fast if INTEGRATION_SECRET_KEY is not set)
 from utils.encryption import decrypt_secret  # noqa: F401
 
+@app.after_request
+def add_cors_headers(response):
+    """
+    Ensure CORS headers are added to all responses, including error responses.
+    This is a safety net in case Flask-CORS doesn't handle certain error cases.
+    """
+    origin = request.headers.get("Origin", "")
+    if origin in ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+    elif ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+    
+    # Ensure other CORS headers are present
+    if "Access-Control-Allow-Methods" not in response.headers:
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    if "Access-Control-Allow-Headers" not in response.headers:
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Actor, Stripe-Signature"
+    
+    return response
+
 @app.before_request
 def check_auth():
     """
@@ -128,14 +148,30 @@ def check_auth():
     auth_header = request.headers.get("Authorization", "")
     
     if not auth_header.startswith("Bearer "):
-        return jsonify({"detail": "Unauthorized"}), 401
+        response = jsonify({"detail": "Unauthorized"})
+        response.status_code = 401
+        # CORS headers will be added by after_request handler, but explicit for safety
+        origin = request.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        elif ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+        return response
     
     token = auth_header.replace("Bearer ", "").strip()
     
     # Verify JWT token
     payload, error = decode_and_verify_token(token)
     if error or not payload:
-        return jsonify({"detail": "Unauthorized"}), 401
+        response = jsonify({"detail": "Unauthorized"})
+        response.status_code = 401
+        # CORS headers will be added by after_request handler, but explicit for safety
+        origin = request.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        elif ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+        return response
     
     # Extract claims and store on flask.g for downstream use
     g.user_id = payload.get("sub")
@@ -145,7 +181,15 @@ def check_auth():
     # Tenant-first model: tenant_id is ALWAYS required for authenticated requests
     if not g.tenant_id:
         logger.error("JWT token missing tenant_id claim - rejecting request (tenant-first model)")
-        return jsonify({"detail": "Invalid token: missing tenant_id"}), 401
+        response = jsonify({"detail": "Invalid token: missing tenant_id"})
+        response.status_code = 401
+        # CORS headers will be added by after_request handler, but explicit for safety
+        origin = request.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        elif ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+        return response
     
     # ACTIVE/INACTIVE ENFORCEMENT: Check tenant and user active status
     # This must happen BEFORE subscription gating or other logic
