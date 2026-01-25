@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Code, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Code, AlertTriangle, AlertCircle } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 
 interface RequirementsViewProps {
@@ -14,10 +14,23 @@ interface RequirementsViewProps {
     data_validation_tests: TestCase[]
     edge_cases: TestCase[]
     negative_tests: TestCase[]
+    system_tests?: TestCase[]
   }
+  testPlanByRequirement?: Array<{
+    requirement_id: string
+    requirement_text: string
+    requirement_source: 'jira' | 'inferred'
+    tests: {
+      happy_path: TestCase[]
+      negative: TestCase[]
+      boundary: TestCase[]
+      authorization: TestCase[]
+      other: TestCase[]
+    }
+  }>
 }
 
-function RequirementCard({ requirement, testPlan }: { requirement: Requirement; testPlan?: RequirementsViewProps['testPlan'] }) {
+function RequirementCard({ requirement, testPlan, testPlanByRequirement }: { requirement: Requirement; testPlan?: RequirementsViewProps['testPlan']; testPlanByRequirement?: RequirementsViewProps['testPlanByRequirement'] }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showRawJson, setShowRawJson] = useState(false)
   const [showCoverageConfidence, setShowCoverageConfidence] = useState(false)
@@ -291,79 +304,164 @@ function RequirementCard({ requirement, testPlan }: { requirement: Requirement; 
               )}
 
               {/* Executable Tests & Steps */}
-              {testPlan && (() => {
-                // Find all tests where source_requirement_id matches this requirement
-                const allTests: TestCase[] = [
-                  ...(testPlan.api_tests || []),
-                  ...(testPlan.ui_tests || []),
-                  ...(testPlan.data_validation_tests || []),
-                  ...(testPlan.edge_cases || []),
-                  ...(testPlan.negative_tests || [])
-                ]
-                const requirementTests = allTests.filter(
-                  test => test.source_requirement_id === requirement.id
-                )
+              {(testPlan || testPlanByRequirement) && (() => {
+                // Helper: Flatten all test categories from test_plan into a single list
+                const flattenAllTests = (): TestCase[] => {
+                  if (!testPlan) return []
+                  return [
+                    ...(testPlan.api_tests || []),
+                    ...(testPlan.ui_tests || []),
+                    ...(testPlan.data_validation_tests || []),
+                    ...(testPlan.edge_cases || []),
+                    ...(testPlan.negative_tests || []),
+                    ...(testPlan.system_tests || [])
+                  ]
+                }
                 
-                if (requirementTests.length === 0) {
-                  return null
+                const allTests = flattenAllTests()
+                
+                // Partition tests per requirement into directTests and inheritedTests
+                const directTests: TestCase[] = []
+                const inheritedTests: TestCase[] = []
+                
+                for (const test of allTests) {
+                  if (!test || typeof test !== 'object') continue
+                  
+                  const sourceReqId = test.source_requirement_id
+                  const requirementsCovered = Array.isArray(test.requirements_covered) ? test.requirements_covered : []
+                  
+                  // DIRECT TESTS: source_requirement_id === requirement.id
+                  if (sourceReqId === requirement.id) {
+                    directTests.push(test)
+                  }
+                  // INHERITED COVERAGE: requirement.id in requirements_covered AND source_requirement_id !== requirement.id
+                  else if (
+                    requirementsCovered.includes(requirement.id) &&
+                    sourceReqId !== requirement.id
+                  ) {
+                    inheritedTests.push(test)
+                  }
+                }
+                
+                // Sort tests by id for deterministic ordering
+                const sortTestsById = (tests: TestCase[]) => {
+                  return [...tests].sort((a, b) => (a.id || '').localeCompare(b.id || ''))
+                }
+                
+                const sortedDirectTests = sortTestsById(directTests)
+                const sortedInheritedTests = sortTestsById(inheritedTests)
+                
+                // If no direct or inherited tests, show "Not covered"
+                if (sortedDirectTests.length === 0 && sortedInheritedTests.length === 0) {
+                  return (
+                    <div className="border border-border/30 rounded-lg bg-background/50 backdrop-blur-sm p-3">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Not covered</span>
+                      </div>
+                    </div>
+                  )
                 }
                 
                 return (
-                  <div className="border border-border/30 rounded-lg bg-background/50 backdrop-blur-sm">
-                    <button
-                      onClick={() => setShowExecutableTests(!showExecutableTests)}
-                      className="w-full flex items-center justify-between p-3 text-left hover:bg-secondary/10 transition-colors"
-                    >
-                      <span className="text-sm font-semibold text-foreground/90">Executable Tests & Steps</span>
-                      {showExecutableTests ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </button>
-                    <AnimatePresence>
-                      {showExecutableTests && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden"
+                  <div className="space-y-3">
+                    {/* DIRECT TESTS: Render full test cards including steps */}
+                    {sortedDirectTests.length > 0 && (
+                      <div className="border border-border/30 rounded-lg bg-background/50 backdrop-blur-sm">
+                        <button
+                          onClick={() => setShowExecutableTests(!showExecutableTests)}
+                          className="w-full flex items-center justify-between p-3 text-left hover:bg-secondary/10 transition-colors"
                         >
-                          <div className="px-3 pb-3 space-y-4 border-t border-border/30 pt-3">
-                            {requirementTests.map((test) => (
-                              <div key={test.id} className="space-y-2 border-b border-border/20 pb-3 last:border-b-0 last:pb-0">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-mono text-xs text-foreground/80">{test.id}</span>
-                                    {test.intent_type && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        {test.intent_type.replace('_', ' ')}
-                                      </Badge>
+                          <span className="text-sm font-semibold text-foreground/90">
+                            Executable Tests ({sortedDirectTests.length})
+                          </span>
+                          {showExecutableTests ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        <AnimatePresence>
+                          {showExecutableTests && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="px-3 pb-3 space-y-4 border-t border-border/30 pt-3">
+                                {sortedDirectTests.map((test) => (
+                                  <div key={test.id} className="space-y-2 border-b border-border/20 pb-3 last:border-b-0 last:pb-0">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-mono text-xs text-foreground/80">{test.id}</span>
+                                        {test.intent_type && (
+                                          <Badge variant="secondary" className="text-xs">
+                                            {test.intent_type.replace('_', ' ')}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-sm text-foreground/90">{test.title}</p>
+                                    </div>
+                                    {test.steps && test.steps.length > 0 ? (
+                                      <div className="space-y-1">
+                                        <span className="text-xs font-medium text-foreground/80">Steps:</span>
+                                        <ol className="list-decimal list-inside space-y-1 text-xs text-foreground/70 ml-2">
+                                          {test.steps.map((step, idx) => (
+                                            <li key={idx}>{step}</li>
+                                          ))}
+                                        </ol>
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground italic">
+                                        Steps not generated for this test (inferred coverage)
+                                      </p>
                                     )}
                                   </div>
-                                  <p className="text-sm text-foreground/90">{test.title}</p>
-                                </div>
-                                {test.steps && test.steps.length > 0 ? (
-                                  <div className="space-y-1">
-                                    <span className="text-xs font-medium text-foreground/80">Steps:</span>
-                                    <ol className="list-decimal list-inside space-y-1 text-xs text-foreground/70 ml-2">
-                                      {test.steps.map((step, idx) => (
-                                        <li key={idx}>{step}</li>
-                                      ))}
-                                    </ol>
-                                  </div>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground italic">
-                                    Steps not generated for this test (inferred coverage)
-                                  </p>
-                                )}
+                                ))}
                               </div>
-                            ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+                    
+                    {/* INHERITED COVERAGE: Render compact list without steps */}
+                    {sortedInheritedTests.length > 0 && (
+                      <div className="border border-border/30 rounded-lg bg-background/50 backdrop-blur-sm">
+                        <div className="p-3 border-b border-border/30">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-foreground/90">
+                              Covered (Inherited)
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              {sortedInheritedTests.length} test{sortedInheritedTests.length !== 1 ? 's' : ''}
+                            </Badge>
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Covered by shared/system tests
+                          </p>
+                        </div>
+                        <div className="px-3 pb-3 space-y-2 pt-3">
+                          {sortedInheritedTests.map((test) => (
+                            <div key={test.id} className="flex items-start gap-2 text-sm">
+                              <span className="font-mono text-xs text-foreground/70 min-w-[100px]">{test.id}</span>
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-foreground/90">{test.title}</span>
+                                  {test.intent_type && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {test.intent_type.replace('_', ' ')}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })()}
@@ -507,7 +605,7 @@ function RequirementCard({ requirement, testPlan }: { requirement: Requirement; 
   )
 }
 
-export function RequirementsView({ requirements, testPlan }: RequirementsViewProps) {
+export function RequirementsView({ requirements, testPlan, testPlanByRequirement }: RequirementsViewProps) {
   if (requirements.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -525,7 +623,11 @@ export function RequirementsView({ requirements, testPlan }: RequirementsViewPro
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.05 }}
         >
-          <RequirementCard requirement={requirement} testPlan={testPlan} />
+          <RequirementCard 
+            requirement={requirement} 
+            testPlan={testPlan}
+            testPlanByRequirement={testPlanByRequirement}
+          />
         </motion.div>
       ))}
     </div>

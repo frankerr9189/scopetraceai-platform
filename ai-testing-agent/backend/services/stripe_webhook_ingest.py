@@ -26,6 +26,49 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _map_price_id_to_plan_tier(price_id: str) -> Optional[str]:
+    """
+    Map Stripe price_id to plan_tier using authoritative env vars.
+    
+    Args:
+        price_id: Stripe price ID from subscription line items
+        
+    Returns:
+        plan_tier: 'individual', 'team', or 'pro', or None if not found
+    """
+    if not price_id:
+        return None
+    
+    # Map price_id to plan_tier using authoritative env vars
+    price_to_tier = {
+        os.getenv("STRIPE_PRICE_INDIVIDUAL"): "individual",
+        os.getenv("STRIPE_PRICE_TEAM"): "team",
+        os.getenv("STRIPE_PRICE_PRO"): "pro",
+    }
+    
+    # Remove None values (env vars not set)
+    price_to_tier = {k: v for k, v in price_to_tier.items() if k is not None}
+    
+    plan_tier = price_to_tier.get(price_id)
+    return plan_tier
+
+
+def _normalize_plan_tier(plan_tier: Optional[str]) -> Optional[str]:
+    """
+    Normalize legacy 'user' tier to 'individual'.
+    
+    Args:
+        plan_tier: Plan tier value (may be 'user', 'individual', 'team', 'pro', etc.)
+        
+    Returns:
+        Normalized plan_tier ('individual' if input was 'user', otherwise unchanged)
+    """
+    if plan_tier == "user":
+        logger.warning(f"Normalizing legacy plan_tier 'user' to 'individual'")
+        return "individual"
+    return plan_tier
+
+
 def _process_checkout_session_completed(event: Dict[str, Any], db: Session, event_id: str) -> None:
     """
     Process checkout.session.completed event to update tenant_billing.
@@ -58,7 +101,6 @@ def _process_checkout_session_completed(event: Dict[str, Any], db: Session, even
     # Extract metadata
     metadata = session.get("metadata", {})
     tenant_id = metadata.get("tenant_id")
-    plan_tier = metadata.get("plan_tier")
     
     # Extract Stripe IDs
     stripe_customer_id = session.get("customer")
@@ -67,12 +109,6 @@ def _process_checkout_session_completed(event: Dict[str, Any], db: Session, even
     # Validate required fields
     if not tenant_id:
         error_msg = "missing_metadata: tenant_id not found in session metadata"
-        logger.warning(f"checkout.session.completed event {event_id}: {error_msg}")
-        _mark_event_error(db, event_id, error_msg)
-        return
-    
-    if plan_tier not in ("user", "team"):
-        error_msg = f"invalid_plan_tier: plan_tier must be 'user' or 'team', got '{plan_tier}'"
         logger.warning(f"checkout.session.completed event {event_id}: {error_msg}")
         _mark_event_error(db, event_id, error_msg)
         return
@@ -89,6 +125,47 @@ def _process_checkout_session_completed(event: Dict[str, Any], db: Session, even
     except stripe.error.StripeError as e:
         error_msg = f"stripe_api_error: Failed to retrieve subscription {stripe_subscription_id}: {str(e)}"
         logger.error(f"checkout.session.completed event {event_id}: {error_msg}")
+        _mark_event_error(db, event_id, error_msg)
+        return
+    
+    # Extract price_id from subscription line items to determine plan_tier
+    # Use first line item's price_id (subscriptions typically have one line item)
+    line_items = subscription.get("items", {}).get("data", [])
+    if not line_items:
+        error_msg = "missing_line_items: subscription has no line items"
+        logger.warning(f"checkout.session.completed event {event_id}: {error_msg}")
+        _mark_event_error(db, event_id, error_msg)
+        return
+    
+    price_id = line_items[0].get("price", {}).get("id")
+    if not price_id:
+        error_msg = "missing_price_id: line item has no price ID"
+        logger.warning(f"checkout.session.completed event {event_id}: {error_msg}")
+        _mark_event_error(db, event_id, error_msg)
+        return
+    
+    # Map price_id to plan_tier using authoritative env vars
+    plan_tier = _map_price_id_to_plan_tier(price_id)
+    
+    # Fallback to metadata if price_id mapping fails (backward compatibility)
+    if not plan_tier:
+        plan_tier = metadata.get("plan_tier")
+        if plan_tier:
+            logger.warning(f"checkout.session.completed event {event_id}: price_id {price_id} not mapped, using metadata plan_tier={plan_tier}")
+        else:
+            error_msg = f"unknown_price_id: price_id {price_id} not mapped to plan_tier and no metadata plan_tier found"
+            logger.warning(f"checkout.session.completed event {event_id}: {error_msg}")
+            _mark_event_error(db, event_id, error_msg)
+            return
+    
+    # Normalize legacy 'user' tier to 'individual'
+    plan_tier = _normalize_plan_tier(plan_tier)
+    
+    # Validate plan_tier against locked plan tiers
+    valid_plan_tiers = {"individual", "team", "pro"}
+    if plan_tier not in valid_plan_tiers:
+        error_msg = f"invalid_plan_tier: plan_tier must be one of {valid_plan_tiers}, got '{plan_tier}'"
+        logger.warning(f"checkout.session.completed event {event_id}: {error_msg}")
         _mark_event_error(db, event_id, error_msg)
         return
     
@@ -286,7 +363,7 @@ def _process_customer_subscription_updated(event: Dict[str, Any], db: Session, e
     # Look up tenant_billing by stripe_subscription_id
     result = db.execute(
         text("""
-            SELECT tenant_id, status, cancel_at_period_end,
+            SELECT tenant_id, status, plan_tier, cancel_at_period_end,
                    EXTRACT(EPOCH FROM current_period_start)::BIGINT as cps_epoch,
                    EXTRACT(EPOCH FROM current_period_end)::BIGINT as cpe_epoch
             FROM tenant_billing
@@ -304,15 +381,41 @@ def _process_customer_subscription_updated(event: Dict[str, Any], db: Session, e
     
     tenant_id = str(result.tenant_id)
     existing_status = result.status
+    existing_plan_tier = result.plan_tier
     existing_cap = result.cancel_at_period_end
     existing_cps_epoch = result.cps_epoch
     existing_cpe_epoch = result.cpe_epoch
     
     # Extract subscription data
     sub_status = subscription.get("status")
+    stripe_customer_id = subscription.get("customer")  # May be string or expanded object
+    if isinstance(stripe_customer_id, dict):
+        stripe_customer_id = stripe_customer_id.get("id")
     current_period_start = subscription.get("current_period_start")  # epoch seconds
     current_period_end = subscription.get("current_period_end")  # epoch seconds
     cancel_at_period_end = subscription.get("cancel_at_period_end", False)
+    
+    # Extract price_id from subscription line items to determine plan_tier
+    line_items = subscription.get("items", {}).get("data", [])
+    new_plan_tier = None
+    if line_items:
+        price_id = line_items[0].get("price", {}).get("id")
+        if price_id:
+            new_plan_tier = _map_price_id_to_plan_tier(price_id)
+            if new_plan_tier:
+                # Normalize legacy 'user' tier to 'individual'
+                new_plan_tier = _normalize_plan_tier(new_plan_tier)
+    
+    # Normalize existing plan_tier if it's legacy 'user'
+    if existing_plan_tier:
+        existing_plan_tier = _normalize_plan_tier(existing_plan_tier)
+        # Update DB if normalization changed it
+        if existing_plan_tier != result.plan_tier:
+            db.execute(
+                text("UPDATE tenant_billing SET plan_tier = :plan_tier WHERE tenant_id = :tenant_id"),
+                {"plan_tier": existing_plan_tier, "tenant_id": tenant_id}
+            )
+            db.commit()
     
     # Map subscription status to tenant_billing.status
     # Keep consistent with Phase 4A mapping
@@ -326,8 +429,12 @@ def _process_customer_subscription_updated(event: Dict[str, Any], db: Session, e
         # Use status as-is for other cases
         billing_status = sub_status
     
+    # Use new_plan_tier if available, otherwise keep existing
+    final_plan_tier = new_plan_tier if new_plan_tier else existing_plan_tier
+    
     # Idempotency check: if all fields are already equal, treat as no-op
     if (existing_status == billing_status and
+        (not new_plan_tier or existing_plan_tier == new_plan_tier) and
         existing_cap == cancel_at_period_end and
         (existing_cps_epoch is None or existing_cps_epoch == current_period_start) and
         (existing_cpe_epoch is None or existing_cpe_epoch == current_period_end)):
@@ -337,7 +444,7 @@ def _process_customer_subscription_updated(event: Dict[str, Any], db: Session, e
     
     # Update tenant_billing
     try:
-        # Build update query with conditional timestamp updates
+        # Build update query with conditional timestamp, plan_tier, and customer_id updates
         update_params = {
             "status": billing_status,
             "cancel_at_period_end": cancel_at_period_end,
@@ -350,6 +457,16 @@ def _process_customer_subscription_updated(event: Dict[str, Any], db: Session, e
             "cancel_at_period_end = :cancel_at_period_end",
             "updated_at = NOW()"
         ]
+        
+        # Update plan_tier if it changed
+        if new_plan_tier and new_plan_tier != existing_plan_tier:
+            set_clauses.append("plan_tier = :plan_tier")
+            update_params["plan_tier"] = new_plan_tier
+        
+        # Update stripe_customer_id if available
+        if stripe_customer_id:
+            set_clauses.append("stripe_customer_id = :stripe_customer_id")
+            update_params["stripe_customer_id"] = stripe_customer_id
         
         if current_period_start is not None:
             set_clauses.append("current_period_start = to_timestamp(:current_period_start)")
@@ -368,10 +485,11 @@ def _process_customer_subscription_updated(event: Dict[str, Any], db: Session, e
         db.execute(text(update_query), update_params)
         db.commit()
         
-        logger.info(
-            f"Updated tenant_billing for subscription {stripe_subscription_id} (tenant {tenant_id}): "
-            f"status={billing_status}, cancel_at_period_end={cancel_at_period_end}"
-        )
+        log_msg = f"Updated tenant_billing for subscription {stripe_subscription_id} (tenant {tenant_id}): status={billing_status}"
+        if new_plan_tier and new_plan_tier != existing_plan_tier:
+            log_msg += f", plan_tier={new_plan_tier} (was {existing_plan_tier})"
+        log_msg += f", cancel_at_period_end={cancel_at_period_end}"
+        logger.info(log_msg)
         
         # Mark event as processed
         _mark_event_processed(db, event_id)

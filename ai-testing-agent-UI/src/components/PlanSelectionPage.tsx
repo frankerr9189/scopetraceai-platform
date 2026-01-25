@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Sparkles, Zap, Loader2 } from 'lucide-react'
+import { Badge } from './ui/badge'
+import { Sparkles, Zap, Loader2, Info, Users, Play } from 'lucide-react'
 import { useTenantStatus } from '../contexts/TenantStatusContext'
 import { TEST_PLAN_API_BASE_URL } from '../config'
 
@@ -202,7 +203,7 @@ export function PlanSelectionPage() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({ plan_tier: 'user' }),
+          body: JSON.stringify({ plan_tier: 'individual' }),
         }
       )
 
@@ -283,27 +284,97 @@ export function PlanSelectionPage() {
     }
   }
 
+  const handleProContinue = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        setError('Authentication required. Please log in again.')
+        navigate('/login', { replace: true })
+        return
+      }
+
+      // Call checkout-session endpoint
+      const response = await fetch(
+        `${TEST_PLAN_API_BASE_URL}/api/v1/billing/checkout-session`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ plan_tier: 'pro' }),
+        }
+      )
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to create checkout session'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorData.detail || errorData.message || errorMessage
+        } catch {
+          errorMessage = response.statusText || `Server returned ${response.status}`
+        }
+        setError(errorMessage)
+        return
+      }
+
+      const data = await response.json()
+      if (data.ok && data.url) {
+        // Redirect to Stripe checkout
+        window.location.href = data.url
+      } else {
+        setError('Failed to get checkout URL')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl border-border/50 bg-gradient-to-br from-background via-background to-secondary/10">
+      <Card className="w-full max-w-5xl border-border/50 bg-gradient-to-br from-background via-background to-secondary/10">
         <CardHeader>
           <CardTitle className="text-2xl">Choose your plan</CardTitle>
+          <p className="text-sm text-foreground/70 mt-2">
+            All plans include full test plan generation, RTM export, and audit metadata
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Run explanation helper text */}
+          <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-md border border-border/50">
+            <Info className="h-4 w-4 text-foreground/60 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-foreground/70">
+              <strong>What is a run?</strong> One run generates a full test plan, RTM export, and audit metadata for a ticket or ticket set.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Trial Option */}
             <Card className="border-border/50 bg-gradient-to-br from-background via-background to-secondary/10">
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <Sparkles className="h-6 w-6 text-foreground/80" />
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-lg font-semibold">Trial</h3>
-                    <span className="text-xs text-primary">Recommended</span>
+                    <p className="text-2xl font-bold mt-1">Free</p>
+                    <p className="text-xs text-foreground/60">7 days</p>
                   </div>
                 </div>
-                <p className="text-sm text-foreground/70">
-                  3 runs each: Requirements, Test Plan, Jira Writeback
-                </p>
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="h-4 w-4 text-foreground/60" />
+                    <span className="text-foreground/70">1 user</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Play className="h-4 w-4 text-foreground/60" />
+                    <span className="text-foreground/70">3 runs total</span>
+                  </div>
+                </div>
                 <Button
                   onClick={handleTrialContinue}
                   disabled={isLoading || isPolling}
@@ -326,11 +397,22 @@ export function PlanSelectionPage() {
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <Zap className="h-6 w-6 text-foreground/80" />
-                  <h3 className="text-lg font-semibold">Individual</h3>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold">Individual</h3>
+                    <p className="text-2xl font-bold mt-1">$199</p>
+                    <p className="text-xs text-foreground/60">per month</p>
+                  </div>
                 </div>
-                <p className="text-sm text-foreground/70">
-                  Personal plan with full access
-                </p>
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="h-4 w-4 text-foreground/60" />
+                    <span className="text-foreground/70">1 user</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Play className="h-4 w-4 text-foreground/60" />
+                    <span className="text-foreground/70">20 runs/month</span>
+                  </div>
+                </div>
                 <Button
                   onClick={handleIndividualContinue}
                   disabled={isLoading || isPolling}
@@ -350,15 +432,29 @@ export function PlanSelectionPage() {
             </Card>
 
             {/* Team Option */}
-            <Card className="border-border/50 bg-gradient-to-br from-background via-background to-secondary/10">
+            <Card className="border-border/50 bg-gradient-to-br from-background via-background to-secondary/10 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <Badge className="bg-primary text-primary-foreground">Most Popular</Badge>
+              </div>
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <Zap className="h-6 w-6 text-foreground/80" />
-                  <h3 className="text-lg font-semibold">Team</h3>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold">Team</h3>
+                    <p className="text-2xl font-bold mt-1">$499</p>
+                    <p className="text-xs text-foreground/60">per month</p>
+                  </div>
                 </div>
-                <p className="text-sm text-foreground/70">
-                  Team collaboration features
-                </p>
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="h-4 w-4 text-foreground/60" />
+                    <span className="text-foreground/70">Up to 3 users</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Play className="h-4 w-4 text-foreground/60" />
+                    <span className="text-foreground/70">75 runs/month</span>
+                  </div>
+                </div>
                 <Button
                   onClick={handleTeamContinue}
                   disabled={isLoading || isPolling}
@@ -372,6 +468,45 @@ export function PlanSelectionPage() {
                     </>
                   ) : (
                     'Select Team'
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Pro Option */}
+            <Card className="border-border/50 bg-gradient-to-br from-background via-background to-secondary/10">
+              <CardContent className="p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Zap className="h-6 w-6 text-foreground/80" />
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold">Pro</h3>
+                    <p className="text-2xl font-bold mt-1">$899</p>
+                    <p className="text-xs text-foreground/60">per month</p>
+                  </div>
+                </div>
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="h-4 w-4 text-foreground/60" />
+                    <span className="text-foreground/70">Up to 5 users</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Play className="h-4 w-4 text-foreground/60" />
+                    <span className="text-foreground/70">200 runs/month</span>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleProContinue}
+                  disabled={isLoading || isPolling}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {isLoading || isPolling ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isPolling ? 'Processing payment...' : 'Setting up...'}
+                    </>
+                  ) : (
+                    'Select Pro'
                   )}
                 </Button>
               </CardContent>

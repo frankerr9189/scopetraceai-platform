@@ -161,6 +161,7 @@ def get_tenant_billing(db: Session, tenant_id: str) -> Dict[str, Any]:
         result = db.execute(
             text("""
                 SELECT tb.status, tb.plan_tier,
+                       tb.current_period_start, tb.current_period_end,
                        t.trial_requirements_runs_remaining,
                        t.trial_testplan_runs_remaining,
                        t.trial_writeback_runs_remaining
@@ -195,6 +196,8 @@ def get_tenant_billing(db: Session, tenant_id: str) -> Dict[str, Any]:
             "subscription_status": subscription_status,
             "plan_tier": result.plan_tier,
             "status": result.status,  # Raw billing status (Stripe status)
+            "current_period_start": result.current_period_start,  # Stripe period start (datetime or None)
+            "current_period_end": result.current_period_end,  # Stripe period end (datetime or None)
             "trial_requirements_runs_remaining": result.trial_requirements_runs_remaining or 0,
             "trial_testplan_runs_remaining": result.trial_testplan_runs_remaining or 0,
             "trial_writeback_runs_remaining": result.trial_writeback_runs_remaining or 0,

@@ -1,0 +1,45 @@
+{
+  "business_intent": "",
+  "metadata": {
+    "generated_at": "2026-01-24T04:15:58Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "covered",
+        "stateful": "not_applicable"
+      },
+      "description": "Add Requirement Traceability Matrix (RTM) Generation for Test Plans. This requirement also covers: 'Non-blocking RTM generation for test plan creation'",
+      "id": "ATA-36-REQ-001",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": true
+    }
+  ],
+  "scope": {
+    "id": "MANUAL",
+    "name": "",
+    "type": "manual"
+  }
+}

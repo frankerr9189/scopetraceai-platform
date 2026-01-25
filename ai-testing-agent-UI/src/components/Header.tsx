@@ -6,6 +6,7 @@ export function Header() {
   const isRequirementsPage = location.pathname === '/requirements'
   const isRunHistoryPage = location.pathname.startsWith('/run-history')
   const isAdminPage = location.pathname.startsWith('/admin')
+  const isProfilePage = location.pathname === '/profile'
   
   return (
     <motion.header
@@ -30,6 +31,8 @@ export function Header() {
                   ? 'AI Sr Business Analyst Scope' 
                   : isRunHistoryPage 
                   ? 'Run History' 
+                  : isProfilePage
+                  ? 'Profile'
                   : 'Test Plan Creation Agent'}
               </h1>
               <p className="text-lg text-muted-foreground font-light">
@@ -37,6 +40,8 @@ export function Header() {
                   ? 'Generate Normalized, consistent requirements from text, Jira, or documents.'
                   : isRunHistoryPage
                   ? 'View past test plan generation runs and their artifacts'
+                  : isProfilePage
+                  ? 'Manage your account, security, and subscription'
                   : 'Autonomous test intelligence & traceability - Powered by AI'
                 }
               </p>

@@ -1,0 +1,195 @@
+{
+  "business_intent": "To enhance test coverage transparency and compliance with ISO audit requirements through automated RTM generation.",
+  "metadata": {
+    "generated_at": "2026-01-24T02:40:54Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
+      "id": "ATA-36-REQ-001",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Identification of uncovered requirements in RTM.",
+      "id": "ATA-36-REQ-002",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Inclusion of associated test case ID(s) in RTM.",
+      "id": "ATA-36-REQ-003",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Inclusion of coverage status in RTM.",
+      "id": "ATA-36-REQ-004",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Deriving RTM directly from test plan.",
+      "id": "ATA-36-REQ-005",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": false
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Non-blocking RTM generation for test plan creation.",
+      "id": "ATA-36-REQ-006",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": false
+    }
+  ],
+  "scope": {
+    "id": "MANUAL",
+    "name": "",
+    "type": "manual"
+  }
+}

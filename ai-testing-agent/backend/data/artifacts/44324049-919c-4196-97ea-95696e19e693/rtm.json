@@ -1,0 +1,102 @@
+[
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-001"
+    ],
+    "requirement_description": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
+    "requirement_id": "ATA-36-REQ-001",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-002"
+    ],
+    "requirement_description": "Identification of uncovered requirements in RTM.",
+    "requirement_id": "ATA-36-REQ-002",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-003"
+    ],
+    "requirement_description": "Inclusion of associated test case ID(s) in RTM.",
+    "requirement_id": "ATA-36-REQ-003",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-004"
+    ],
+    "requirement_description": "Inclusion of coverage status in RTM.",
+    "requirement_id": "ATA-36-REQ-004",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-005"
+    ],
+    "requirement_description": "Deriving RTM directly from test plan.",
+    "requirement_id": "ATA-36-REQ-005",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-006"
+    ],
+    "requirement_description": "Ensuring each requirement appears once in RTM.",
+    "requirement_id": "ATA-36-REQ-006",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "COVERED",
+    "covered_by_tests": [
+      "UI-007"
+    ],
+    "requirement_description": "Non-blocking RTM generation for test plan creation.",
+    "requirement_id": "ATA-36-REQ-007",
+    "testability": "testable",
+    "trace_type": "testable"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Identification of uncovered requirements",
+    "requirement_id": "ATA-36-ITEM-004",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Editing test cases against requirements within Jira",
+    "requirement_id": "ATA-36-ITEM-011",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  },
+  {
+    "coverage_status": "N/A",
+    "covered_by_tests": [],
+    "rationale": "Informational content; not independently testable",
+    "requirement_description": "Editing of test plans",
+    "requirement_id": "ATA-36-ITEM-012",
+    "source_section": "description",
+    "testability": "not_testable",
+    "trace_type": "informational"
+  }
+]

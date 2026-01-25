@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
-import { User, Lock, Loader2, Users } from 'lucide-react'
+import { User, Lock, Loader2, Users, CreditCard, ExternalLink } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { 
   getUserProfile, 
   updateUserProfile, 
@@ -11,10 +12,12 @@ import {
   listTenantUsers,
   inviteTenantUser,
   getBillingStatus,
+  createPortalSession,
   deactivateTenantUser,
   reactivateTenantUser,
   type TenantUser,
-  type InviteUserRequest
+  type InviteUserRequest,
+  type BillingStatus
 } from '../services/api'
 import { showToast } from './Toast'
 
@@ -27,6 +30,7 @@ function formatDate(dateString: string | null | undefined): string {
 }
 
 export function ProfilePage() {
+  const navigate = useNavigate()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -64,11 +68,26 @@ export function ProfilePage() {
   })
   const [activatingUserId, setActivatingUserId] = useState<string | null>(null)
   
+  // Billing/Subscription state
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null)
+  const [billingLoading, setBillingLoading] = useState(false)
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false)
+  
   useEffect(() => {
     loadProfile()
+    loadBillingStatus()
   }, [])
   
-  // Load user role and team management data if admin
+  // Set browser tab title for Profile page
+  useEffect(() => {
+    document.title = 'Profile · ScopeTraceAI'
+    // Cleanup: restore default title when component unmounts
+    return () => {
+      document.title = 'ScopeTraceAI'
+    }
+  }, [])
+  
+  // Load user role and team management data if admin/owner
   useEffect(() => {
     const userStr = localStorage.getItem('user')
     if (userStr) {
@@ -76,7 +95,7 @@ export function ProfilePage() {
         const user = JSON.parse(userStr)
         setUserRole(user.role)
         setCurrentUserId(user.id || null)
-        if (user.role === 'admin') {
+        if (user.role === 'admin' || user.role === 'owner') {
           loadTenantUsers()
           loadSeatCap()
         }
@@ -110,13 +129,83 @@ export function ProfilePage() {
       // Map plan tier to seat cap
       const seatCapMap: Record<string, number> = {
         'free': 1,
-        'user': 5,
-        'team': 10
+        'trial': 1,
+        'individual': 1,
+        'team': 3,
+        'pro': 5,
+        'enterprise': 100
       }
       setSeatCap(seatCapMap[planTier] || 1)
     } catch (err) {
       // Silently fail - don't break page if billing status unavailable
       console.warn('Failed to load seat cap:', err)
+    }
+  }
+
+  const loadBillingStatus = async () => {
+    setBillingLoading(true)
+    try {
+      const billing = await getBillingStatus()
+      setBillingStatus(billing)
+    } catch (err) {
+      // Silently fail - don't break page if billing status unavailable
+      console.warn('Failed to load billing status:', err)
+    } finally {
+      setBillingLoading(false)
+    }
+  }
+
+  const isEligibleForPortal = (): boolean => {
+    if (!billingStatus) return false
+    
+    // Check if tenant has a paid plan tier (not trial/unselected)
+    const paidTiers = ['individual', 'team', 'pro', 'enterprise']
+    const hasPaidPlan = billingStatus.plan_tier && paidTiers.includes(billingStatus.plan_tier)
+    
+    // Check if status indicates they have a Stripe subscription
+    // Exclude incomplete/unselected (no Stripe customer yet)
+    // Include active, trialing, past_due, canceled (all have Stripe customer)
+    const hasStripeSubscription = billingStatus.status && 
+      billingStatus.status !== 'incomplete' && 
+      billingStatus.status !== 'unselected'
+    
+    // Eligible if: paid plan tier AND has Stripe subscription status
+    // Period dates are a good indicator but not required (edge case: just activated)
+    return hasPaidPlan && hasStripeSubscription
+  }
+
+  const handleOpenPortal = async () => {
+    // Check eligibility: if trial/unselected/incomplete, navigate to plan selection instead
+    if (!isEligibleForPortal()) {
+      // Navigate to plan selection page for upgrade
+      navigate('/onboarding/plan')
+      return
+    }
+
+    // Eligible for portal: call portal session endpoint
+    setIsOpeningPortal(true)
+    try {
+      const result = await createPortalSession()
+      if (result.ok && result.url) {
+        // Redirect to Stripe Customer Portal
+        window.location.href = result.url
+      } else {
+        const errorMsg = result.error || 'Failed to open billing portal'
+        showToast(errorMsg, 'error')
+      }
+    } catch (err: any) {
+      // Handle 409 errors (no stripe_customer_id) gracefully
+      if (err.status === 409) {
+        const errorMsg = err.error || 'No active subscription. Please upgrade to a paid plan first.'
+        showToast(errorMsg, 'error')
+        // Optionally navigate to plan selection on 409
+        navigate('/onboarding/plan')
+      } else {
+        const errorMsg = err.error || err.message || 'Failed to open billing portal'
+        showToast(errorMsg, 'error')
+      }
+    } finally {
+      setIsOpeningPortal(false)
     }
   }
   
@@ -329,7 +418,10 @@ export function ProfilePage() {
   
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold mb-8">Profile Settings</h1>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Account Profile</h1>
+        <p className="text-muted-foreground">Manage your account, security, and subscription</p>
+      </div>
       
       {error && (
         <div className="mb-6 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
@@ -555,6 +647,112 @@ export function ProfilePage() {
           </CardContent>
         </Card>
         
+        {/* Billing & Subscription Section (admin/owner only) */}
+        {(userRole === 'admin' || userRole === 'owner') && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <CreditCard className="h-6 w-6 text-foreground/80" />
+                <CardTitle>Billing & Subscription</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {billingLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-foreground/50" />
+                </div>
+              ) : billingStatus ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-foreground/70">Plan Tier</label>
+                      <div className="mt-1">
+                        <Badge variant="outline" className="text-base px-3 py-1">
+                          {billingStatus.plan_tier ? 
+                            billingStatus.plan_tier.charAt(0).toUpperCase() + billingStatus.plan_tier.slice(1) 
+                            : '—'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground/70">Status</label>
+                      <div className="mt-1">
+                        <Badge 
+                          variant={
+                            billingStatus.status === 'active' || billingStatus.status === 'trialing' 
+                              ? 'default' 
+                              : billingStatus.status === 'canceled' || billingStatus.status === 'past_due'
+                              ? 'destructive'
+                              : 'secondary'
+                          }
+                          className="text-base px-3 py-1"
+                        >
+                          {billingStatus.status ? 
+                            billingStatus.status.charAt(0).toUpperCase() + billingStatus.status.slice(1) 
+                            : '—'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {(billingStatus.current_period_start || billingStatus.current_period_end) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/50">
+                      {billingStatus.current_period_start && (
+                        <div>
+                          <label className="text-sm font-medium text-foreground/70">Period Start</label>
+                          <p className="text-sm text-foreground mt-1">
+                            {formatDate(billingStatus.current_period_start)}
+                          </p>
+                        </div>
+                      )}
+                      {billingStatus.current_period_end && (
+                        <div>
+                          <label className="text-sm font-medium text-foreground/70">Period End</label>
+                          <p className="text-sm text-foreground mt-1">
+                            {formatDate(billingStatus.current_period_end)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-border/50">
+                    <Button
+                      onClick={handleOpenPortal}
+                      disabled={isOpeningPortal}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {isOpeningPortal ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {isEligibleForPortal() ? 'Opening...' : 'Redirecting...'}
+                        </>
+                      ) : (
+                        <>
+                          {isEligibleForPortal() 
+                            ? (billingStatus.status === 'canceled' ? 'Reactivate Subscription' : 'Manage Billing')
+                            : 'Upgrade Plan'}
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      {isEligibleForPortal()
+                        ? 'Update payment method, view invoices, or cancel subscription'
+                        : 'Upgrade to a paid plan to access billing management'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Unable to load billing information
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Team Management Section (admin only) */}
         {userRole === 'admin' && (
           <Card>

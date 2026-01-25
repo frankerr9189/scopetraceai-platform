@@ -101,6 +101,36 @@ export async function getBillingStatus(): Promise<BillingStatus> {
 }
 
 /**
+ * Create Stripe Customer Portal session for billing management
+ */
+export interface PortalSessionResponse {
+  ok: boolean
+  url?: string
+  error?: string
+}
+
+export async function createPortalSession(): Promise<PortalSessionResponse> {
+  const response = await fetch(`${TEST_PLAN_API_BASE_URL}/api/v1/billing/portal-session`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    // Surface backend error string for 409 and other errors
+    const errorData = await response.json().catch(() => ({ ok: false, error: 'Unknown error' }))
+    const errorMessage = errorData.error || errorData.detail || errorData.message || 'Unknown error'
+    throw { ...errorData, error: errorMessage, status: response.status }
+  }
+
+  return response.json()
+}
+
+/**
  * Notify the sidebar (and any listeners) to refresh tenant status.
  * Call after successful: requirements generation, test plan generation, jira writeback execute.
  */

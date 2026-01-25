@@ -4,6 +4,7 @@ POST /analyze endpoint for requirement analysis.
 from datetime import datetime
 import re
 import time
+import os
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -14,6 +15,57 @@ from app.api.presentation import generate_readable_summary
 from app.config import settings
 from app.services.jira_client import JiraClient, JiraClientError, extract_ticket_id_from_text
 from app.services.attachment_parser import extract_text_from_attachment, AttachmentParserError
+
+
+def _get_allowed_origins() -> List[str]:
+    """
+    Get list of allowed CORS origins (same logic as main.py).
+    Uses base list + CORS_ALLOWED_ORIGINS env var.
+    """
+    base_origins = [
+        "http://localhost:5173",
+        "http://localhost:5137",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5137",
+        "http://127.0.0.1:3000",
+        "https://app.scopetraceai.com",
+        "https://scopetraceai-platform.vercel.app",
+        "https://scopetraceai-platform.onrender.com",
+        "https://scopetraceai.com",
+        "https://www.scopetraceai.com",
+    ]
+    
+    # Add additional origins from env var
+    production_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+    if production_origins:
+        for origin in production_origins.split(","):
+            origin = origin.strip()
+            if origin and origin not in base_origins:
+                base_origins.append(origin)
+    
+    return base_origins
+
+
+def _get_cors_headers(request: Request) -> Dict[str, str]:
+    """
+    Get CORS headers for error responses.
+    Only sets Access-Control-Allow-Origin if origin is in allowed list.
+    No hardcoded fallback.
+    """
+    origin = request.headers.get("Origin")
+    allowed = _get_allowed_origins()
+    
+    headers = {
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
+    }
+    
+    if origin and origin in allowed:
+        headers["Access-Control-Allow-Origin"] = origin
+    
+    return headers
 
 # Input guardrail constants
 MAX_REQUIREMENTS_PER_PACKAGE = 100
@@ -163,6 +215,10 @@ class AnalyzeResponse(BaseModel):
         ...,
         description="Human-readable presentation layer (derived, non-authoritative)"
     )
+    usage: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Usage data (runs_used, runs_limit, period_start, period_end) - optional"
+    )
 
 
 router = APIRouter()
@@ -229,15 +285,146 @@ async def analyze_requirements(
     # Verify internal service key (required - this is the ONLY auth enforcement)
     await verify_internal_service_key(request)
     
-    # Extract tenant/user context for logging only (optional, not for enforcement)
+    # ============================================================================
+    # TENANT_ID EXTRACTION (SECURITY)
+    # ============================================================================
+    # SECURITY NOTE: tenant_id comes from X-Tenant-ID header, which is set by the
+    # Flask app (policy authority) after JWT validation. The Flask app extracts
+    # tenant_id from the JWT token's 'tenant_id' claim (not from client headers).
+    # 
+    # Trust boundary:
+    # - Client → Flask app: JWT validated, tenant_id extracted from JWT claim
+    # - Flask app → BA agent: Internal service key validated, tenant_id passed in header
+    # 
+    # The BA agent trusts tenant_id from Flask app because:
+    # 1. Only Flask app can call BA agent (X-Internal-Service-Key required)
+    # 2. Flask app extracts tenant_id from verified JWT (not client-controlled)
+    # 3. This is an internal service-to-service call, not client-facing
+    # ============================================================================
     tenant_id, user_id = extract_tenant_context_for_logging(request)
     if tenant_id:
         logger.info(f"Processing request (tenant={tenant_id}, user={user_id})")
+    else:
+        # tenant_id should always be present if Flask app called us correctly
+        logger.warning("X-Tenant-ID header missing - this should not happen in normal operation")
     
     # ============================================================================
     # NOTE: Entitlement checks (subscription, plan tiers, trials) are REMOVED.
     # Flask app enforces all policy before calling this agent.
     # ============================================================================
+    
+    # ============================================================================
+    # RUN LIMIT ENFORCEMENT (FAIL-CLOSED)
+    # Enforce run limits per period based on plan tier BEFORE expensive work
+    # 
+    # FAIL-CLOSED POLICY: If usage metering fails (exception, DB error, etc.),
+    # return HTTP 503 and DO NOT proceed with analysis. This prevents:
+    # - Unmetered runs when metering is unavailable
+    # - Billing discrepancies
+    # - Resource exhaustion
+    # ============================================================================
+    usage_data = None
+    if not tenant_id:
+        # tenant_id is required for run limit enforcement
+        # Return 503 (service unavailable) since we cannot meter usage without tenant_id
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ok": False,
+                "error": "USAGE_METER_UNAVAILABLE",
+                "message": "Usage metering unavailable. Please try again shortly."
+            },
+            headers=_get_cors_headers(request)
+        )
+    
+    # tenant_id is present - proceed with run limit enforcement
+    # FAIL-CLOSED: All exceptions in usage metering result in 503 (do not proceed)
+    try:
+        import sys
+        import os
+        # Calculate absolute path to testing agent backend
+        current_file = os.path.abspath(__file__)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
+        backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
+        
+        if not os.path.exists(backend_path):
+            raise RuntimeError(f"Backend path not found: {backend_path}")
+        
+        # Verify DATABASE_URL is PostgreSQL
+        db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            raise RuntimeError("DATABASE_URL not set - cannot perform usage metering")
+        
+        if not (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
+            raise RuntimeError(f"DATABASE_URL is not PostgreSQL: {db_url[:50]}... - cannot perform usage metering")
+        
+        # Save current directory and change to backend for reliable imports
+        original_cwd = os.getcwd()
+        try:
+            if backend_path not in sys.path:
+                sys.path.insert(0, backend_path)
+            os.chdir(backend_path)
+            
+            from db import get_db
+            from services.entitlements_centralized import get_tenant_billing
+            from services.run_limits import check_and_increment_run_usage
+            
+            db = next(get_db())
+            try:
+                # Get billing data to extract plan_tier and period info
+                billing = get_tenant_billing(db, str(tenant_id))
+                plan_tier = billing.get("plan_tier")
+                current_period_start = billing.get("current_period_start")
+                current_period_end = billing.get("current_period_end")
+                
+                # Check and atomically increment run usage
+                run_allowed, run_error, usage_data = check_and_increment_run_usage(
+                    db=db,
+                    tenant_id=str(tenant_id),
+                    plan_tier=plan_tier,
+                    current_period_start=current_period_start,
+                    current_period_end=current_period_end
+                )
+                
+                if not run_allowed:
+                    # Run limit reached - return 402
+                    error_response = {
+                        "ok": False,
+                        "error": run_error or "RUN_LIMIT_REACHED",
+                        "message": "Run limit reached for current period"
+                    }
+                    if usage_data:
+                        error_response.update({
+                            "runs_used": usage_data.get("runs_used"),
+                            "runs_limit": usage_data.get("runs_limit"),
+                            "period_start": usage_data.get("period_start"),
+                            "period_end": usage_data.get("period_end")
+                        })
+                    
+                    return JSONResponse(
+                        status_code=402,
+                        content=error_response,
+                        headers=_get_cors_headers(request)
+                    )
+            finally:
+                db.close()
+        finally:
+            os.chdir(original_cwd)
+    except Exception as run_limit_error:
+        # FAIL-CLOSED: If usage metering fails, do NOT proceed with analysis
+        # This prevents unmetered runs and billing discrepancies
+        logger.error(f"Run limit check failed for tenant {tenant_id}: {str(run_limit_error)}", exc_info=True)
+        
+        # Return 503 (service unavailable) with error details
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ok": False,
+                "error": "USAGE_METER_UNAVAILABLE",
+                "message": "Usage metering unavailable. Please try again shortly."
+            },
+            headers=_get_cors_headers(request)
+        )
     
     # Determine if request is JSON or FormData
     content_type = request.headers.get("content-type", "").lower()
@@ -716,12 +903,19 @@ async def analyze_requirements(
         # after successful agent execution. This agent is execution-only.
         # ============================================================================
         
-        return AnalyzeResponse(
-            meta=meta,
-            summary=summary,
-            package=package,
-            readable_summary=readable_summary
-        )
+        # Build response with optional usage data
+        response_data = {
+            "meta": meta,
+            "summary": summary,
+            "package": package,
+            "readable_summary": readable_summary
+        }
+        
+        # Add usage data if available
+        if usage_data:
+            response_data["usage"] = usage_data
+        
+        return AnalyzeResponse(**response_data)
     except AnalysisError as e:
         # Record usage event (failure)
         error_code = "analysis_error"

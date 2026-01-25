@@ -1,0 +1,1715 @@
+{
+  "_has_numbered_acceptance_criteria": true,
+  "assumptions": [],
+  "audit_metadata": {
+    "agent_metadata": {
+      "agent": "test-plan-agent",
+      "agent_version": "1.0.0",
+      "change_policy": "idempotent",
+      "determinism": "LLM + deterministic post-pass",
+      "logic_version": "testplan-v1+coverage-enforcer-v1"
+    },
+    "agent_version": "1.0.0",
+    "algorithms": {
+      "confidence_calculation": "Risk-weighted coverage confidence with dimension analysis",
+      "coverage_analysis": "Requirement-to-test mapping with RTM generation",
+      "quality_scoring": "Heuristic-based clarity and testability scoring",
+      "test_generation": "LLM-based structured generation with deterministic ID assignment"
+    },
+    "environment": "development",
+    "generated_at": "2026-01-24T04:01:04Z",
+    "jira_created_at": null,
+    "jira_created_by": null,
+    "jira_issue_key": null,
+    "model": {
+      "name": "gpt-4o-mini",
+      "response_format": "json_object",
+      "temperature": 0.2
+    },
+    "run_id": "f562385c-8525-48d1-ba13-f904d68492c3",
+    "scope_approved_at": null,
+    "scope_approved_by": null,
+    "scope_id": "MANUAL",
+    "scope_reviewed_at": null,
+    "scope_reviewed_by": null,
+    "scope_status": null,
+    "source": {
+      "scope_id": "MANUAL",
+      "scope_type": "manual",
+      "ticket_count": 1,
+      "type": "jira"
+    }
+  },
+  "business_intent": "To enhance test coverage transparency and support ISO audit requirements through automated RTM generation.",
+  "gaps_detected": [],
+  "metadata": {
+    "generated_at": "2026-01-24T04:01:04Z",
+    "source": "jira",
+    "source_id": "MANUAL"
+  },
+  "requirements": [
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
+      "id": "ATA-36-REQ-001",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "jira",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Ensuring each requirement appears once in RTM.",
+      "id": "ATA-36-REQ-002",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Identification of uncovered requirements.",
+      "id": "ATA-36-REQ-003",
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Inclusion of associated test case ID(s) in RTM.",
+      "id": "ATA-36-REQ-004",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Inclusion of coverage status in RTM.",
+      "id": "ATA-36-REQ-005",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Deriving RTM directly from test plan.",
+      "id": "ATA-36-REQ-006",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": true
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "description": "Non-blocking RTM generation for test plan creation.",
+      "id": "ATA-36-REQ-007",
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "source": "inferred",
+      "testable": true
+    }
+  ],
+  "rtm": [
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "SYS-001",
+        "VAL-ATA-36-001-RTM-SCHEMA",
+        "EDGE-ATA-36-001-RTM-ASYNC"
+      ],
+      "requirement_description": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
+      "requirement_id": "ATA-36-REQ-001",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "SYS-002"
+      ],
+      "requirement_description": "Ensuring each requirement appears once in RTM.",
+      "requirement_id": "ATA-36-REQ-002",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "API-001"
+      ],
+      "requirement_description": "Identification of uncovered requirements.",
+      "requirement_id": "ATA-36-REQ-003",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "SYS-003"
+      ],
+      "requirement_description": "Inclusion of associated test case ID(s) in RTM.",
+      "requirement_id": "ATA-36-REQ-004",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "SYS-004"
+      ],
+      "requirement_description": "Inclusion of coverage status in RTM.",
+      "requirement_id": "ATA-36-REQ-005",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "SYS-005"
+      ],
+      "requirement_description": "Deriving RTM directly from test plan.",
+      "requirement_id": "ATA-36-REQ-006",
+      "testability": "testable",
+      "trace_type": "testable"
+    },
+    {
+      "coverage_status": "COVERED",
+      "covered_by_tests": [
+        "SYS-006"
+      ],
+      "requirement_description": "Non-blocking RTM generation for test plan creation.",
+      "requirement_id": "ATA-36-REQ-007",
+      "testability": "testable",
+      "trace_type": "testable"
+    }
+  ],
+  "rtm_agent_metadata": {
+    "agent": "rtm-generator",
+    "agent_version": "1.0.0",
+    "change_policy": "idempotent",
+    "determinism": "deterministic mapping",
+    "logic_version": "rtm-v1"
+  },
+  "rtm_artifact": {
+    "requirements_rtm": [
+      {
+        "coverage": {
+          "covered": [
+            "happy_path",
+            "data_validation"
+          ],
+          "expected": [
+            "happy_path"
+          ],
+          "missing": [],
+          "status": "FULL"
+        },
+        "covered_by_tests": [
+          "SYS-001",
+          "VAL-ATA-36-001-RTM-SCHEMA",
+          "EDGE-ATA-36-001-RTM-ASYNC"
+        ],
+        "mapping": {
+          "method": "reverse_map_from_ticket_traceability",
+          "score": null
+        },
+        "requirement_description": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
+        "requirement_id": "ATA-36-REQ-001",
+        "source": {
+          "breakdown_item_ids": [
+            "ATA-36-ITEM-001"
+          ],
+          "derivation": "explicit",
+          "ticket_ids": [
+            "ATA-36"
+          ]
+        },
+        "testability": "testable"
+      },
+      {
+        "coverage": {
+          "covered": [
+            "happy_path"
+          ],
+          "expected": [
+            "happy_path"
+          ],
+          "missing": [],
+          "status": "FULL"
+        },
+        "covered_by_tests": [
+          "SYS-002"
+        ],
+        "mapping": {
+          "method": "reverse_map_from_ticket_traceability",
+          "score": null
+        },
+        "requirement_description": "Ensuring each requirement appears once in RTM.",
+        "requirement_id": "ATA-36-REQ-002",
+        "source": {
+          "breakdown_item_ids": [
+            "ATA-36-ITEM-002"
+          ],
+          "derivation": "inferred",
+          "ticket_ids": [
+            "ATA-36"
+          ]
+        },
+        "testability": "testable"
+      },
+      {
+        "coverage": {
+          "covered": [
+            "happy_path"
+          ],
+          "expected": [
+            "happy_path"
+          ],
+          "missing": [],
+          "status": "FULL"
+        },
+        "covered_by_tests": [
+          "API-001"
+        ],
+        "mapping": {
+          "method": "reverse_map_from_ticket_traceability",
+          "score": null
+        },
+        "requirement_description": "Identification of uncovered requirements.",
+        "requirement_id": "ATA-36-REQ-003",
+        "source": {
+          "breakdown_item_ids": [],
+          "derivation": "inferred",
+          "ticket_ids": []
+        },
+        "testability": "testable"
+      },
+      {
+        "coverage": {
+          "covered": [
+            "happy_path"
+          ],
+          "expected": [
+            "happy_path"
+          ],
+          "missing": [],
+          "status": "FULL"
+        },
+        "covered_by_tests": [
+          "SYS-003"
+        ],
+        "mapping": {
+          "method": "reverse_map_from_ticket_traceability",
+          "score": null
+        },
+        "requirement_description": "Inclusion of associated test case ID(s) in RTM.",
+        "requirement_id": "ATA-36-REQ-004",
+        "source": {
+          "breakdown_item_ids": [
+            "ATA-36-ITEM-003",
+            "ATA-36-ITEM-006",
+            "ATA-36-ITEM-009"
+          ],
+          "derivation": "inferred",
+          "ticket_ids": [
+            "ATA-36"
+          ]
+        },
+        "testability": "testable"
+      },
+      {
+        "coverage": {
+          "covered": [
+            "happy_path"
+          ],
+          "expected": [
+            "happy_path"
+          ],
+          "missing": [],
+          "status": "FULL"
+        },
+        "covered_by_tests": [
+          "SYS-004"
+        ],
+        "mapping": {
+          "method": "reverse_map_from_ticket_traceability",
+          "score": null
+        },
+        "requirement_description": "Inclusion of coverage status in RTM.",
+        "requirement_id": "ATA-36-REQ-005",
+        "source": {
+          "breakdown_item_ids": [
+            "ATA-36-ITEM-007"
+          ],
+          "derivation": "inferred",
+          "ticket_ids": [
+            "ATA-36"
+          ]
+        },
+        "testability": "testable"
+      },
+      {
+        "coverage": {
+          "covered": [
+            "happy_path"
+          ],
+          "expected": [
+            "happy_path"
+          ],
+          "missing": [],
+          "status": "FULL"
+        },
+        "covered_by_tests": [
+          "SYS-005"
+        ],
+        "mapping": {
+          "method": "reverse_map_from_ticket_traceability",
+          "score": null
+        },
+        "requirement_description": "Deriving RTM directly from test plan.",
+        "requirement_id": "ATA-36-REQ-006",
+        "source": {
+          "breakdown_item_ids": [
+            "ATA-36-ITEM-008"
+          ],
+          "derivation": "inferred",
+          "ticket_ids": [
+            "ATA-36"
+          ]
+        },
+        "testability": "testable"
+      },
+      {
+        "coverage": {
+          "covered": [
+            "happy_path"
+          ],
+          "expected": [
+            "happy_path"
+          ],
+          "missing": [],
+          "status": "FULL"
+        },
+        "covered_by_tests": [
+          "SYS-006"
+        ],
+        "mapping": {
+          "method": "reverse_map_from_ticket_traceability",
+          "score": null
+        },
+        "requirement_description": "Non-blocking RTM generation for test plan creation.",
+        "requirement_id": "ATA-36-REQ-007",
+        "source": {
+          "breakdown_item_ids": [
+            "ATA-36-ITEM-005"
+          ],
+          "derivation": "inferred",
+          "ticket_ids": [
+            "ATA-36"
+          ]
+        },
+        "testability": "testable"
+      }
+    ],
+    "rtm_metadata": {
+      "generated_at": "2026-01-24T04:01:04Z",
+      "generated_by": "system",
+      "generator_version": "1.0.0",
+      "inputs_hash": "8c535770463ac50f1c2f00447dba2fff87611e6b10a9c3c3f14b6812e0230959",
+      "prompt_version": "rtm-v2.0-req-first",
+      "rtm_schema_version": "2.0",
+      "run_id": "381cabe3-7163-4be5-b3e5-36aa28fd7513",
+      "tenant_id": "70baa0c6-a96b-4a82-b06d-4c9ca90faf9e"
+    },
+    "ticket_traceability": {
+      "unmapped_items": [
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-36-ITEM-004",
+          "rationale": "Informational content; not independently testable",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "Identification of uncovered requirements"
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-010",
+          "rationale": "Out of scope; not a testable requirement",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "Manual input of requirements into RTM"
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-011",
+          "rationale": "Out of scope; not a testable requirement",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "Editing test cases against requirements within Jira"
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-012",
+          "rationale": "Out of scope; not a testable requirement",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "Editing of test plans"
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-013",
+          "rationale": "Item does not map to any requirement",
+          "reason_code": "NO_MATCH_FOUND",
+          "source_section": "description",
+          "testable": true,
+          "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured."
+        },
+        {
+          "classification": "risk_note",
+          "item_id": "ATA-36-ITEM-014",
+          "rationale": "Risk statement; not a testable requirement",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "[Scope Risk] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)"
+        }
+      ]
+    }
+  },
+  "rtm_logic_version": "rtm-v1.1-item-first",
+  "schema_version": "1.0",
+  "scope_summary": {
+    "failed_tickets": null,
+    "requirements_covered": 7,
+    "requirements_total": 7,
+    "requirements_uncovered": 0,
+    "scope_id": "MANUAL",
+    "scope_type": "manual",
+    "ticket_details": [
+      {
+        "description": "Normalized Requirements:\n1) Automatic generation of Requirement Traceability Matrix (RTM)\n   This capability shall automatically generate a Requirement Traceability Matrix (RTM) for each test plan to ...",
+        "explanation": null,
+        "has_acceptance_criteria": true,
+        "has_explicit_requirements": true,
+        "requirements_count": 7,
+        "status": "processed",
+        "summary": "Add Requirement Traceability Matrix (RTM) Generation for Test Plans",
+        "ticket_id": "ATA-36"
+      }
+    ],
+    "tickets_analyzed": 1,
+    "tickets_failed": 0,
+    "tickets_requested": 1
+  },
+  "summary": "Generated multiple inferred requirements and corresponding negative tests due to lack of explicit execution mechanisms and acceptance criteria.",
+  "tenant_id": "70baa0c6-a96b-4a82-b06d-4c9ca90faf9e",
+  "test_plan": {
+    "api_tests": [
+      {
+        "confidence": "explicit",
+        "expected_result": "System automatically performs: [1]) Automatic generation of Requirement Traceability Matrix (RTM)",
+        "id": "SYS-001",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-36-REQ-001"
+        ],
+        "source_requirement_id": "ATA-36-REQ-001",
+        "steps": [
+          "Create a test plan containing at least one requirement and one test case.",
+          "Allow the system to complete test plan generation.",
+          "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+          "Verify the RTM contains exactly one entry per requirement.",
+          "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+        ],
+        "steps_origin": "requirement-derived",
+        "title": "System-level happy path: [1]) Automatic generation of Requirement Traceability Matrix (RTM)"
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "System automatically performs: Ensuring each requirement appears once in RTM.",
+        "id": "SYS-002",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-36-REQ-002"
+        ],
+        "reusable_system_test": true,
+        "source_requirement_id": "ATA-36-REQ-002",
+        "steps": [
+          "Create a test plan containing at least one requirement and one test case.",
+          "Allow the system to complete test plan generation.",
+          "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+          "Verify the RTM contains exactly one entry per requirement.",
+          "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+        ],
+        "steps_origin": "requirement-derived",
+        "title": "System-level happy path: Ensuring each requirement appears once in RTM."
+      },
+      {
+        "confidence": "inferred",
+        "expected_result": "Happy Path behavior validated",
+        "id": "API-001",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-36-REQ-003"
+        ],
+        "source_requirement_id": "ATA-36-REQ-003",
+        "steps": [
+          "Navigate to the application",
+          "Trigger the action described in the requirement",
+          "Observe the system response and verify it matches the expected outcome"
+        ],
+        "steps_origin": "inferred",
+        "title": "Happy Path: Identification of uncovered requirements."
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "System automatically performs: Inclusion of associated test case ID(s) in RTM.",
+        "id": "SYS-003",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-36-REQ-004"
+        ],
+        "reusable_system_test": true,
+        "source_requirement_id": "ATA-36-REQ-004",
+        "steps": [
+          "Create a test plan containing at least one requirement and one test case.",
+          "Allow the system to complete test plan generation.",
+          "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+          "Verify the RTM contains exactly one entry per requirement.",
+          "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+        ],
+        "steps_origin": "requirement-derived",
+        "title": "System-level happy path: Inclusion of associated test case ID(s) in RTM."
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "System automatically performs: Inclusion of coverage status in RTM.",
+        "id": "SYS-004",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-36-REQ-005"
+        ],
+        "reusable_system_test": true,
+        "source_requirement_id": "ATA-36-REQ-005",
+        "steps": [
+          "Create a test plan containing at least one requirement and one test case.",
+          "Allow the system to complete test plan generation.",
+          "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+          "Verify the RTM contains exactly one entry per requirement.",
+          "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+        ],
+        "steps_origin": "requirement-derived",
+        "title": "System-level happy path: Inclusion of coverage status in RTM."
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "System automatically performs: Deriving RTM directly from test plan.",
+        "id": "SYS-005",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-36-REQ-006"
+        ],
+        "reusable_system_test": true,
+        "source_requirement_id": "ATA-36-REQ-006",
+        "steps": [
+          "Create a test plan containing at least one requirement and one test case.",
+          "Allow the system to complete test plan generation.",
+          "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+          "Verify the RTM contains exactly one entry per requirement.",
+          "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+        ],
+        "steps_origin": "requirement-derived",
+        "title": "System-level happy path: Deriving RTM directly from test plan."
+      },
+      {
+        "confidence": "explicit",
+        "expected_result": "System automatically performs: Non-blocking RTM generation for test plan creation.",
+        "id": "SYS-006",
+        "intent_type": "happy_path",
+        "priority": "medium",
+        "requirements_covered": [
+          "ATA-36-REQ-007"
+        ],
+        "source_requirement_id": "ATA-36-REQ-007",
+        "steps": [
+          "Create a test plan containing at least one requirement and one test case.",
+          "Allow the system to complete test plan generation.",
+          "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+          "Verify the RTM contains exactly one entry per requirement.",
+          "Verify that RTM generation does not block or delay test plan creation."
+        ],
+        "steps_origin": "requirement-derived",
+        "title": "System-level happy path: Non-blocking RTM generation for test plan creation."
+      }
+    ],
+    "data_validation_tests": [
+      {
+        "_unmapped_requirement_references": [],
+        "confidence": "inferred",
+        "expected_result": "RTM artifact must contain all required fields and pass schema validation (must specify exact schema/field names to validate)",
+        "id": "VAL-ATA-36-001-RTM-SCHEMA",
+        "intent_type": "data_validation",
+        "priority": "high",
+        "requirements_covered": [
+          "ATA-36-REQ-001"
+        ],
+        "source_requirement_id": "ATA-36-REQ-001",
+        "steps": [
+          "Generate RTM for test plan",
+          "Download RTM JSON/CSV artifact",
+          "Verify RTM contains required fields: requirement_id, requirement_description, coverage_status, test_case_ids (must specify exact field names to check)"
+        ],
+        "title": "Data Validation: RTM schema integrity for ATA-36-REQ-001"
+      }
+    ],
+    "edge_cases": [
+      {
+        "_unmapped_requirement_references": [],
+        "confidence": "inferred",
+        "expected_result": "Test plan creation must complete immediately; RTM generation must be non-blocking (must specify exact completion status/timeout to verify)",
+        "id": "EDGE-ATA-36-001-RTM-ASYNC",
+        "intent_type": "resilience",
+        "priority": "high",
+        "requirements_covered": [
+          "ATA-36-REQ-001"
+        ],
+        "source_requirement_id": "ATA-36-REQ-001",
+        "steps": [
+          "Create test plan with large number of requirements (>=50)",
+          "Trigger RTM generation",
+          "Verify test plan creation completes without waiting for RTM (must specify exact timing/status to verify)"
+        ],
+        "title": "Resilience: Non-blocking RTM generation for ATA-36-REQ-001"
+      }
+    ],
+    "negative_tests": [
+      {
+        "_unmapped_requirement_references": [
+          "NEG-007:source_requirement_id=REQ-008",
+          "NEG-007:requirements_covered=REQ-008"
+        ],
+        "confidence": "inferred",
+        "expected_result": "Requirement description is not included in the RTM. (must specify exact error/status/field to verify)",
+        "id": "NEG-007",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [],
+        "steps": [],
+        "steps_explanation": "No specific steps can be derived from the requirement text.",
+        "steps_origin": "none",
+        "title": "Negative: Missing Requirement Description in RTM"
+      },
+      {
+        "_unmapped_requirement_references": [
+          "NEG-008:source_requirement_id=REQ-009",
+          "NEG-008:requirements_covered=REQ-009"
+        ],
+        "confidence": "inferred",
+        "expected_result": "RTM generation is blocking the test plan creation. (must specify exact error/status/field to verify)",
+        "id": "NEG-008",
+        "intent_type": "negative",
+        "priority": "medium",
+        "requirements_covered": [],
+        "steps": [],
+        "steps_explanation": "No specific steps can be derived from the requirement text.",
+        "steps_origin": "none",
+        "title": "Negative: Blocking RTM Generation"
+      }
+    ],
+    "ui_tests": []
+  },
+  "test_plan_by_requirement": [
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-36-REQ-001",
+      "requirement_source": "jira",
+      "requirement_text": "[1]) Automatic generation of Requirement Traceability Matrix (RTM)",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "System automatically performs: [1]) Automatic generation of Requirement Traceability Matrix (RTM)",
+            "id": "SYS-001",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-36-REQ-001"
+            ],
+            "source_requirement_id": "ATA-36-REQ-001",
+            "steps": [
+              "Create a test plan containing at least one requirement and one test case.",
+              "Allow the system to complete test plan generation.",
+              "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+              "Verify the RTM contains exactly one entry per requirement.",
+              "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+            ],
+            "steps_origin": "requirement-derived",
+            "title": "System-level happy path: [1]) Automatic generation of Requirement Traceability Matrix (RTM)"
+          }
+        ],
+        "negative": [],
+        "other": [
+          {
+            "_unmapped_requirement_references": [],
+            "confidence": "inferred",
+            "expected_result": "RTM artifact must contain all required fields and pass schema validation (must specify exact schema/field names to validate)",
+            "id": "VAL-ATA-36-001-RTM-SCHEMA",
+            "intent_type": "data_validation",
+            "priority": "high",
+            "requirements_covered": [
+              "ATA-36-REQ-001"
+            ],
+            "source_requirement_id": "ATA-36-REQ-001",
+            "steps": [
+              "Generate RTM for test plan",
+              "Download RTM JSON/CSV artifact",
+              "Verify RTM contains required fields: requirement_id, requirement_description, coverage_status, test_case_ids (must specify exact field names to check)"
+            ],
+            "title": "Data Validation: RTM schema integrity for ATA-36-REQ-001"
+          },
+          {
+            "_unmapped_requirement_references": [],
+            "confidence": "inferred",
+            "expected_result": "Test plan creation must complete immediately; RTM generation must be non-blocking (must specify exact completion status/timeout to verify)",
+            "id": "EDGE-ATA-36-001-RTM-ASYNC",
+            "intent_type": "resilience",
+            "priority": "high",
+            "requirements_covered": [
+              "ATA-36-REQ-001"
+            ],
+            "source_requirement_id": "ATA-36-REQ-001",
+            "steps": [
+              "Create test plan with large number of requirements (>=50)",
+              "Trigger RTM generation",
+              "Verify test plan creation completes without waiting for RTM (must specify exact timing/status to verify)"
+            ],
+            "title": "Resilience: Non-blocking RTM generation for ATA-36-REQ-001"
+          }
+        ]
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-36-REQ-002",
+      "requirement_source": "inferred",
+      "requirement_text": "Ensuring each requirement appears once in RTM.",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "System automatically performs: Ensuring each requirement appears once in RTM.",
+            "id": "SYS-002",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-36-REQ-002"
+            ],
+            "reusable_system_test": true,
+            "source_requirement_id": "ATA-36-REQ-002",
+            "steps": [
+              "Create a test plan containing at least one requirement and one test case.",
+              "Allow the system to complete test plan generation.",
+              "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+              "Verify the RTM contains exactly one entry per requirement.",
+              "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+            ],
+            "steps_origin": "requirement-derived",
+            "title": "System-level happy path: Ensuring each requirement appears once in RTM."
+          }
+        ],
+        "negative": [],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "medium",
+        "reasons": [
+          "Low requirement clarity",
+          "Low requirement testability",
+          "All coverage is inferred"
+        ],
+        "score": 0.5
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.6,
+        "issues": [
+          "Missing explicit action verb",
+          "Ambiguous or implied actor",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-36-REQ-003",
+      "requirement_source": "inferred",
+      "requirement_text": "Identification of uncovered requirements.",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "inferred",
+            "expected_result": "Happy Path behavior validated",
+            "id": "API-001",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-36-REQ-003"
+            ],
+            "source_requirement_id": "ATA-36-REQ-003",
+            "steps": [
+              "Navigate to the application",
+              "Trigger the action described in the requirement",
+              "Observe the system response and verify it matches the expected outcome"
+            ],
+            "steps_origin": "inferred",
+            "title": "Happy Path: Identification of uncovered requirements."
+          }
+        ],
+        "negative": [],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-36-REQ-004",
+      "requirement_source": "inferred",
+      "requirement_text": "Inclusion of associated test case ID(s) in RTM.",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "System automatically performs: Inclusion of associated test case ID(s) in RTM.",
+            "id": "SYS-003",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-36-REQ-004"
+            ],
+            "reusable_system_test": true,
+            "source_requirement_id": "ATA-36-REQ-004",
+            "steps": [
+              "Create a test plan containing at least one requirement and one test case.",
+              "Allow the system to complete test plan generation.",
+              "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+              "Verify the RTM contains exactly one entry per requirement.",
+              "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+            ],
+            "steps_origin": "requirement-derived",
+            "title": "System-level happy path: Inclusion of associated test case ID(s) in RTM."
+          }
+        ],
+        "negative": [],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-36-REQ-005",
+      "requirement_source": "inferred",
+      "requirement_text": "Inclusion of coverage status in RTM.",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "System automatically performs: Inclusion of coverage status in RTM.",
+            "id": "SYS-004",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-36-REQ-005"
+            ],
+            "reusable_system_test": true,
+            "source_requirement_id": "ATA-36-REQ-005",
+            "steps": [
+              "Create a test plan containing at least one requirement and one test case.",
+              "Allow the system to complete test plan generation.",
+              "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+              "Verify the RTM contains exactly one entry per requirement.",
+              "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+            ],
+            "steps_origin": "requirement-derived",
+            "title": "System-level happy path: Inclusion of coverage status in RTM."
+          }
+        ],
+        "negative": [],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-36-REQ-006",
+      "requirement_source": "inferred",
+      "requirement_text": "Deriving RTM directly from test plan.",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "System automatically performs: Deriving RTM directly from test plan.",
+            "id": "SYS-005",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-36-REQ-006"
+            ],
+            "reusable_system_test": true,
+            "source_requirement_id": "ATA-36-REQ-006",
+            "steps": [
+              "Create a test plan containing at least one requirement and one test case.",
+              "Allow the system to complete test plan generation.",
+              "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+              "Verify the RTM contains exactly one entry per requirement.",
+              "Verify each RTM entry includes requirement ID, description, associated test case IDs, and coverage status."
+            ],
+            "steps_origin": "requirement-derived",
+            "title": "System-level happy path: Deriving RTM directly from test plan."
+          }
+        ],
+        "negative": [],
+        "other": []
+      }
+    },
+    {
+      "coverage_confidence": {
+        "level": "high",
+        "reasons": [
+          "Low requirement testability"
+        ],
+        "score": 0.8
+      },
+      "coverage_expectations": {
+        "authorization": "not_applicable",
+        "boundary": "not_applicable",
+        "data_validation": "not_applicable",
+        "happy_path": "covered",
+        "negative": "not_applicable",
+        "stateful": "not_applicable"
+      },
+      "quality": {
+        "clarity_score": 0.8,
+        "issues": [
+          "Missing explicit action verb",
+          "Outcome not directly observable",
+          "Missing explicit success criteria"
+        ],
+        "testability_score": 0.4
+      },
+      "requirement_id": "ATA-36-REQ-007",
+      "requirement_source": "inferred",
+      "requirement_text": "Non-blocking RTM generation for test plan creation.",
+      "tests": {
+        "authorization": [],
+        "boundary": [],
+        "happy_path": [
+          {
+            "confidence": "explicit",
+            "expected_result": "System automatically performs: Non-blocking RTM generation for test plan creation.",
+            "id": "SYS-006",
+            "intent_type": "happy_path",
+            "priority": "medium",
+            "requirements_covered": [
+              "ATA-36-REQ-007"
+            ],
+            "source_requirement_id": "ATA-36-REQ-007",
+            "steps": [
+              "Create a test plan containing at least one requirement and one test case.",
+              "Allow the system to complete test plan generation.",
+              "Verify that a Requirement Traceability Matrix (RTM) is generated automatically.",
+              "Verify the RTM contains exactly one entry per requirement.",
+              "Verify that RTM generation does not block or delay test plan creation."
+            ],
+            "steps_origin": "requirement-derived",
+            "title": "System-level happy path: Non-blocking RTM generation for test plan creation."
+          }
+        ],
+        "negative": [],
+        "other": []
+      }
+    }
+  ],
+  "ticket_item_coverage": [
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-36-ITEM-001",
+      "test_ids": [
+        "SYS-001",
+        "EDGE-ATA-36-001-RTM-ASYNC",
+        "VAL-ATA-36-001-RTM-SCHEMA"
+      ],
+      "testable": true,
+      "text": "Automatic generation of Requirement Traceability Matrix (RTM)"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-36-ITEM-002",
+      "test_ids": [
+        "SYS-002"
+      ],
+      "testable": true,
+      "text": "Ensuring each requirement appears once in RTM"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-36-ITEM-003",
+      "test_ids": [
+        "SYS-003"
+      ],
+      "testable": true,
+      "text": "Inclusion of Requirement ID in RTM"
+    },
+    {
+      "classification": "informational_only",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-36-ITEM-004",
+      "non_testable_reason": "Informational content; not independently testable",
+      "testable": false,
+      "text": "Identification of uncovered requirements"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-36-ITEM-005",
+      "test_ids": [
+        "SYS-006"
+      ],
+      "testable": true,
+      "text": "Non-blocking RTM generation for test plan creation"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-36-ITEM-006",
+      "test_ids": [
+        "SYS-003"
+      ],
+      "testable": true,
+      "text": "Inclusion of associated test case ID(s) in RTM"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-36-ITEM-007",
+      "test_ids": [
+        "SYS-004"
+      ],
+      "testable": true,
+      "text": "Inclusion of coverage status in RTM"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-36-ITEM-008",
+      "test_ids": [
+        "SYS-005"
+      ],
+      "testable": true,
+      "text": "Deriving RTM directly from test plan"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "direct_test",
+      "item_id": "ATA-36-ITEM-009",
+      "test_ids": [
+        "SYS-003"
+      ],
+      "testable": true,
+      "text": "Inclusion of Requirement description in RTM"
+    },
+    {
+      "classification": "out_of_scope",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-36-ITEM-010",
+      "non_testable_reason": null,
+      "testable": false,
+      "text": "Manual input of requirements into RTM"
+    },
+    {
+      "classification": "out_of_scope",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-36-ITEM-011",
+      "non_testable_reason": null,
+      "testable": false,
+      "text": "Editing test cases against requirements within Jira"
+    },
+    {
+      "classification": "out_of_scope",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-36-ITEM-012",
+      "non_testable_reason": null,
+      "testable": false,
+      "text": "Editing of test plans"
+    },
+    {
+      "classification": "system_behavior",
+      "coverage_method": "inherited_via_parent_requirement",
+      "item_id": "ATA-36-ITEM-013",
+      "parent_requirement_id": null,
+      "testable": true,
+      "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured."
+    },
+    {
+      "classification": "risk_note",
+      "coverage_method": "not_independently_testable",
+      "item_id": "ATA-36-ITEM-014",
+      "non_testable_reason": null,
+      "testable": false,
+      "text": "[Scope Risk] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)"
+    }
+  ],
+  "ticket_traceability": [
+    {
+      "items": [
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-001",
+          "mapped_requirement_id": "ATA-36-REQ-001",
+          "source_section": "description",
+          "testable": true,
+          "text": "Automatic generation of Requirement Traceability Matrix (RTM)",
+          "validated_by_tests": [
+            "SYS-001",
+            "EDGE-ATA-36-001-RTM-ASYNC",
+            "VAL-ATA-36-001-RTM-SCHEMA"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-002",
+          "mapped_requirement_id": "ATA-36-REQ-002",
+          "source_section": "description",
+          "testable": true,
+          "text": "Ensuring each requirement appears once in RTM",
+          "validated_by_tests": [
+            "SYS-002"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-003",
+          "mapped_requirement_id": "ATA-36-REQ-004",
+          "source_section": "description",
+          "testable": true,
+          "text": "Inclusion of Requirement ID in RTM",
+          "validated_by_tests": [
+            "SYS-003"
+          ]
+        },
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-36-ITEM-004",
+          "note": "Informational content; not independently testable",
+          "source_section": "description",
+          "testable": false,
+          "text": "Identification of uncovered requirements"
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-005",
+          "mapped_requirement_id": "ATA-36-REQ-007",
+          "source_section": "description",
+          "testable": true,
+          "text": "Non-blocking RTM generation for test plan creation",
+          "validated_by_tests": [
+            "SYS-006"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-006",
+          "mapped_requirement_id": "ATA-36-REQ-004",
+          "source_section": "description",
+          "testable": true,
+          "text": "Inclusion of associated test case ID(s) in RTM",
+          "validated_by_tests": [
+            "SYS-003"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-007",
+          "mapped_requirement_id": "ATA-36-REQ-005",
+          "source_section": "description",
+          "testable": true,
+          "text": "Inclusion of coverage status in RTM",
+          "validated_by_tests": [
+            "SYS-004"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-008",
+          "mapped_requirement_id": "ATA-36-REQ-006",
+          "source_section": "description",
+          "testable": true,
+          "text": "Deriving RTM directly from test plan",
+          "validated_by_tests": [
+            "SYS-005"
+          ]
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-009",
+          "mapped_requirement_id": "ATA-36-REQ-004",
+          "source_section": "description",
+          "testable": true,
+          "text": "Inclusion of Requirement description in RTM",
+          "validated_by_tests": [
+            "SYS-003"
+          ]
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-010",
+          "note": "Out of scope; not a testable requirement",
+          "source_section": "description",
+          "testable": false,
+          "text": "Manual input of requirements into RTM"
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-011",
+          "note": "Out of scope; not a testable requirement",
+          "source_section": "description",
+          "testable": false,
+          "text": "Editing test cases against requirements within Jira"
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-012",
+          "note": "Out of scope; not a testable requirement",
+          "source_section": "description",
+          "testable": false,
+          "text": "Editing of test plans"
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-013",
+          "source_section": "description",
+          "testable": true,
+          "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured."
+        },
+        {
+          "classification": "risk_note",
+          "item_id": "ATA-36-ITEM-014",
+          "note": "Risk statement; not a testable requirement",
+          "source_section": "description",
+          "testable": false,
+          "text": "[Scope Risk] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)"
+        }
+      ],
+      "ticket_id": "ATA-36",
+      "unmapped_items": [
+        {
+          "classification": "informational_only",
+          "item_id": "ATA-36-ITEM-004",
+          "rationale": "Informational content; not independently testable",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "Identification of uncovered requirements"
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-010",
+          "rationale": "Out of scope; not a testable requirement",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "Manual input of requirements into RTM"
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-011",
+          "rationale": "Out of scope; not a testable requirement",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "Editing test cases against requirements within Jira"
+        },
+        {
+          "classification": "out_of_scope",
+          "item_id": "ATA-36-ITEM-012",
+          "rationale": "Out of scope; not a testable requirement",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "Editing of test plans"
+        },
+        {
+          "classification": "system_behavior",
+          "item_id": "ATA-36-ITEM-013",
+          "rationale": "Item does not map to any requirement",
+          "reason_code": "NO_MATCH_FOUND",
+          "source_section": "description",
+          "testable": true,
+          "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured."
+        },
+        {
+          "classification": "risk_note",
+          "item_id": "ATA-36-ITEM-014",
+          "rationale": "Risk statement; not a testable requirement",
+          "reason_code": "INFORMATIONAL_ONLY",
+          "source_section": "description",
+          "testable": false,
+          "text": "[Scope Risk] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)"
+        }
+      ]
+    }
+  ],
+  "ticket_traceability_unmapped_items": [
+    {
+      "classification": "informational_only",
+      "item_id": "ATA-36-ITEM-004",
+      "rationale": "Informational content; not independently testable",
+      "reason_code": "INFORMATIONAL_ONLY",
+      "source_section": "description",
+      "testable": false,
+      "text": "Identification of uncovered requirements"
+    },
+    {
+      "classification": "out_of_scope",
+      "item_id": "ATA-36-ITEM-010",
+      "rationale": "Out of scope; not a testable requirement",
+      "reason_code": "INFORMATIONAL_ONLY",
+      "source_section": "description",
+      "testable": false,
+      "text": "Manual input of requirements into RTM"
+    },
+    {
+      "classification": "out_of_scope",
+      "item_id": "ATA-36-ITEM-011",
+      "rationale": "Out of scope; not a testable requirement",
+      "reason_code": "INFORMATIONAL_ONLY",
+      "source_section": "description",
+      "testable": false,
+      "text": "Editing test cases against requirements within Jira"
+    },
+    {
+      "classification": "out_of_scope",
+      "item_id": "ATA-36-ITEM-012",
+      "rationale": "Out of scope; not a testable requirement",
+      "reason_code": "INFORMATIONAL_ONLY",
+      "source_section": "description",
+      "testable": false,
+      "text": "Editing of test plans"
+    },
+    {
+      "classification": "system_behavior",
+      "item_id": "ATA-36-ITEM-013",
+      "rationale": "Item does not map to any requirement",
+      "reason_code": "NO_MATCH_FOUND",
+      "source_section": "description",
+      "testable": true,
+      "text": "Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured."
+    },
+    {
+      "classification": "risk_note",
+      "item_id": "ATA-36-ITEM-014",
+      "rationale": "Risk statement; not a testable requirement",
+      "reason_code": "INFORMATIONAL_ONLY",
+      "source_section": "description",
+      "testable": false,
+      "text": "[Scope Risk] Potential misalignment between RTM entries and actual test cases if requirements are not accurately captured. (Severity: medium)"
+    }
+  ]
+}

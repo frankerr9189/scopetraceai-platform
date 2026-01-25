@@ -168,14 +168,59 @@ export function TestPlanPage({ testPlanData, setTestPlanData, activeTab, setActi
                         </div>
                       )}
                     </div>
-                    {testPlanData.scope_summary && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {testPlanData.scope_summary.requirements_covered} of {testPlanData.scope_summary.requirements_total} requirements covered
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {testPlanData.scope_summary.tickets_analyzed} ticket{testPlanData.scope_summary.tickets_analyzed !== 1 ? 's' : ''} analyzed
-                        </p>
+                    {testPlanData.scope_summary && (() => {
+                      // Compute totals from the rendered list instead of relying on scope_summary
+                      const requirementsList = testPlanData.requirements || []
+                      const actualRequirementsTotal = requirementsList.length
+                      
+                      // Derive covered/uncovered from RTM if present, otherwise use scope_summary as fallback
+                      let requirementsCovered = testPlanData.scope_summary.requirements_covered
+                      let requirementsUncovered = testPlanData.scope_summary.requirements_uncovered
+                      
+                      // Try to compute from RTM if available
+                      const rtmArtifact = testPlanData.rtm_artifact
+                      if (rtmArtifact && rtmArtifact.requirements_rtm) {
+                        const requirementsRtm = rtmArtifact.requirements_rtm || []
+                        const coveredCount = requirementsRtm.filter((row: any) => {
+                          const coverage = row.coverage || {}
+                          const status = coverage.status || "NONE"
+                          return status === "FULL" || status === "PARTIAL"
+                        }).length
+                        const uncoveredCount = requirementsRtm.filter((row: any) => {
+                          const coverage = row.coverage || {}
+                          const status = coverage.status || "NONE"
+                          return status === "NONE"
+                        }).length
+                        
+                        if (coveredCount + uncoveredCount === actualRequirementsTotal) {
+                          requirementsCovered = coveredCount
+                          requirementsUncovered = uncoveredCount
+                        }
+                      } else if (testPlanData.rtm && Array.isArray(testPlanData.rtm)) {
+                        // Fallback to flat rtm
+                        const coveredCount = testPlanData.rtm.filter((row: any) => {
+                          return row.coverage_status === "COVERED" || 
+                                 (Array.isArray(row.covered_by_tests) && row.covered_by_tests.length > 0)
+                        }).length
+                        const uncoveredCount = testPlanData.rtm.filter((row: any) => {
+                          return row.coverage_status === "NOT_COVERED" && 
+                                 (!Array.isArray(row.covered_by_tests) || row.covered_by_tests.length === 0)
+                        }).length
+                        
+                        if (coveredCount + uncoveredCount === actualRequirementsTotal) {
+                          requirementsCovered = coveredCount
+                          requirementsUncovered = uncoveredCount
+                        }
+                      }
+                      
+                      return (
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            {requirementsCovered} of {actualRequirementsTotal} requirements covered
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {testPlanData.scope_summary.tickets_analyzed} ticket{testPlanData.scope_summary.tickets_analyzed !== 1 ? 's' : ''} analyzed
+                          </p>
                         {(() => {
                           const testPlan = testPlanData.test_plan || {}
                           const allTests = [
@@ -217,8 +262,9 @@ export function TestPlanPage({ testPlanData, setTestPlanData, activeTab, setActi
                             </p>
                           )
                         })()}
-                      </div>
-                    )}
+                        </div>
+                      )
+                    })()}
                   </div>
                   <div className="flex flex-col gap-2">
                     <div className="flex gap-2">
@@ -346,6 +392,7 @@ export function TestPlanPage({ testPlanData, setTestPlanData, activeTab, setActi
                         <RequirementsView 
                           requirements={testPlanData.requirements} 
                           testPlan={testPlanData.test_plan}
+                          testPlanByRequirement={testPlanData.test_plan_by_requirement}
                         />
                         {testPlanData.audit_metadata && (
                           <AuditMetadataView metadata={testPlanData.audit_metadata} />
