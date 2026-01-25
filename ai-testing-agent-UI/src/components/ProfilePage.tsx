@@ -160,14 +160,14 @@ export function ProfilePage() {
     
     // Check if tenant has a paid plan tier (not trial/unselected)
     const paidTiers = ['individual', 'team', 'pro', 'enterprise']
-    const hasPaidPlan = billingStatus.plan_tier && paidTiers.includes(billingStatus.plan_tier)
+    const hasPaidPlan = Boolean(billingStatus.plan_tier && paidTiers.includes(billingStatus.plan_tier))
     
     // Check if status indicates they have a Stripe subscription
     // Exclude incomplete/unselected (no Stripe customer yet)
     // Include active, trialing, past_due, canceled (all have Stripe customer)
-    const hasStripeSubscription = billingStatus.status && 
+    const hasStripeSubscription = Boolean(billingStatus.status && 
       billingStatus.status !== 'incomplete' && 
-      billingStatus.status !== 'unselected'
+      billingStatus.status !== 'unselected')
     
     // Eligible if: paid plan tier AND has Stripe subscription status
     // Period dates are a good indicator but not required (edge case: just activated)

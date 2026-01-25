@@ -322,6 +322,13 @@ export interface TestPlanResponse {
     negative_tests: TestCase[]
   }
   rtm: RTMEntry[]
+  rtm_artifact?: {
+    requirements_rtm?: Array<{
+      coverage?: {
+        status?: string
+      }
+    }>
+  }
   summary: string
   scope_summary?: {
     scope_type: string

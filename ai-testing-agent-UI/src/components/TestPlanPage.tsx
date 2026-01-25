@@ -175,7 +175,8 @@ export function TestPlanPage({ testPlanData, setTestPlanData, activeTab, setActi
                       
                       // Derive covered/uncovered from RTM if present, otherwise use scope_summary as fallback
                       let requirementsCovered = testPlanData.scope_summary.requirements_covered
-                      let requirementsUncovered = testPlanData.scope_summary.requirements_uncovered
+                      // Note: requirementsUncovered computed but not currently displayed in UI
+                      let _requirementsUncovered = testPlanData.scope_summary.requirements_uncovered
                       
                       // Try to compute from RTM if available
                       const rtmArtifact = testPlanData.rtm_artifact
@@ -194,7 +195,7 @@ export function TestPlanPage({ testPlanData, setTestPlanData, activeTab, setActi
                         
                         if (coveredCount + uncoveredCount === actualRequirementsTotal) {
                           requirementsCovered = coveredCount
-                          requirementsUncovered = uncoveredCount
+                          _requirementsUncovered = uncoveredCount
                         }
                       } else if (testPlanData.rtm && Array.isArray(testPlanData.rtm)) {
                         // Fallback to flat rtm
@@ -209,7 +210,7 @@ export function TestPlanPage({ testPlanData, setTestPlanData, activeTab, setActi
                         
                         if (coveredCount + uncoveredCount === actualRequirementsTotal) {
                           requirementsCovered = coveredCount
-                          requirementsUncovered = uncoveredCount
+                          _requirementsUncovered = uncoveredCount
                         }
                       }
                       
