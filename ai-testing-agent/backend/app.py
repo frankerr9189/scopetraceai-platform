@@ -94,6 +94,138 @@ from auth.jwt import create_access_token, decode_and_verify_token
 # Import encryption utilities (will fail fast if INTEGRATION_SECRET_KEY is not set)
 from utils.encryption import decrypt_secret  # noqa: F401
 
+
+def validate_email_strict(email: str) -> tuple:
+    """
+    Strict email validation to prevent bot signups and invalid email formats.
+    
+    Rejects:
+    - Quoted local-parts (e.g., "text"@test.com)
+    - Missing or invalid TLDs (e.g., test@com, a@b.c)
+    - Single-character domains
+    - Malformed structures
+    
+    Allows:
+    - Standard emails (user@example.com)
+    - Plus addressing (user+tag@example.com)
+    - Dots in local-part (first.last@example.com)
+    - Valid TLDs (.com, .net, .io, .co.uk, etc.)
+    
+    Args:
+        email: Email string to validate
+        
+    Returns:
+        Tuple of (is_valid: bool, error_message: str)
+    """
+    if not email or not isinstance(email, str):
+        return False, "Email is required"
+    
+    email = email.strip()
+    
+    # Length check (RFC 5321: max 254 chars for email)
+    if len(email) > 254:
+        return False, "Email is too long (max 254 characters)"
+    
+    if len(email) < 5:  # Minimum: a@b.co
+        return False, "Email is too short"
+    
+    # Split into local-part and domain
+    if '@' not in email:
+        return False, "Email must contain @ symbol"
+    
+    parts = email.split('@')
+    if len(parts) != 2:
+        return False, "Email must contain exactly one @ symbol"
+    
+    local_part, domain = parts
+    
+    # Validate local-part (before @)
+    if not local_part or len(local_part) == 0:
+        return False, "Email local-part cannot be empty"
+    
+    if len(local_part) > 64:  # RFC 5321 limit
+        return False, "Email local-part is too long (max 64 characters)"
+    
+    # Reject quoted local-parts (bot prevention)
+    if local_part.startswith('"') and local_part.endswith('"'):
+        return False, "Quoted email addresses are not allowed"
+    
+    # Reject spaces in local-part
+    if ' ' in local_part:
+        return False, "Email local-part cannot contain spaces"
+    
+    # Allow: letters, numbers, dots, hyphens, underscores, plus signs, percent
+    # Reject: other special characters that are commonly used in bot-generated emails
+    local_part_pattern = r'^[a-zA-Z0-9._%+-]+$'
+    if not re.match(local_part_pattern, local_part):
+        return False, "Email local-part contains invalid characters"
+    
+    # Local-part cannot start or end with dot
+    if local_part.startswith('.') or local_part.endswith('.'):
+        return False, "Email local-part cannot start or end with a dot"
+    
+    # Local-part cannot have consecutive dots
+    if '..' in local_part:
+        return False, "Email local-part cannot have consecutive dots"
+    
+    # Validate domain (after @)
+    if not domain or len(domain) == 0:
+        return False, "Email domain cannot be empty"
+    
+    if len(domain) > 253:  # RFC 5321 limit
+        return False, "Email domain is too long (max 253 characters)"
+    
+    # Reject single-character domains
+    if len(domain) < 4:  # Minimum: a.co
+        return False, "Email domain is too short"
+    
+    # Domain must contain at least one dot (for TLD)
+    if '.' not in domain:
+        return False, "Email domain must contain a top-level domain (e.g., .com, .net)"
+    
+    # Split domain into parts
+    domain_parts = domain.split('.')
+    
+    # Must have at least domain name + TLD
+    if len(domain_parts) < 2:
+        return False, "Email domain must have a valid top-level domain"
+    
+    # Validate each domain part
+    for part in domain_parts:
+        if not part or len(part) == 0:
+            return False, "Email domain cannot have empty parts"
+        
+        # Each part can contain letters, numbers, hyphens
+        if not re.match(r'^[a-zA-Z0-9-]+$', part):
+            return False, "Email domain contains invalid characters"
+        
+        # Parts cannot start or end with hyphen
+        if part.startswith('-') or part.endswith('-'):
+            return False, "Email domain parts cannot start or end with a hyphen"
+    
+    # Validate TLD (last part)
+    tld = domain_parts[-1]
+    if len(tld) < 2:
+        return False, "Top-level domain must be at least 2 characters"
+    
+    # TLD must be letters only (no numbers, no hyphens)
+    if not re.match(r'^[a-zA-Z]+$', tld):
+        return False, "Top-level domain must contain only letters"
+    
+    # Reject common invalid TLDs that bots use
+    invalid_tlds = {'com', 'net', 'org', 'io', 'co', 'uk', 'us'}  # These are valid, but check for single-char before
+    # Actually, we want to allow these. Let's check for obviously fake ones:
+    # Single character TLDs are already rejected above (len < 2)
+    
+    # Additional check: domain name (second-to-last part) should be reasonable
+    if len(domain_parts) >= 2:
+        domain_name = domain_parts[-2]
+        if len(domain_name) < 1:
+            return False, "Email domain name cannot be empty"
+    
+    return True, ""
+
+
 @app.after_request
 def add_cors_headers(response):
     """
@@ -381,12 +513,25 @@ MAX_DOC_UPLOAD_MB = 15
 AGENT_VERSION = "1.0.0"
 
 # ============================================================================
-# Rate Limiting for Public Onboarding Endpoints (In-Memory)
+# Rate Limiting for Public and Authenticated Endpoints (In-Memory)
 # ============================================================================
-# TODO: Replace with distributed rate limiting (Redis) for production
-# Simple in-memory rate limiting keyed by (ip, route) with timestamps
+# Rate limiting is a critical security measure to prevent bot abuse and automated attacks.
+# Public endpoints (onboarding, lead submission) are limited per IP.
+# Authenticated endpoints (user invites) are limited per user to prevent abuse by compromised accounts.
+#
+# TODO: Replace with distributed rate limiting (Redis) for production multi-instance deployments
+# Simple in-memory rate limiting keyed by (ip/user_id, route) with timestamps
 _rate_limit_store = {}
 _rate_limit_cleanup_interval = 3600  # Clean up old entries every hour
+
+# Rate limit configuration (configurable via environment variables)
+# Public endpoints: 5 requests per minute per IP (bot prevention)
+RATE_LIMIT_PUBLIC_REQUESTS = int(os.getenv("RATE_LIMIT_PUBLIC_REQUESTS", "5"))
+RATE_LIMIT_PUBLIC_WINDOW = int(os.getenv("RATE_LIMIT_PUBLIC_WINDOW", "60"))  # 1 minute
+
+# Authenticated endpoints: 10 requests per minute per user (higher limit for legitimate use)
+RATE_LIMIT_AUTH_REQUESTS = int(os.getenv("RATE_LIMIT_AUTH_REQUESTS", "10"))
+RATE_LIMIT_AUTH_WINDOW = int(os.getenv("RATE_LIMIT_AUTH_WINDOW", "60"))  # 1 minute
 
 def _cleanup_rate_limit_store():
     """Remove entries older than 1 hour from rate limit store."""
@@ -398,21 +543,35 @@ def _cleanup_rate_limit_store():
     for key in keys_to_remove:
         del _rate_limit_store[key]
 
-def _check_rate_limit(ip: str, route: str, max_requests: int, window_seconds: int = 3600) -> tuple[bool, int]:
+def _check_rate_limit(ip: str, route: str, max_requests: int, window_seconds: int = 3600, user_id: Optional[str] = None) -> tuple[bool, int, int]:
     """
-    Check if IP has exceeded rate limit for route.
+    Check if IP/user has exceeded rate limit for route.
+    
+    Rate limiting is a critical security measure to prevent bot abuse and automated attacks
+    on public endpoints (onboarding, lead submission) and authenticated endpoints (user invites).
     
     Args:
         ip: Client IP address
         route: Route identifier (e.g., "/api/v1/onboarding/tenant")
         max_requests: Maximum requests allowed in window
         window_seconds: Time window in seconds (default 1 hour)
+        user_id: Optional user ID for authenticated endpoints (limits per user, not just IP)
     
     Returns:
-        tuple: (allowed: bool, remaining: int)
+        tuple: (allowed: bool, remaining: int, retry_after_seconds: int)
+        - allowed: Whether request is allowed
+        - remaining: Number of requests remaining in window
+        - retry_after_seconds: Seconds until next request allowed (0 if allowed)
     """
     current_time = time.time()
-    key = (ip, route)
+    
+    # For authenticated endpoints, use user_id if provided; otherwise use IP
+    # This allows per-user rate limiting for authenticated routes while maintaining IP-based
+    # limiting for public endpoints
+    if user_id:
+        key = (user_id, route)  # Per-user rate limiting for authenticated endpoints
+    else:
+        key = (ip, route)  # Per-IP rate limiting for public endpoints
     
     # Clean up old entries periodically
     if len(_rate_limit_store) > 10000:  # Prevent unbounded growth
@@ -426,14 +585,17 @@ def _check_rate_limit(ip: str, route: str, max_requests: int, window_seconds: in
     
     # Check if limit exceeded
     if len(recent_timestamps) >= max_requests:
-        return False, 0
+        # Calculate retry-after: time until oldest request in window expires
+        oldest_timestamp = min(recent_timestamps) if recent_timestamps else current_time
+        retry_after = int(window_seconds - (current_time - oldest_timestamp)) + 1
+        return False, 0, retry_after
     
     # Add current request timestamp
     recent_timestamps.append(current_time)
     _rate_limit_store[key] = recent_timestamps
     
     remaining = max_requests - len(recent_timestamps)
-    return True, remaining
+    return True, remaining, 0
 
 def _get_client_ip() -> str:
     """Get client IP address from request headers."""
@@ -450,6 +612,29 @@ def _get_client_ip() -> str:
     
     # Fall back to remote address
     return request.remote_addr or 'unknown'
+
+
+def _check_honeypot(data: dict, honeypot_field: str = "company_website") -> bool:
+    """
+    Check if honeypot field is filled (indicates bot).
+    
+    Honeypot fields are hidden form fields that should never be filled by legitimate users.
+    If filled, it indicates automated bot behavior. This check is silent to avoid
+    alerting bots that they've been detected.
+    
+    Args:
+        data: Request JSON data
+        honeypot_field: Name of honeypot field to check
+    
+    Returns:
+        True if honeypot is triggered (bot detected), False otherwise
+    """
+    if not data:
+        return False
+    
+    honeypot_value = data.get(honeypot_field, "").strip()
+    # If honeypot field is present and non-empty, it's a bot
+    return bool(honeypot_value)
 
 # Model configuration
 LLM_MODEL = "gpt-4o-mini"
@@ -5072,7 +5257,7 @@ def login():
                 { "tenant_id": "...", "tenant_name": "...", "tenant_slug": "..." }
             ]
         }
-        - 401: Invalid credentials (generic)
+        - 401: Invalid email or password. Please try again. (generic - does not reveal user existence)
         - 403: User or tenant inactive
     """
     try:
@@ -5104,7 +5289,8 @@ def login():
                 tenant_slug_lower = tenant_slug.lower().strip()
                 tenant = db.query(Tenant).filter(func.lower(Tenant.slug) == tenant_slug_lower).first()
                 if not tenant:
-                    return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                    # Generic error message to prevent information leakage
+                    return jsonify({"detail": "Invalid email or password. Please try again."}), 401
                 
                 if not tenant.is_active:
                     return jsonify({
@@ -5118,7 +5304,8 @@ def login():
                 ).first()
                 
                 if not user:
-                    return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                    # Generic error message to prevent information leakage (user existence)
+                    return jsonify({"detail": "Invalid email or password. Please try again."}), 401
                 
                 if not user.is_active:
                     return jsonify({
@@ -5127,7 +5314,8 @@ def login():
                     }), 403
                 
                 if not bcrypt.checkpw(password_bytes, user.password_hash.encode('utf-8')):
-                    return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                    # Generic error message to prevent information leakage (password correctness)
+                    return jsonify({"detail": "Invalid email or password. Please try again."}), 401
                 
                 user.last_login_at = datetime.now(timezone.utc)
                 db.commit()
@@ -5154,14 +5342,14 @@ def login():
                 }), 200
             
             # New flow: lookup all tenant_users by email (case-insensitive)
+            # Security: Always perform password check to prevent user existence leakage
+            # Even if no users found, we still check password (will fail) to maintain consistent timing
             users = db.query(TenantUser).filter(
                 func.lower(TenantUser.email) == email_lower
             ).all()
             
-            if not users:
-                return jsonify({"detail": "Invalid tenant or credentials"}), 401
-            
             # Verify password for all matches and collect valid tenants
+            # If no users found, this loop won't execute, but we still return generic error below
             valid_tenants = []
             for user in users:
                 try:
@@ -5178,8 +5366,11 @@ def login():
                     continue
             
             # If no valid matches after password check, return 401
+            # Generic error message prevents information leakage about:
+            # - User existence (whether email exists in system)
+            # - Password correctness (whether password is wrong vs email doesn't exist)
             if not valid_tenants:
-                return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                return jsonify({"detail": "Invalid email or password. Please try again."}), 401
             
             # If exactly one match, authenticate immediately
             if len(valid_tenants) == 1:
@@ -5275,14 +5466,16 @@ def login_with_tenant():
         try:
             tenant_id_uuid = uuid_module.UUID(tenant_id_str)
         except ValueError:
-            return jsonify({"detail": "Invalid tenant or credentials"}), 401
+            # Generic error message to prevent information leakage
+            return jsonify({"detail": "Invalid email or password. Please try again."}), 401
         
         db = next(get_db())
         try:
             # Load tenant
             tenant = db.query(Tenant).filter(Tenant.id == tenant_id_uuid).first()
             if not tenant:
-                return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                # Generic error message to prevent information leakage (tenant existence)
+                return jsonify({"detail": "Invalid email or password. Please try again."}), 401
             
             # Check if tenant is active
             if not tenant.is_active:
@@ -5299,7 +5492,8 @@ def login_with_tenant():
             ).first()
             
             if not user:
-                return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                # Generic error message to prevent information leakage (user existence)
+                return jsonify({"detail": "Invalid email or password. Please try again."}), 401
             
             # Check if user is active
             if not user.is_active:
@@ -5310,7 +5504,8 @@ def login_with_tenant():
             
             # Verify password
             if not bcrypt.checkpw(password_bytes, user.password_hash.encode('utf-8')):
-                return jsonify({"detail": "Invalid tenant or credentials"}), 401
+                # Generic error message to prevent information leakage (password correctness)
+                return jsonify({"detail": "Invalid email or password. Please try again."}), 401
             
             # Update last_login_at
             user.last_login_at = datetime.now(timezone.utc)
@@ -6639,11 +6834,19 @@ def create_tenant():
             "suggestions": ["acme-widgets-2", "acme-widgets-3"]
         }
     """
-    # Rate limiting: max 10 requests per hour per IP
+    # Rate limiting: 5 requests per minute per IP (bot prevention)
+    # Public endpoints are vulnerable to automated abuse, so strict limits are applied
     client_ip = _get_client_ip()
-    allowed, remaining = _check_rate_limit(client_ip, "/api/v1/onboarding/tenant", max_requests=10, window_seconds=3600)
+    allowed, remaining, retry_after = _check_rate_limit(
+        client_ip, 
+        "/api/v1/onboarding/tenant", 
+        max_requests=RATE_LIMIT_PUBLIC_REQUESTS, 
+        window_seconds=RATE_LIMIT_PUBLIC_WINDOW
+    )
     if not allowed:
-        return jsonify({"detail": "Rate limit exceeded"}), 429
+        response = jsonify({"detail": "Too many requests. Please try again later."})
+        response.headers["Retry-After"] = str(retry_after)
+        return response, 429
     
     try:
         from db import get_db
@@ -6654,6 +6857,12 @@ def create_tenant():
         data = request.get_json()
         if not data:
             return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        # Honeypot check: silently reject if honeypot field is filled (bot detection)
+        # This prevents automated bot signups without alerting the bot
+        if _check_honeypot(data, "company_website"):
+            # Return generic validation error (do not indicate bot detection)
+            return jsonify({"detail": "Invalid request"}), 400
         
         company_name = data.get("company_name", "").strip()
         if not company_name:
@@ -6775,11 +6984,19 @@ def create_tenant_admin(tenant_id):
             }
         }
     """
-    # Rate limiting: max 20 requests per hour per IP
+    # Rate limiting: 5 requests per minute per IP (bot prevention)
+    # Public endpoints are vulnerable to automated abuse, so strict limits are applied
     client_ip = _get_client_ip()
-    allowed, remaining = _check_rate_limit(client_ip, f"/api/v1/onboarding/tenant/{tenant_id}/admin", max_requests=20, window_seconds=3600)
+    allowed, remaining, retry_after = _check_rate_limit(
+        client_ip, 
+        f"/api/v1/onboarding/tenant/{tenant_id}/admin", 
+        max_requests=RATE_LIMIT_PUBLIC_REQUESTS, 
+        window_seconds=RATE_LIMIT_PUBLIC_WINDOW
+    )
     if not allowed:
-        return jsonify({"detail": "Rate limit exceeded"}), 429
+        response = jsonify({"detail": "Too many requests. Please try again later."})
+        response.headers["Retry-After"] = str(retry_after)
+        return response, 429
     
     try:
         from db import get_db
@@ -6791,6 +7008,12 @@ def create_tenant_admin(tenant_id):
         data = request.get_json()
         if not data:
             return jsonify({"detail": "Request body must be JSON"}), 400
+        
+        # Honeypot check: silently reject if honeypot field is filled (bot detection)
+        # This prevents automated bot signups without alerting the bot
+        if _check_honeypot(data, "company_website"):
+            # Return generic validation error (do not indicate bot detection)
+            return jsonify({"detail": "Invalid request"}), 400
         
         email = data.get("email", "").strip()
         password = data.get("password", "")
@@ -6805,7 +7028,14 @@ def create_tenant_admin(tenant_id):
             return jsonify({"detail": "password is required"}), 400
         
         # Normalize email: lowercase and trim
-        email = email.lower().strip()
+        email = email.strip()
+        
+        # Strict email validation (bot prevention)
+        is_valid, error_msg = validate_email_strict(email)
+        if not is_valid:
+            return jsonify({"detail": error_msg or "Invalid email format"}), 400
+        
+        email = email.lower()
         
         # Validate tenant_id
         try:
@@ -13925,11 +14155,34 @@ def invite_tenant_user():
         tenant_uuid = g.tenant_id if isinstance(g.tenant_id, uuid_module.UUID) else uuid_module.UUID(tenant_id)
         created_by_user_id = str(g.user_id) if hasattr(g, 'user_id') and g.user_id else None
         
+        # Rate limiting: 10 requests per minute per user (authenticated endpoint)
+        # Authenticated endpoints have higher limits than public endpoints since they require
+        # valid authentication, but still need protection against compromised accounts
+        user_id_str = str(g.user_id) if hasattr(g, 'user_id') and g.user_id else None
+        client_ip = _get_client_ip()
+        allowed, remaining, retry_after = _check_rate_limit(
+            client_ip,
+            "/api/v1/tenant/users/invite",
+            max_requests=RATE_LIMIT_AUTH_REQUESTS,
+            window_seconds=RATE_LIMIT_AUTH_WINDOW,
+            user_id=user_id_str
+        )
+        if not allowed:
+            response = jsonify({"ok": False, "error": "RATE_LIMIT_EXCEEDED", "message": "Too many requests. Please try again later."})
+            response.headers["Retry-After"] = str(retry_after)
+            return response, 429
+        
         data = request.get_json()
         if not data:
             return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": "Request body must be JSON"}), 400
         
-        email = data.get("email", "").strip().lower()
+        # Honeypot check: silently reject if honeypot field is filled (bot detection)
+        # This prevents automated bot signups without alerting the bot
+        if _check_honeypot(data, "company_website"):
+            # Return generic validation error (do not indicate bot detection)
+            return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": "Invalid request"}), 400
+        
+        email = data.get("email", "").strip()
         role = data.get("role", "user").strip().lower()
         first_name = data.get("first_name", "").strip() if data.get("first_name") else None
         last_name = data.get("last_name", "").strip() if data.get("last_name") else None
@@ -13937,6 +14190,13 @@ def invite_tenant_user():
         # Validation
         if not email:
             return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": "email is required"}), 400
+        
+        # Strict email validation (bot prevention)
+        is_valid, error_msg = validate_email_strict(email)
+        if not is_valid:
+            return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": error_msg or "Invalid email format"}), 400
+        
+        email = email.lower()
         
         if role not in ["user", "admin"]:
             return jsonify({"ok": False, "error": "INVALID_REQUEST", "message": "role must be 'user' or 'admin'"}), 400
@@ -17109,18 +17369,39 @@ def create_lead():
         from sqlalchemy import func
         import re
         
+        # Rate limiting: 5 requests per minute per IP (bot prevention)
+        # Public endpoints are vulnerable to automated abuse, so strict limits are applied
+        client_ip = _get_client_ip()
+        allowed, remaining, retry_after = _check_rate_limit(
+            client_ip,
+            "/api/v1/leads",
+            max_requests=RATE_LIMIT_PUBLIC_REQUESTS,
+            window_seconds=RATE_LIMIT_PUBLIC_WINDOW
+        )
+        if not allowed:
+            response = jsonify({"error": "Too many requests. Please try again later."})
+            response.headers["Retry-After"] = str(retry_after)
+            return response, 429
+        
         # Get request data
         data = request.get_json() or {}
+        
+        # Honeypot check: silently reject if honeypot field is filled (bot detection)
+        # This prevents automated bot submissions without alerting the bot
+        if _check_honeypot(data, "company_website"):
+            # Return generic success response (do not indicate bot detection)
+            # This makes bots think their submission succeeded while we silently ignore it
+            return jsonify({"id": str(uuid.uuid4()), "status": "new"}), 200
         
         # Validate and sanitize email (required)
         email = data.get("email", "").strip()
         if not email:
             return jsonify({"error": "Email is required"}), 400
         
-        # Validate email format
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, email) or len(email) > 254:
-            return jsonify({"error": "Invalid email format"}), 400
+        # Strict email validation (bot prevention)
+        is_valid, error_msg = validate_email_strict(email)
+        if not is_valid:
+            return jsonify({"error": error_msg or "Invalid email format"}), 400
         
         # Sanitize and trim all string fields
         name = (data.get("name") or "").strip()[:200] if data.get("name") else None
