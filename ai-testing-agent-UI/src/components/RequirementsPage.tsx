@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -595,6 +595,8 @@ function getScopeStatusBadge(scopeStatus: string) {
 export function RequirementsPage() {
   const { tenantStatus, bootstrapStatus } = useTenantStatus()
   const [inputSource, setInputSource] = useState<InputSource>('free-text')
+  const [previousInputSource, setPreviousInputSource] = useState<InputSource>('free-text')
+  const [showPhase2Modal, setShowPhase2Modal] = useState(false)
   const [freeText, setFreeText] = useState('')
   const [jiraTickets, setJiraTickets] = useState<string[]>([''])
   const [attachments, setAttachments] = useState<AttachmentFile[]>([])
@@ -603,6 +605,7 @@ export function RequirementsPage() {
   const [results, setResults] = useState<AnalyzeRequirementsResponse | null>(null)
   const [showLockModal, setShowLockModal] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const modalRef = useRef<HTMLDivElement>(null)
   
   // Jira Target state (Phase 4B: Create)
   const [jiraProjects, setJiraProjects] = useState<JiraProject[]>([])
@@ -754,16 +757,42 @@ export function RequirementsPage() {
     setSelectedProjectKey(projectKey)
   }
   
-  // Handle input source change - clear Jira Target when switching to Jira Tickets
+  // Handle input source change - intercept document-upload and show Phase 2 modal
   const handleInputSourceChange = (newSource: InputSource) => {
-    setInputSource(newSource)
-    if (newSource === 'jira-tickets') {
-      // Clear Jira Target state when switching to Jira Tickets
-      setSelectedProjectKey('')
-      setCreateDryRunResult(null)
+    if (newSource === 'document-upload') {
+      // Show Phase 2 modal and revert to previous selection
+      setShowPhase2Modal(true)
+      setInputSource(previousInputSource)
+    } else {
+      // Update previous source before changing (for future document-upload attempts)
+      setPreviousInputSource(inputSource)
+      setInputSource(newSource)
+      if (newSource === 'jira-tickets') {
+        // Clear Jira Target state when switching to Jira Tickets
+        setSelectedProjectKey('')
+        setCreateDryRunResult(null)
+      }
+      // Do NOT load Jira projects when switching to free-text/document-upload
+      // Projects will be loaded lazily when user clicks "Push to Jira" or "Create Dry Run"
     }
-    // Do NOT load Jira projects when switching to free-text/document-upload
-    // Projects will be loaded lazily when user clicks "Push to Jira" or "Create Dry Run"
+  }
+
+  // Handle ESC key to close Phase 2 modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showPhase2Modal) {
+        setShowPhase2Modal(false)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [showPhase2Modal])
+
+  // Handle backdrop click to close Phase 2 modal
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      setShowPhase2Modal(false)
+    }
   }
   
   // Handle Create Dry-Run
@@ -1041,10 +1070,11 @@ export function RequirementsPage() {
               onChange={(e) => handleInputSourceChange(e.target.value as InputSource)}
               disabled={isLoading}
               className="w-full px-4 py-2 bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+              aria-label="Input Source. Document Upload option is Phase 2."
             >
               <option value="free-text">Free Text</option>
               <option value="jira-tickets">Jira Tickets</option>
-              <option value="document-upload">Document Upload</option>
+              <option value="document-upload">Document Upload [Phase 2]</option>
             </select>
           </div>
 
@@ -1619,6 +1649,49 @@ export function RequirementsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Phase 2 Document Upload Modal */}
+      {showPhase2Modal && (
+        <div 
+          ref={modalRef}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={handleBackdropClick}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="phase2-modal-title"
+        >
+          <Card className="max-w-md w-full mx-4 border-border/50 bg-gradient-to-br from-background via-background to-secondary/10">
+            <CardHeader>
+              <CardTitle id="phase2-modal-title" className="text-xl font-bold">
+                Document Upload is coming in Phase 2
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-foreground/90">
+                Phase 2 will introduce document ingestion for PDFs and Word files, including extraction and AI-based requirements normalization directly from uploaded specs.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                For now, use Jira or Free Text input.
+              </p>
+              <div className="flex items-center gap-2 justify-end pt-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => window.open('https://scopetraceai.com', '_blank')}
+                  className="text-sm"
+                >
+                  Learn more
+                </Button>
+                <Button
+                  onClick={() => setShowPhase2Modal(false)}
+                  className="flex items-center gap-2"
+                >
+                  Got it
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Lock Scope Confirmation Modal */}
