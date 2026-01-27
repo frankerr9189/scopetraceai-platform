@@ -239,11 +239,15 @@ def send_team_invite_email(
     # Safe fallback for tenant name
     display_tenant_name = tenant_name.strip() if tenant_name and tenant_name.strip() else "your team"
     
-    # Email body with finalized copy
+    # Build inviter line if inviter name is provided
+    inviter_line = ""
+    if inviter_name and inviter_name.strip():
+        inviter_line = f"\nInvited by: {inviter_name.strip()}\n"
+    
+    # Email body with finalized copy (well-formatted with proper line breaks)
     email_body = f"""Hi,
 
-You've been invited to join {display_tenant_name} on ScopeTraceAI.
-
+You've been invited to join {display_tenant_name} on ScopeTraceAI.{inviter_line}
 To accept the invitation, click the link below:
 {invite_link}
 
