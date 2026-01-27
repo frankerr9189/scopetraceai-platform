@@ -256,6 +256,31 @@ def _process_checkout_session_completed(event: Dict[str, Any], db: Session, even
             f"subscription_id={stripe_subscription_id}"
         )
         
+        # Send welcome email after successful paid plan activation (onboarding complete)
+        # Email failure should not block webhook processing
+        try:
+            from services.email_service import send_welcome_email
+            from models import TenantUser
+            import uuid as uuid_module
+            
+            # Convert tenant_id string to UUID for query
+            tenant_uuid = uuid_module.UUID(tenant_id)
+            
+            # Get first admin user in tenant for welcome email
+            # Query for admin user created first (original onboarding user)
+            admin_user = db.query(TenantUser).filter(
+                TenantUser.tenant_id == tenant_uuid,
+                TenantUser.role == "admin"
+            ).order_by(TenantUser.created_at.asc()).first()
+            
+            if admin_user:
+                send_welcome_email(admin_user.email, admin_user.first_name)
+            else:
+                logger.warning(f"No admin user found for tenant {tenant_id} when sending welcome email")
+        except Exception as email_error:
+            # Log error but don't fail webhook processing
+            logger.error(f"Failed to send welcome email after paid plan activation: {email_error}", exc_info=True)
+        
         # Mark event as processed
         _mark_event_processed(db, event_id)
         

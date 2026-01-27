@@ -6177,6 +6177,22 @@ def update_tenant_subscription(tenant_id):
                 tenant.trial_writeback_runs_remaining = 0
                 db.commit()
                 
+                # Send welcome email after successful trial plan selection (onboarding complete)
+                # Email failure should not block onboarding completion
+                try:
+                    from services.email_service import send_welcome_email
+                    from models import TenantUser
+                    
+                    # Get user email and first_name for personalization
+                    user = db.query(TenantUser).filter(TenantUser.id == g.user_id).first()
+                    if user:
+                        send_welcome_email(user.email, user.first_name)
+                    else:
+                        logger.warning(f"User {g.user_id} not found when sending welcome email")
+                except Exception as email_error:
+                    # Log error but don't fail onboarding
+                    logger.error(f"Failed to send welcome email after trial plan selection: {email_error}", exc_info=True)
+                
             elif plan in paid_tiers or plan == "enterprise":
                 # Paid tiers: Set plan_tier but keep status='incomplete' (Stripe activates via webhook)
                 # Admin override: Allow setting status for paid tiers (for testing/admin purposes)
