@@ -14152,11 +14152,12 @@ def invite_tenant_user():
     """
     try:
         from db import get_db
-        from models import TenantUser
+        from models import TenantUser, Tenant
         from services.entitlements_centralized import check_seat_cap
         from services.auth import (
-            create_invite_token, send_invite_email, get_invite_url, hash_password
+            create_invite_token, get_invite_url, hash_password, USER_INVITE_TOKEN_EXPIRY_DAYS
         )
+        from services.email_service import send_team_invite_email
         from sqlalchemy import func
         import uuid as uuid_module
         
@@ -14262,7 +14263,33 @@ def invite_tenant_user():
                     # Create invite token and send email
                     raw_token, token_model = create_invite_token(db, str(existing_user.id), created_by_user_id)
                     invite_url = get_invite_url(raw_token)
-                    send_invite_email(existing_user.email, invite_url)
+                    
+                    # Get tenant name and inviter name for email personalization
+                    tenant = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
+                    tenant_name = tenant.name if tenant else None
+                    
+                    inviter_name = None
+                    if created_by_user_id:
+                        inviter = db.query(TenantUser).filter(
+                            TenantUser.id == (uuid_module.UUID(created_by_user_id) if isinstance(created_by_user_id, str) else created_by_user_id)
+                        ).first()
+                        inviter_name = inviter.first_name if inviter else None
+                    
+                    # Send invite email via Resend (email failure should not block invite creation)
+                    expiry_hours = USER_INVITE_TOKEN_EXPIRY_DAYS * 24
+                    email_sent = send_team_invite_email(
+                        existing_user.email,
+                        tenant_name,
+                        invite_url,
+                        expiry_hours,
+                        inviter_name
+                    )
+                    
+                    if email_sent:
+                        logger.info(f"INVITE_EMAIL_SENT tenant_id={tenant_id} to={existing_user.email}")
+                    else:
+                        logger.error(f"INVITE_EMAIL_FAILED tenant_id={tenant_id} to={existing_user.email} error=email_send_failed")
+                    
                     db.commit()
                     
                     # Debug log (dev only)
@@ -14302,9 +14329,34 @@ def invite_tenant_user():
             # Create invite token
             raw_token, token_model = create_invite_token(db, str(new_user.id), created_by_user_id)
             
-            # Send invite email
+            # Get invite URL
             invite_url = get_invite_url(raw_token)
-            send_invite_email(new_user.email, invite_url)
+            
+            # Get tenant name and inviter name for email personalization
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
+            tenant_name = tenant.name if tenant else None
+            
+            inviter_name = None
+            if created_by_user_id:
+                inviter = db.query(TenantUser).filter(
+                    TenantUser.id == (uuid_module.UUID(created_by_user_id) if isinstance(created_by_user_id, str) else created_by_user_id)
+                ).first()
+                inviter_name = inviter.first_name if inviter else None
+            
+            # Send invite email via Resend (email failure should not block invite creation)
+            expiry_hours = USER_INVITE_TOKEN_EXPIRY_DAYS * 24
+            email_sent = send_team_invite_email(
+                new_user.email,
+                tenant_name,
+                invite_url,
+                expiry_hours,
+                inviter_name
+            )
+            
+            if email_sent:
+                logger.info(f"INVITE_EMAIL_SENT tenant_id={tenant_id} to={new_user.email}")
+            else:
+                logger.error(f"INVITE_EMAIL_FAILED tenant_id={tenant_id} to={new_user.email} error=email_send_failed")
             
             db.commit()
             

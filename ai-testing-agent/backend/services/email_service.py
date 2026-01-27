@@ -191,3 +191,95 @@ Thanks again,
         # Log error but don't raise exception (webhook should not fail due to email)
         logger.error(f"Failed to send upgrade thank-you email to {to_email}: {str(e)}", exc_info=True)
         return False
+
+
+def send_team_invite_email(
+    to_email: str,
+    tenant_name: Optional[str],
+    invite_link: str,
+    expiry_hours: int,
+    inviter_name: Optional[str] = None
+) -> bool:
+    """
+    Send team invite email when a tenant admin invites a user to join their team.
+    
+    This function sends an invitation email with an accept link after a tenant admin
+    successfully creates an invite for a new or inactive user.
+    
+    Args:
+        to_email: Recipient email address
+        tenant_name: Name of the tenant/organization (optional, falls back to "your team")
+        invite_link: Full URL to accept invite page with token
+        expiry_hours: Number of hours until invite expires
+        inviter_name: Optional first name of the person sending the invite
+    
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    
+    Note:
+        This function logs errors but does not raise exceptions.
+        Email failures should not block invite creation.
+    """
+    if resend is None:
+        logger.error("resend package not installed. Cannot send team invite email.")
+        return False
+    
+    # Get Resend API key from environment
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    if not resend_api_key:
+        logger.error("RESEND_API_KEY environment variable not set. Cannot send team invite email.")
+        return False
+    
+    # Get email from address (default to hello@scopetraceai.com)
+    email_from = os.getenv("EMAIL_FROM", "ScopeTraceAI <hello@scopetraceai.com>")
+    
+    # Set Resend API key
+    resend.api_key = resend_api_key
+    
+    # Safe fallback for tenant name
+    display_tenant_name = tenant_name.strip() if tenant_name and tenant_name.strip() else "your team"
+    
+    # Email body with finalized copy
+    email_body = f"""Hi,
+
+You've been invited to join {display_tenant_name} on ScopeTraceAI.
+
+To accept the invitation, click the link below:
+{invite_link}
+
+This link will expire in {expiry_hours} hours.
+
+If you weren't expecting this invitation, you can ignore this email.
+
+— ScopeTraceAI
+"""
+    
+    try:
+        # Send email via Resend
+        # Resend Python SDK: https://github.com/resendlabs/resend-python
+        # Set API key (if not already set globally)
+        if not hasattr(resend, 'api_key') or not resend.api_key:
+            resend.api_key = resend_api_key
+        
+        # Send email using Resend API
+        params = {
+            "from": email_from,
+            "to": [to_email],
+            "subject": "You've been invited to join ScopeTraceAI",
+            "html": email_body.replace('\n', '<br>'),  # Convert newlines to HTML breaks
+            "reply_to": "hello@scopetraceai.com"
+        }
+        
+        result = resend.Emails.send(params)
+        
+        if result and hasattr(result, 'id'):
+            logger.info(f"Team invite email sent successfully to {to_email} (Resend ID: {result.id})")
+            return True
+        else:
+            logger.warning(f"Team invite email sent to {to_email} but no confirmation ID received")
+            return True  # Assume success if no error raised
+        
+    except Exception as e:
+        # Log error but don't raise exception (invite creation should not fail due to email)
+        logger.error(f"Failed to send team invite email to {to_email}: {str(e)}", exc_info=True)
+        return False
