@@ -256,17 +256,18 @@ def _process_checkout_session_completed(event: Dict[str, Any], db: Session, even
             f"subscription_id={stripe_subscription_id}"
         )
         
-        # Send welcome email after successful paid plan activation (onboarding complete)
+        # Send upgrade thank-you email after successful paid plan activation
+        # This email is sent when a tenant upgrades from trial to a paid plan via Stripe checkout
         # Email failure should not block webhook processing
         try:
-            from services.email_service import send_welcome_email
+            from services.email_service import send_upgrade_thank_you_email
             from models import TenantUser
             import uuid as uuid_module
             
             # Convert tenant_id string to UUID for query
             tenant_uuid = uuid_module.UUID(tenant_id)
             
-            # Get first admin user in tenant for welcome email
+            # Get first admin user in tenant for upgrade email
             # Query for admin user created first (original onboarding user)
             admin_user = db.query(TenantUser).filter(
                 TenantUser.tenant_id == tenant_uuid,
@@ -274,12 +275,13 @@ def _process_checkout_session_completed(event: Dict[str, Any], db: Session, even
             ).order_by(TenantUser.created_at.asc()).first()
             
             if admin_user:
-                send_welcome_email(admin_user.email, admin_user.first_name)
+                send_upgrade_thank_you_email(admin_user.email, admin_user.first_name)
+                logger.info(f"UPGRADE_EMAIL_SENT tenant_id={tenant_id} to={admin_user.email}")
             else:
-                logger.warning(f"No admin user found for tenant {tenant_id} when sending welcome email")
+                logger.warning(f"No admin user found for tenant {tenant_id} when sending upgrade email")
         except Exception as email_error:
             # Log error but don't fail webhook processing
-            logger.error(f"Failed to send welcome email after paid plan activation: {email_error}", exc_info=True)
+            logger.error(f"Failed to send upgrade thank-you email after paid plan activation: {email_error}", exc_info=True)
         
         # Mark event as processed
         _mark_event_processed(db, event_id)

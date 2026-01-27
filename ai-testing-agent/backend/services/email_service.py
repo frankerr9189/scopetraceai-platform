@@ -103,3 +103,91 @@ Welcome aboard,
         # Log error but don't raise exception (onboarding should not fail due to email)
         logger.error(f"Failed to send welcome email to {to_email}: {str(e)}", exc_info=True)
         return False
+
+
+def send_upgrade_thank_you_email(to_email: str, first_name: Optional[str] = None) -> bool:
+    """
+    Send upgrade thank-you email when tenant upgrades from trial to a paid plan.
+    
+    This function sends an upgrade confirmation email after a tenant successfully
+    activates a paid plan via Stripe checkout.
+    
+    Args:
+        to_email: Recipient email address
+        first_name: Optional first name for personalization
+    
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    
+    Note:
+        This function logs errors but does not raise exceptions.
+        Email failures should not block webhook processing.
+    """
+    if resend is None:
+        logger.error("resend package not installed. Cannot send upgrade email.")
+        return False
+    
+    # Get Resend API key from environment
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    if not resend_api_key:
+        logger.error("RESEND_API_KEY environment variable not set. Cannot send upgrade email.")
+        return False
+    
+    # Get email from address (default to hello@scopetraceai.com)
+    email_from = os.getenv("EMAIL_FROM", "ScopeTraceAI <hello@scopetraceai.com>")
+    
+    # Set Resend API key
+    resend.api_key = resend_api_key
+    
+    # Personalize greeting with safe fallback
+    # Use first_name if provided and non-empty, otherwise fall back to "there"
+    personalized_name = first_name.strip() if first_name and first_name.strip() else "there"
+    greeting = f"Hi {personalized_name},"
+    
+    # Email body with finalized copy
+    email_body = f"""{greeting}
+
+Thanks for upgrading to a paid ScopeTraceAI plan — we really appreciate it.
+
+You now have access to higher usage limits, team features, and priority support to help you move faster and with confidence.
+
+Here are a few things you might want to do next:
+• Invite teammates
+• Run your first production project
+• Explore advanced analysis and traceability features
+
+If you have any questions about your plan or need help getting started, just reply to this email — we're here to help.
+
+Thanks again,
+— ScopeTraceAI
+"""
+    
+    try:
+        # Send email via Resend
+        # Resend Python SDK: https://github.com/resendlabs/resend-python
+        # Set API key (if not already set globally)
+        if not hasattr(resend, 'api_key') or not resend.api_key:
+            resend.api_key = resend_api_key
+        
+        # Send email using Resend API
+        params = {
+            "from": email_from,
+            "to": [to_email],
+            "subject": "Thanks for upgrading to ScopeTraceAI 🎉",
+            "html": email_body.replace('\n', '<br>'),  # Convert newlines to HTML breaks
+            "reply_to": "hello@scopetraceai.com"
+        }
+        
+        result = resend.Emails.send(params)
+        
+        if result and hasattr(result, 'id'):
+            logger.info(f"Upgrade thank-you email sent successfully to {to_email} (Resend ID: {result.id})")
+            return True
+        else:
+            logger.warning(f"Upgrade thank-you email sent to {to_email} but no confirmation ID received")
+            return True  # Assume success if no error raised
+        
+    except Exception as e:
+        # Log error but don't raise exception (webhook should not fail due to email)
+        logger.error(f"Failed to send upgrade thank-you email to {to_email}: {str(e)}", exc_info=True)
+        return False
