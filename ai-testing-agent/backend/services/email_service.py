@@ -51,22 +51,27 @@ def send_welcome_email(to_email: str, first_name: Optional[str] = None) -> bool:
     # Set Resend API key
     resend.api_key = resend_api_key
     
-    # Personalize greeting
-    greeting = f"Hi {first_name}," if first_name else "Hi there,"
+    # Personalize greeting with safe fallback
+    # Use first_name if provided and non-empty, otherwise fall back to "there"
+    personalized_name = first_name.strip() if first_name and first_name.strip() else "there"
+    greeting = f"Hi {personalized_name},"
     
-    # Email body with next steps
+    # Email body with finalized copy
     email_body = f"""{greeting}
 
-Thanks for joining ScopeTraceAI!
+Thanks for joining ScopeTraceAI — we're excited to have you.
 
-Here are your next steps to get started:
-1. Connect your Jira instance
-2. Add tickets or specs
-3. Generate your first test plan
+You can now turn requirements, specs, and Jira tickets into clear, testable, and traceable outputs in minutes.
 
-Reply to this email if you have any questions.
+Here's how to get started:
+• Connect Jira (optional)
+• Upload requirements or add tickets
+• Generate your first test plan or analysis
 
-- The ScopeTraceAI Team
+If you have any questions or want help getting set up, just reply to this email — it goes straight to our team.
+
+Welcome aboard,
+— ScopeTraceAI
 """
     
     try:
