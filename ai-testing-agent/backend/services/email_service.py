@@ -242,13 +242,12 @@ def send_team_invite_email(
     # Build inviter line if inviter name is provided
     inviter_line = ""
     if inviter_name and inviter_name.strip():
-        inviter_line = f"\nInvited by: {inviter_name.strip()}\n"
+        inviter_line = f"\n\nInvited by: {inviter_name.strip()}\n\n"
     
-    # Email body with finalized copy (well-formatted with proper line breaks)
-    email_body = f"""Hi,
+    # Build email body in plain text format first (using \n\n for paragraph spacing)
+    text_body = f"""Hi,
 
-You've been invited to join {display_tenant_name} on ScopeTraceAI.{inviter_line}
-To accept the invitation, click the link below:
+You've been invited to join {display_tenant_name} on ScopeTraceAI.{inviter_line}To accept the invitation, click the link below:
 {invite_link}
 
 This link will expire in {expiry_hours} hours.
@@ -258,6 +257,10 @@ If you weren't expecting this invitation, you can ignore this email.
 — ScopeTraceAI
 """
     
+    # Derive HTML body from text body (replace \n\n with <br><br> and \n with <br>)
+    # This ensures both versions have identical content
+    html_body = text_body.replace('\n\n', '<br><br>').replace('\n', '<br>')
+    
     try:
         # Send email via Resend
         # Resend Python SDK: https://github.com/resendlabs/resend-python
@@ -265,12 +268,13 @@ If you weren't expecting this invitation, you can ignore this email.
         if not hasattr(resend, 'api_key') or not resend.api_key:
             resend.api_key = resend_api_key
         
-        # Send email using Resend API
+        # Send email using Resend API with both text and HTML versions
         params = {
             "from": email_from,
             "to": [to_email],
             "subject": "You've been invited to join ScopeTraceAI",
-            "html": email_body.replace('\n', '<br>'),  # Convert newlines to HTML breaks
+            "text": text_body,  # Plain text version
+            "html": html_body,  # HTML version
             "reply_to": "hello@scopetraceai.com"
         }
         
