@@ -61,7 +61,22 @@ elif DATABASE_URL.startswith("postgresql://"):
 
 # Create engine using SQLAlchemy-compatible URL (may include +psycopg)
 # PostgreSQL only - no SQLite fallback
-engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
+# Connection pool configuration to prevent pool exhaustion:
+# - pool_size: Number of connections to maintain in the pool (default 5)
+# - max_overflow: Additional connections beyond pool_size (default 10)
+# - pool_pre_ping: Test connections before using (handles stale connections)
+# - pool_recycle: Recycle connections after 3600 seconds (1 hour) to prevent stale connections
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    echo=False,
+    pool_size=5,  # Base pool size
+    max_overflow=10,  # Additional connections beyond pool_size
+    pool_pre_ping=True,  # Test connections before using (handles stale connections)
+    pool_recycle=3600,  # Recycle connections after 1 hour
+    connect_args={
+        "connect_timeout": 10,  # Connection timeout in seconds
+    }
+)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
