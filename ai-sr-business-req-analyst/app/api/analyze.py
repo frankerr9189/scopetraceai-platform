@@ -347,9 +347,6 @@ async def analyze_requirements(
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
         backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
         
-        if not os.path.exists(backend_path):
-            raise RuntimeError(f"Backend path not found: {backend_path}")
-        
         # Verify DATABASE_URL is PostgreSQL
         db_url = os.getenv("DATABASE_URL")
         if not db_url:
@@ -361,13 +358,25 @@ async def analyze_requirements(
         # Save current directory and change to backend for reliable imports
         original_cwd = os.getcwd()
         try:
-            if backend_path not in sys.path:
-                sys.path.insert(0, backend_path)
-            os.chdir(backend_path)
-            
-            from db import get_db
-            from services.entitlements_centralized import get_tenant_billing
-            from services.run_limits import check_and_increment_run_usage
+            # Try to import from testing agent backend first (for local dev)
+            # If that fails, use local BA agent services (for production deployment)
+            try:
+                if os.path.exists(backend_path) and backend_path not in sys.path:
+                    sys.path.insert(0, backend_path)
+                if os.path.exists(backend_path):
+                    os.chdir(backend_path)
+                
+                from db import get_db
+                from services.entitlements_centralized import get_tenant_billing
+                from services.run_limits import check_and_increment_run_usage
+            except (ImportError, RuntimeError, OSError) as import_err:
+                # Fallback to local BA agent services (production deployment)
+                # This is the normal path for Render deployment where services are separate
+                os.chdir(original_cwd)  # Restore original directory
+                logger.info(f"Using local BA agent services (backend path not available): {str(import_err)}")
+                from app.db import get_db
+                from app.services.entitlements_centralized import get_tenant_billing
+                from app.services.run_limits import check_and_increment_run_usage
             
             db = next(get_db())
             try:
