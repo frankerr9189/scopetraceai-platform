@@ -778,50 +778,6 @@ export function RequirementsPage() {
            metadata.jira_context !== undefined
   }
 
-  // Phase 4A: Handle Rewrite Dry-Run (kept for backward compatibility, but not used in UI)
-  const handleRewriteDryRun = async () => {
-    if (!results?.package) return
-    
-    setIsRewritingDryRun(true)
-    setError(null)
-    
-    try {
-      const dryRunResponse = await rewriteDryRun({
-        package: results.package
-      })
-      setRewriteDryRunResult(dryRunResponse)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to run rewrite dry-run')
-    } finally {
-      setIsRewritingDryRun(false)
-    }
-  }
-
-  // Phase 4A: Handle Rewrite Execute (kept for backward compatibility, but not used in UI)
-  const handleRewriteExecute = async () => {
-    if (!results?.package || !rewriteDryRunResult) return
-    
-    setIsRewritingExecute(true)
-    setError(null)
-    
-    try {
-      const executeRequest: RewriteExecuteRequest = {
-        package: results.package,
-        checksum: rewriteDryRunResult.checksum,
-        approved_by: 'user', // TODO: Get actual user ID
-        approved_at: new Date().toISOString()
-      }
-      
-      await rewriteExecute(executeRequest)
-      setError(null)
-      refreshTenantStatus()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to execute rewrite')
-    } finally {
-      setIsRewritingExecute(false)
-    }
-  }
-
   // Combined handler: Submit to Jira (dry-run + execute in one flow)
   const handleSubmitToJira = async () => {
     if (!results?.package) return
@@ -855,7 +811,7 @@ export function RequirementsPage() {
         approved_at: new Date().toISOString()
       }
       
-      const executeResponse = await rewriteExecute(executeRequest)
+      await rewriteExecute(executeRequest)
       setError(null)
       refreshTenantStatus()
       
