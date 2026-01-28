@@ -149,17 +149,31 @@ class InvariantValidator:
                                 qual_end = qual_start + (clause_end_match.start() if clause_end_match else len(remaining_text))
                                 qualifier_ranges.append((qual_start, qual_end))
                         
-                        # Count action verbs NOT in qualifier ranges
+                        # Count action verbs that are in predicate position (not noun uses like "permission updates").
+                        # Only count: (1) the first action verb after "shall", or (2) verbs after " and "/" or "/", " (compound).
                         main_clause_verb_count = 0
+                        shall_match = re.search(r'\bshall\b', statement_text, re.IGNORECASE)
+                        start_after = shall_match.end() if shall_match else 0
+                        seen_positions = []
                         for verb in action_verbs:
-                            # Find all occurrences of this verb
                             for match in re.finditer(rf'\b{verb}[s]?\b', statement_text, re.IGNORECASE):
                                 verb_pos = match.start()
-                                # Check if this verb is in any qualifier range
+                                # Skip if in qualifier
                                 in_qualifier = any(qual_start <= verb_pos < qual_end for qual_start, qual_end in qualifier_ranges)
-                                if not in_qualifier:
+                                if in_qualifier:
+                                    continue
+                                # First verb after "shall" always counts (main predicate)
+                                if verb_pos >= start_after and main_clause_verb_count == 0:
                                     main_clause_verb_count += 1
-                                    break  # Count each verb only once
+                                    seen_positions.append(verb_pos)
+                                    break
+                                # Later verb counts only if it follows " and " or " or " (compound predicate)
+                                text_before = statement_text[:verb_pos].rstrip()
+                                if re.search(r'\s+(?:and|or)\s+$', text_before):
+                                    if verb_pos not in seen_positions:
+                                        main_clause_verb_count += 1
+                                        seen_positions.append(verb_pos)
+                                break  # Count each verb type only once
                         
                         # Determine if we have multiple obligations
                         has_multiple_obligations = False
