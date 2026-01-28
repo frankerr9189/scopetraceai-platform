@@ -291,3 +291,80 @@ If you weren't expecting this invitation, you can ignore this email.
         # Log error but don't raise exception (invite creation should not fail due to email)
         logger.error(f"Failed to send team invite email to {to_email}: {str(e)}", exc_info=True)
         return False
+
+
+def send_password_reset_email_resend(to_email: str, reset_url: str) -> None:
+    """
+    Send password reset email via Resend.
+    
+    This function sends a password reset email with a reset link after a user
+    requests a password reset via the forgot password flow.
+    
+    Args:
+        to_email: Recipient email address
+        reset_url: Full URL to reset password page with token
+    
+    Note:
+        This function logs errors but does not raise exceptions.
+        Email failures should not block password reset flow.
+    """
+    if resend is None:
+        logger.error("resend package not installed. Cannot send password reset email.")
+        return
+    
+    # Get Resend API key from environment
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    if not resend_api_key:
+        logger.error("RESEND_API_KEY environment variable not set. Cannot send password reset email.")
+        return
+    
+    # Get email from address (default to hello@scopetraceai.com)
+    email_from = os.getenv("EMAIL_FROM", "ScopeTraceAI <hello@scopetraceai.com>")
+    
+    # Set Resend API key
+    resend.api_key = resend_api_key
+    
+    # Build email body in plain text format first (using \n\n for paragraph spacing)
+    text_body = f"""Hi,
+
+We received a request to reset your ScopeTraceAI password.
+
+Reset your password using this link (valid for 30 minutes):
+{reset_url}
+
+If you didn't request a password reset, you can ignore this email.
+
+— ScopeTraceAI
+"""
+    
+    # Derive HTML body from text body (replace \n\n with <br><br> and \n with <br>)
+    # This ensures both versions have identical content
+    html_body = text_body.replace('\n\n', '<br><br>').replace('\n', '<br>')
+    
+    try:
+        # Send email via Resend
+        # Resend Python SDK: https://github.com/resendlabs/resend-python
+        # Set API key (if not already set globally)
+        if not hasattr(resend, 'api_key') or not resend.api_key:
+            resend.api_key = resend_api_key
+        
+        # Send email using Resend API with both text and HTML versions
+        params = {
+            "from": email_from,
+            "to": [to_email],
+            "subject": "Reset your ScopeTraceAI password",
+            "text": text_body,  # Plain text version
+            "html": html_body,  # HTML version
+            "reply_to": "hello@scopetraceai.com"
+        }
+        
+        result = resend.Emails.send(params)
+        
+        if result and hasattr(result, 'id'):
+            logger.info(f"PASSWORD_RESET_EMAIL_SENT to={to_email} (Resend ID: {result.id})")
+        else:
+            logger.warning(f"PASSWORD_RESET_EMAIL_SENT to={to_email} but no confirmation ID received")
+        
+    except Exception as e:
+        # Log error but don't raise exception (password reset flow should not fail due to email)
+        logger.error(f"PASSWORD_RESET_EMAIL_FAILED to={to_email} error={str(e)}", exc_info=True)

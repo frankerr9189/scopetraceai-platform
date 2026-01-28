@@ -229,29 +229,22 @@ def consume_reset_token(db: Session, raw_token: str) -> Optional[str]:
 
 def send_password_reset_email(to_email: str, reset_url: str) -> None:
     """
-    Send password reset email to user.
-    
-    In development: logs the reset URL to server logs.
-    In production: should integrate with email provider (SendGrid, SES, etc.).
+    Send password reset email to user via Resend.
     
     Args:
         to_email: Recipient email address
         reset_url: Full URL to reset password page with token
-    """
-    # For now, log to server logs (development mode)
-    # In production, integrate with email service
-    # Use WARNING level so it always shows (default log level is WARNING)
-    logger.warning(
-        f"[PASSWORD_RESET] Reset link for {to_email}: {reset_url}\n"
-        f"NOTE: In production, this should be sent via email service."
-    )
     
-    # TODO: Integrate with email provider when available
-    # Example:
-    # if os.getenv("EMAIL_PROVIDER") == "sendgrid":
-    #     sendgrid_send_email(to_email, "Password Reset", f"Click here to reset: {reset_url}")
-    # elif os.getenv("EMAIL_PROVIDER") == "ses":
-    #     ses_send_email(to_email, "Password Reset", f"Click here to reset: {reset_url}")
+    Note:
+        Email failures are logged but do not raise exceptions.
+        Password reset flow continues even if email send fails.
+    """
+    try:
+        from services.email_service import send_password_reset_email_resend
+        send_password_reset_email_resend(to_email, reset_url)
+    except Exception as e:
+        # Log error but don't raise exception (password reset flow should not fail due to email)
+        logger.error(f"PASSWORD_RESET_EMAIL_FAILED to={to_email} error={str(e)}", exc_info=True)
 
 
 def get_reset_url(token: str) -> str:

@@ -955,21 +955,43 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
                 current_period_end = billing.get("current_period_end")
                 
                 # Check and atomically increment run usage
+                # Pass user_id for owner bypass check
                 run_allowed, run_error, usage_data = check_and_increment_run_usage(
                     db=db,
                     tenant_id=str(tenant_id),
                     plan_tier=plan_tier,
                     current_period_start=current_period_start,
-                    current_period_end=current_period_end
+                    current_period_end=current_period_end,
+                    user_id=user_id
                 )
                 
                 if not run_allowed:
-                    # Run limit reached - return 402
+                    # Determine error type and client-friendly message
+                    error_code = run_error or "RUN_LIMIT_REACHED"
+                    
+                    # Map internal error codes to client-friendly messages
+                    if error_code == "RUN_LIMIT_REACHED":
+                        client_message = "You've reached your monthly run limit for your current plan. Upgrade your plan or wait until the next billing period to continue."
+                        http_status = 402  # Payment Required
+                    elif error_code == "USAGE_ROW_MISSING":
+                        client_message = "We ran into a temporary system issue while checking usage limits. Please try again in a moment. If the issue persists, contact support."
+                        http_status = 500  # Internal Server Error
+                    elif error_code == "RUN_LIMIT_CHECK_ERROR":
+                        client_message = "We ran into a temporary system issue while checking usage limits. Please try again in a moment. If the issue persists, contact support."
+                        http_status = 500  # Internal Server Error
+                    else:
+                        # Unknown error - use generic message
+                        client_message = "We ran into a temporary system issue while checking usage limits. Please try again in a moment. If the issue persists, contact support."
+                        http_status = 500
+                    
+                    # Log internal error code for debugging (not exposed to client)
+                    logger.warning(f"Run limit check failed: error_code={error_code} tenant_id={tenant_id} usage_data={usage_data}")
+                    
                     from fastapi.responses import JSONResponse
                     error_response = {
                         "ok": False,
-                        "error": run_error or "RUN_LIMIT_REACHED",
-                        "message": "Run limit reached for current period"
+                        "error": error_code,  # Internal error code (for debugging/logs)
+                        "message": client_message  # Client-friendly message
                     }
                     if usage_data:
                         error_response.update({
@@ -980,7 +1002,7 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
                         })
                     
                     return JSONResponse(
-                        status_code=402,
+                        status_code=http_status,
                         content=error_response,
                         headers=_get_cors_headers(request)
                     )
@@ -1704,21 +1726,43 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
                 current_period_end = billing.get("current_period_end")
                 
                 # Check and atomically increment run usage
+                # Pass user_id for owner bypass check
                 run_allowed, run_error, usage_data = check_and_increment_run_usage(
                     db=db,
                     tenant_id=str(tenant_id),
                     plan_tier=plan_tier,
                     current_period_start=current_period_start,
-                    current_period_end=current_period_end
+                    current_period_end=current_period_end,
+                    user_id=user_id
                 )
                 
                 if not run_allowed:
-                    # Run limit reached - return 402
+                    # Determine error type and client-friendly message
+                    error_code = run_error or "RUN_LIMIT_REACHED"
+                    
+                    # Map internal error codes to client-friendly messages
+                    if error_code == "RUN_LIMIT_REACHED":
+                        client_message = "You've reached your monthly run limit for your current plan. Upgrade your plan or wait until the next billing period to continue."
+                        http_status = 402  # Payment Required
+                    elif error_code == "USAGE_ROW_MISSING":
+                        client_message = "We ran into a temporary system issue while checking usage limits. Please try again in a moment. If the issue persists, contact support."
+                        http_status = 500  # Internal Server Error
+                    elif error_code == "RUN_LIMIT_CHECK_ERROR":
+                        client_message = "We ran into a temporary system issue while checking usage limits. Please try again in a moment. If the issue persists, contact support."
+                        http_status = 500  # Internal Server Error
+                    else:
+                        # Unknown error - use generic message
+                        client_message = "We ran into a temporary system issue while checking usage limits. Please try again in a moment. If the issue persists, contact support."
+                        http_status = 500
+                    
+                    # Log internal error code for debugging (not exposed to client)
+                    logger.warning(f"Run limit check failed: error_code={error_code} tenant_id={tenant_id} usage_data={usage_data}")
+                    
                     from fastapi.responses import JSONResponse
                     error_response = {
                         "ok": False,
-                        "error": run_error or "RUN_LIMIT_REACHED",
-                        "message": "Run limit reached for current period"
+                        "error": error_code,  # Internal error code (for debugging/logs)
+                        "message": client_message  # Client-friendly message
                     }
                     if usage_data:
                         error_response.update({
@@ -1729,7 +1773,7 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
                         })
                     
                     return JSONResponse(
-                        status_code=402,
+                        status_code=http_status,
                         content=error_response,
                         headers=_get_cors_headers(request)
                     )
