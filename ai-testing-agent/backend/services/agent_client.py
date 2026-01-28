@@ -150,6 +150,50 @@ def call_jira_writeback_agent(endpoint: str, payload: Dict[str, Any], tenant_id:
         response = requests.post(url, json=payload, headers=headers, timeout=300)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.HTTPError as e:
+        # Try to extract error details from response body
+        error_detail = str(e)
+        error_type = None
+        try:
+            if e.response is not None:
+                error_body = e.response.json()
+                if isinstance(error_body, dict):
+                    # Extract detailed error information if available
+                    if "error_detail" in error_body:
+                        error_detail = error_body["error_detail"]
+                    elif "detail" in error_body:
+                        error_detail = error_body["detail"]
+                    elif "error" in error_body:
+                        error_detail = error_body["error"]
+                    elif "message" in error_body:
+                        error_detail = error_body["message"]
+                    
+                    if "error_type" in error_body:
+                        error_type = error_body["error_type"]
+        except (ValueError, AttributeError):
+            # If response body is not JSON, use text or default message
+            try:
+                if e.response is not None:
+                    error_detail = e.response.text[:500]  # Limit length
+            except:
+                pass
+        
+        status_code = e.response.status_code if e.response else 'unknown'
+        logger.error(f"Jira writeback agent HTTP error: {endpoint} - Status {status_code}: {error_detail}")
+        
+        # Create a more informative exception with error details
+        error_msg = f"{status_code} Server Error: Service Unavailable for url: {url}"
+        if error_type:
+            error_msg += f". Error type: {error_type}"
+        if error_detail and error_detail != str(e):
+            error_msg += f". {error_detail}"
+        else:
+            error_msg += f". Jira Writeback Agent returned: {error_detail}"
+        
+        raise requests.exceptions.HTTPError(
+            error_msg,
+            response=e.response
+        ) from e
     except requests.exceptions.RequestException as e:
         logger.error(f"Jira writeback agent call failed: {endpoint} - {str(e)}")
         raise

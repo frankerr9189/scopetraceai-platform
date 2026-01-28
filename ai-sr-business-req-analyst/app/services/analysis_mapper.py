@@ -43,6 +43,11 @@ class MappingError(Exception):
     pass
 
 
+# OPTION A LOCK: Single story only, no sub-tasks. All obligations as BRs (BR-001..BR-00N) under one story.
+# When True: never emit child requirements (REQ-001.1, etc.); never split into multiple stories per capability.
+OPTION_A_NO_SUBTASKS = True
+
+
 def _generate_hierarchical_requirement_id(
     parent_index: int,
     child_index: Optional[int] = None,
@@ -85,6 +90,20 @@ def _generate_br_id(requirement_id: str, index: int) -> str:
     """
     br_number = index + 1
     return f"BR-{br_number:03d}"
+
+
+def _generate_br_id_global(br_index_1based: int) -> str:
+    """
+    Generate a globally unique BR ID for obligation-based decomposition.
+    Used when one parent has N children, each with exactly one BR: BR-001 .. BR-00N.
+    
+    Args:
+        br_index_1based: One-based index (1..N)
+        
+    Returns:
+        Business requirement ID (e.g., BR-001, BR-002, BR-008)
+    """
+    return f"BR-{br_index_1based:03d}"
 
 
 def _is_ui_orchestration_ticket(
@@ -1669,9 +1688,12 @@ def _check_br_atomicity(requirements: List[Requirement], original_input: str = "
                     req.open_questions.append(input_atomicity_question)
         
         # Check 2: in_scope-based atomicity
+        # OBLIGATION DECOMPOSITION: Skip for parents that have sub-tasks (obligations are in children's BRs)
+        has_children = req.parent_id is None and any(r.parent_id == req.id for r in requirements)
+        # OPTION A LOCK: Skip for story-level requirements when single-story mode; one story with many BRs is correct
+        option_a_story = OPTION_A_NO_SUBTASKS and req.parent_id is None
         # UI ORCHESTRATION SUPPRESSION: Skip this check for UI orchestration tickets
-        # UI orchestration tickets consolidate UI elements into fewer BRs - this is expected behavior
-        if not is_ui_orchestration:
+        if not is_ui_orchestration and not has_children and not option_a_story:
             # If in_scope has multiple items, check if BR count matches
             if len(in_scope_items) > 1 and br_count < len(in_scope_items):
                 # Check if in_scope items are truly distinct
@@ -1726,6 +1748,28 @@ def _check_br_atomicity(requirements: List[Requirement], original_input: str = "
                 )
                 if split_question not in req.open_questions:
                     req.open_questions.append(split_question)
+
+
+def _obligation_to_br_statement(obligation_text: str) -> str:
+    """
+    Normalize a scope/obligation phrase to a declarative BR statement.
+    Rule-based: "The system shall <obligation>." (lowercase first letter of obligation).
+    
+    Args:
+        obligation_text: One in_scope item (e.g., "Publishing test plans to Jira")
+        
+    Returns:
+        Statement (e.g., "The system shall publish test plans to Jira.")
+    """
+    if not obligation_text or not obligation_text.strip():
+        return "The system shall fulfill the stated obligation."
+    text = obligation_text.strip().rstrip(".!?")
+    # Lowercase first letter for mid-sentence flow after "The system shall "
+    if text:
+        text = text[0].lower() + text[1:]
+    if not text.endswith("."):
+        text = text + "."
+    return "The system shall " + text
 
 
 def _humanize_summary(summary: str) -> str:
@@ -2017,6 +2061,124 @@ def _enforce_ticket_type(requirements: List[Requirement]) -> None:
         else:
             # Child requirement → must be "sub-task"
             req.ticket_type = TicketType.SUB_TASK
+
+
+def _create_obligation_decomposed_requirements(
+    capability: ProposedCapability,
+    cap_idx: int,
+    original_intent: str,
+    llm_output: LLMAnalysisOutput
+) -> List[Requirement]:
+    """
+    Create 1 parent (story) + N children (sub-tasks) when a single proposed_requirement
+    has multiple distinct obligations (in_scope items). Rule-based, deterministic.
+    
+    - Parent: REQ-001, ticket_type=story, scope_boundaries.in_scope = full list, no BRs.
+    - Children: REQ-001.1 .. REQ-001.N, ticket_type=sub-task, each with exactly one BR
+      (BR-001 .. BR-00N), one per obligation. Each child has parent_id=REQ-001.
+    
+    Caller must ensure capability has exactly one proposed_requirement with len(in_scope) >= 2.
+    
+    Returns:
+        [parent, child_1, ..., child_N]
+    """
+    proposed_req = capability.proposed_requirements[0]
+    in_scope_items = list(proposed_req.scope_boundaries.in_scope) if proposed_req.scope_boundaries and proposed_req.scope_boundaries.in_scope else []
+    out_of_scope_items = list(proposed_req.scope_boundaries.out_of_scope) if proposed_req.scope_boundaries and proposed_req.scope_boundaries.out_of_scope else []
+    N = len(in_scope_items)
+    if N < 2:
+        raise MappingError("_create_obligation_decomposed_requirements requires >= 2 in_scope items")
+
+    parent_id = _generate_hierarchical_requirement_id(
+        parent_index=cap_idx,
+        child_index=None,
+        seed=f"{original_intent}_{capability.capability_title}"
+    )
+
+    # Parent: story, full in_scope list, no BRs
+    is_ui_orchestration = _is_ui_orchestration_ticket(proposed_req, capability) if proposed_req else False
+    metadata = RequirementMetadata(
+        source_type=proposed_req.metadata.source_type,
+        enhancement_mode=proposed_req.metadata.enhancement_mode,
+        enhancement_actions=proposed_req.metadata.enhancement_actions,
+        inferred_content=proposed_req.metadata.inferred_content,
+        ui_orchestration=is_ui_orchestration
+    )
+    inferred_logic = _collect_inferred_logic(capability, proposed_req)
+    risks = _map_requirement_risks(proposed_req.risks)
+    constraints_policies = proposed_req.constraints_policies if proposed_req.constraints_policies else ["N/A"]
+    open_questions = proposed_req.open_questions if proposed_req.open_questions else ["N/A"]
+    ambiguities = open_questions.copy() if open_questions != ["N/A"] else []
+    ambiguities.extend(proposed_req.gaps)
+
+    parent_summary = proposed_req.summary or capability.capability_title
+    parent_description = proposed_req.description or capability.description or ""
+    if len(parent_description.strip()) < 10:
+        parent_description = capability.description or f"Overall capability: {capability.capability_title}."
+    parent = Requirement(
+        id=parent_id,
+        parent_id=None,
+        ticket_type=TicketType.STORY,
+        summary=parent_summary,
+        description=parent_description,
+        business_requirements=[],
+        scope_boundaries=ScopeBoundaries(
+            in_scope=in_scope_items,
+            out_of_scope=out_of_scope_items
+        ),
+        constraints_policies=constraints_policies,
+        open_questions=open_questions,
+        metadata=metadata,
+        inferred_logic=inferred_logic,
+        status=RequirementStatus.IN_REVIEW,
+        gaps=proposed_req.gaps,
+        risks=risks,
+        ambiguities=ambiguities,
+        original_intent=original_intent,
+        created_at=datetime.now()
+    )
+    result: List[Requirement] = [parent]
+
+    # Children: one per obligation, each with exactly one BR (BR-001 .. BR-00N)
+    for i, obligation_text in enumerate(in_scope_items):
+        child_index_1based = i + 1
+        child_id = _generate_hierarchical_requirement_id(
+            parent_index=cap_idx,
+            child_index=i,
+            seed=f"{original_intent}_{capability.capability_title}_{obligation_text[:50]}"
+        )
+        br_statement = _obligation_to_br_statement(obligation_text)
+        br_id = _generate_br_id_global(child_index_1based)
+        child_br = BusinessRequirement(id=br_id, statement=br_statement, inferred=proposed_req.metadata.inferred_content)
+        child_summary = _humanize_summary(obligation_text) if obligation_text else f"Obligation {child_index_1based}"
+        if len(child_summary) > 200:
+            child_summary = child_summary[:197] + "..."
+
+        child_req = Requirement(
+            id=child_id,
+            parent_id=parent_id,
+            ticket_type=TicketType.SUB_TASK,
+            summary=child_summary,
+            description=br_statement,
+            business_requirements=[child_br],
+            scope_boundaries=ScopeBoundaries(
+                in_scope=[obligation_text],
+                out_of_scope=out_of_scope_items
+            ),
+            constraints_policies=constraints_policies,
+            open_questions=["N/A"],
+            metadata=metadata,
+            inferred_logic=inferred_logic,
+            status=RequirementStatus.IN_REVIEW,
+            gaps=[],
+            risks=[],
+            ambiguities=[],
+            original_intent=original_intent,
+            created_at=datetime.now()
+        )
+        result.append(child_req)
+
+    return result
 
 
 def _create_parent_requirement(
@@ -2427,6 +2589,10 @@ def map_llm_output_to_package(
                 original_input=original_input
             )
         
+        # OPTION A LOCK: Single story only - never split into multiple stories per capability
+        if OPTION_A_NO_SUBTASKS:
+            should_split_stories = False
+        
         if should_split_stories:
             # STRUCTURAL GUARDRAIL: Pattern A is terminal - if Pattern A is locked, block story splitting
             # Once Pattern A is selected, it becomes the final and authoritative packaging decision.
@@ -2547,7 +2713,24 @@ def map_llm_output_to_package(
                 )
                 requirements.append(parent_req)
         else:
-            # DEFAULT: KEEP IN ONE STORY WITH MULTIPLE BRs
+            # OBLIGATION-BASED DECOMPOSITION: When one proposed_requirement has >=2 in_scope items,
+            # create 1 parent (story) + N children (sub-tasks). DISABLED when OPTION_A_NO_SUBTASKS.
+            if not OPTION_A_NO_SUBTASKS:
+                proposed_reqs = capability.proposed_requirements if capability.proposed_requirements else []
+                if len(proposed_reqs) == 1:
+                    single = proposed_reqs[0]
+                    in_scope_items = (single.scope_boundaries.in_scope if single.scope_boundaries else []) or []
+                    if len(in_scope_items) >= 2:
+                        obligation_reqs = _create_obligation_decomposed_requirements(
+                            capability=capability,
+                            cap_idx=cap_idx,
+                            original_intent=original_intent,
+                            llm_output=llm_output
+                        )
+                        requirements.extend(obligation_reqs)
+                        continue  # Skip default path for this capability
+
+            # DEFAULT: KEEP IN ONE STORY WITH MULTIPLE BRs (or single obligation)
             parent_id = _generate_hierarchical_requirement_id(
                 parent_index=cap_idx,
                 seed=f"{original_intent}_{capability.capability_title}"
@@ -2570,7 +2753,7 @@ def map_llm_output_to_package(
             )
             
             # Determine if decomposition into sub-tasks is warranted
-            # PATTERN A LOCK: If Pattern A is locked, decomposition is REQUIRED
+            # PATTERN A LOCK: If Pattern A is locked, decomposition is REQUIRED (unless OPTION_A_NO_SUBTASKS)
             if pattern_a_locked:
                 # Pattern A locked: Force decomposition - create sub-tasks for all obligations
                 should_decompose = True
@@ -2582,6 +2765,10 @@ def map_llm_output_to_package(
                     enhancement_mode=parent_req.metadata.enhancement_mode,
                     parent_created_from_first=parent_created_from_first
                 )
+            
+            # OPTION A LOCK: Single story only - never create sub-tasks; all BRs stay on the story
+            if OPTION_A_NO_SUBTASKS:
+                should_decompose = False
             
             # Only create children if decomposition is required or criteria are met
             if should_decompose:

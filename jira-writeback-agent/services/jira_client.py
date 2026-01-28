@@ -8,6 +8,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 import json
 import urllib.parse
+import os
 
 
 class JiraClientError(Exception):
@@ -18,7 +19,7 @@ class JiraClientError(Exception):
 class JiraClient:
     """Client for fetching Jira ticket data (read-only)."""
     
-    def __init__(self, base_url: str, username: str, api_token: str):
+    def __init__(self, base_url: str, username: str, api_token: str, timeout: Optional[int] = None):
         """
         Initialize Jira client.
         
@@ -26,10 +27,13 @@ class JiraClient:
             base_url: Jira instance URL (e.g., "https://yourcompany.atlassian.net")
             username: Jira user email for authentication
             api_token: Jira API token for authentication
+            timeout: Request timeout in seconds (default: 90, or JIRA_API_TIMEOUT env var)
         """
         self.jira_url = base_url.rstrip("/")
         self.username = username
         self.api_token = api_token
+        # Default timeout: 90 seconds (Jira can be slow), configurable via env var
+        self.timeout = timeout or int(os.getenv("JIRA_API_TIMEOUT", "90"))
         
         if not self.jira_url:
             raise JiraClientError("JIRA_BASE_URL cannot be empty")
@@ -64,14 +68,14 @@ class JiraClient:
         
         try:
             if method == "GET":
-                response = requests.get(url, auth=auth, headers=headers, timeout=30)
+                response = requests.get(url, auth=auth, headers=headers, timeout=self.timeout)
             elif method == "PUT":
                 response = requests.put(
                     url, 
                     auth=auth, 
                     headers=headers, 
                     data=json.dumps(data) if data else None,
-                    timeout=30
+                    timeout=self.timeout
                 )
             elif method == "POST":
                 response = requests.post(
@@ -79,7 +83,7 @@ class JiraClient:
                     auth=auth,
                     headers=headers,
                     data=json.dumps(data) if data else None,
-                    timeout=30
+                    timeout=self.timeout
                 )
             else:
                 raise JiraClientError(f"Unsupported HTTP method: {method}")
@@ -89,6 +93,12 @@ class JiraClient:
             if response.content:
                 return response.json()
             return {}
+        except requests.exceptions.Timeout as e:
+            raise JiraClientError(
+                f"Jira API request timed out after {self.timeout} seconds. "
+                f"This may indicate Jira is slow or experiencing issues. "
+                f"Please try again or check your Jira instance status."
+            )
         except requests.exceptions.RequestException as e:
             raise JiraClientError(f"Jira API request failed: {str(e)}")
     

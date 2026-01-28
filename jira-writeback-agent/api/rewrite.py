@@ -9,12 +9,19 @@ import time
 import json
 import uuid
 import os
-from datetime import datetime
+import sys
+from datetime import datetime, timezone
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from services.jira_client import JiraClient, JiraClientError
 from services.audit_logger import AuditLogger
 from src.jira_writeback_agent.config import JiraWriteBackConfig
 from src.jira_writeback_agent.version import __version__
+import logging
+
+# Module-level logger
+logger = logging.getLogger(__name__)
 
 
 def _get_allowed_origins() -> List[str]:
@@ -415,23 +422,25 @@ def _extract_description_from_requirements(
     """
     Extract structured combined description from all requirements.
     
-    Creates a deterministic template that includes:
-    - All requirements with summaries and descriptions
-    - Combined scope boundaries (in/out)
+    Returns ONLY the gold-standard normalized output:
+    - Combined scope boundaries (Scope In / Scope Out)
+    - Business Requirements (Normalized)
     - Identified gaps (if present)
     - Identified risks (if present)
-    - Preserved original Jira description
+    
+    Does NOT include original requirements or preserved Jira description
+    (those are posted as separate Jira comments).
     
     Args:
         requirements: List of requirement dictionaries (already sorted by ID)
         package_id: Package identifier
         jira_summary: Current Jira issue summary
-        current_jira_description: Current Jira issue description (to preserve)
+        current_jira_description: Current Jira issue description (unused here; used for comment)
         gap_analysis: Optional gap analysis dict with 'gaps' list
         risk_analysis: Optional risk analysis dict with 'risks' list and 'risk_level' string
         
     Returns:
-        Structured description string following the template format
+        Description string: scope (in/out), business requirements (normalized), gaps, risks
     """
     if not requirements:
         # Fallback if no requirements
@@ -460,19 +469,10 @@ def _extract_description_from_requirements(
                 if risk_level:
                     description_parts.append(f"Risk Level: {risk_level}")
         
-        # Add preserved original description
-        description_parts.append("")
-        description_parts.append("--- Original Jira Description (preserved) ---")
-        description_parts.append(current_jira_description)
-        
         return "\n".join(description_parts)
     
-    # Build normalized requirements section
-    normalized_requirements = []
-    for idx, req in enumerate(requirements, start=1):
-        summary = req.get("summary", "")
-        description = req.get("description", "")
-        normalized_requirements.append(f"{idx}) {summary}\n   {description}")
+    # NOTE: Normalized requirements are NO LONGER included in description.
+    # They are posted as a separate Jira comment instead.
     
     # Collect all in_scope items (union, preserving order)
     in_scope_items = []
@@ -496,30 +496,44 @@ def _extract_description_from_requirements(
                 out_scope_items.append(item)
                 seen_out_scope.add(item)
     
-    # Build the structured description
-    description_parts = [
-        "Normalized Requirements:",
-        "\n\n".join(normalized_requirements)
-    ]
+    # Build the structured description (without normalized requirements)
+    # Normalized requirements are now posted as a separate comment, not in description
+    description_parts = []
     
     # Add scope sections if there are items
     if in_scope_items:
-        description_parts.append("")
         description_parts.append("Scope (In):")
         for item in in_scope_items:
             description_parts.append(f"- {item}")
     
     if out_scope_items:
-        description_parts.append("")
+        if description_parts:  # Add separator if we already have content
+            description_parts.append("")
         description_parts.append("Scope (Out):")
         for item in out_scope_items:
             description_parts.append(f"- {item}")
+    
+    # Business Requirements (Normalized): flatten all BRs in order, verbatim from package
+    all_brs = []
+    for req in requirements:
+        for br in req.get("business_requirements", []):
+            br_id = br.get("id") or ""
+            statement = br.get("statement") or ""
+            if br_id or statement:
+                all_brs.append((br_id, statement))
+    if all_brs:
+        if description_parts:
+            description_parts.append("")
+        description_parts.append("Business Requirements (Normalized):")
+        for br_id, statement in all_brs:
+            description_parts.append(f"{br_id}: {statement}")
     
     # Add gaps section if present and meaningful
     if gap_analysis:
         gaps = [g for g in gap_analysis.get("gaps", []) if g and g != "N/A"]
         if gaps:
-            description_parts.append("")
+            if description_parts:  # Add separator if we already have content
+                description_parts.append("")
             description_parts.append("Identified Gaps:")
             for gap in gaps:
                 description_parts.append(f"- {gap}")
@@ -528,18 +542,14 @@ def _extract_description_from_requirements(
     if risk_analysis:
         risks = [r for r in risk_analysis.get("risks", []) if r and r != "N/A"]
         if risks:
-            description_parts.append("")
+            if description_parts:  # Add separator if we already have content
+                description_parts.append("")
             description_parts.append("Identified Risks:")
             for risk in risks:
                 description_parts.append(f"- {risk}")
             risk_level = risk_analysis.get("risk_level", "")
             if risk_level:
                 description_parts.append(f"Risk Level: {risk_level}")
-    
-    # Add preserved original description
-    description_parts.append("")
-    description_parts.append("--- Original Jira Description (preserved) ---")
-    description_parts.append(current_jira_description)
     
     return "\n".join(description_parts)
 
@@ -589,31 +599,377 @@ def _text_to_adf(text: str) -> Dict[str, Any]:
     }
 
 
+def _get_user_display_name(db: Session, user_id: Optional[str]) -> str:
+    """
+    Get user display name from database using trusted user_id.
+    
+    Priority: first_name + last_name > email > "Owner"
+    
+    Note: Uses tenant_users table (not users table).
+    
+    Args:
+        db: Database session
+        user_id: User UUID string (from trusted source like JWT)
+        
+    Returns:
+        Display name string
+    """
+    if not user_id:
+        return "Owner"
+    
+    try:
+        user_uuid = user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(user_id)
+        
+        result = db.execute(
+            text("""
+                SELECT first_name, last_name, email
+                FROM tenant_users
+                WHERE id = :user_id
+                LIMIT 1
+            """),
+            {"user_id": str(user_uuid)}
+        ).first()
+        
+        if result:
+            # Prefer first_name + last_name
+            if result.first_name or result.last_name:
+                parts = [result.first_name, result.last_name]
+                full_name = " ".join([p for p in parts if p]).strip()
+                if full_name:
+                    return full_name
+            
+            # Fallback to email (tenant_users table doesn't have display_name)
+            if result.email:
+                return result.email
+        
+        return "Owner"
+    except Exception as e:
+        logger.warning(f"Error getting user display name for user_id={user_id}: {str(e)}")
+        return "Owner"
+
+
+def _extract_original_requirements_text(requirements: list) -> str:
+    """
+    Extract the original requirements text that should go in a comment, not description.
+    
+    This is the "Normalized Requirements" section that was previously in the description.
+    
+    Args:
+        requirements: List of requirement dictionaries (already sorted by ID)
+        
+    Returns:
+        Formatted original requirements text
+    """
+    if not requirements or not isinstance(requirements, list):
+        return ""
+    
+    # Build normalized requirements section (same format as before)
+    normalized_requirements = []
+    for idx, req in enumerate(requirements, start=1):
+        if not isinstance(req, dict):
+            continue
+        summary = req.get("summary", "")
+        description = req.get("description", "")
+        normalized_requirements.append(f"{idx}) {summary}\n   {description}")
+    
+    if not normalized_requirements:
+        return ""
+    
+    return "\n\n".join(normalized_requirements)
+
+
+def _generate_original_requirements_comment(
+    original_requirements_text: str,
+    package: Dict[str, Any],
+    reviewer_name: str,
+    reviewer_timestamp: Optional[str] = None,
+    approver_name: Optional[str] = None,
+    approver_timestamp: Optional[str] = None
+) -> str:
+    """
+    Generate Jira comment containing original requirements with reviewer/approver info.
+    
+    Args:
+        original_requirements_text: The original requirements text to include
+        package: Package dictionary (may contain scope_status_transitions)
+        reviewer_name: Name of person who reviewed (from trusted source)
+        reviewer_timestamp: Timestamp when reviewed (optional)
+        approver_name: Name of person who approved/locked (optional)
+        approver_timestamp: Timestamp when approved (optional)
+        
+    Returns:
+        Formatted comment text
+    """
+    if not original_requirements_text:
+        return ""
+    
+    # Try to get reviewer/approver info from package metadata if available
+    metadata = package.get("metadata", {})
+    scope_transitions = package.get("scope_status_transitions", [])
+    
+    # Find reviewed transition
+    reviewed_transition = None
+    approved_transition = None
+    for transition in scope_transitions:
+        if transition.get("new_status") == "reviewed":
+            reviewed_transition = transition
+        elif transition.get("new_status") == "locked":
+            approved_transition = transition
+    
+    # Use transition data if available, otherwise use provided params
+    if reviewed_transition:
+        reviewer_name = reviewed_transition.get("changed_by_name") or reviewer_name
+        reviewer_timestamp = reviewed_transition.get("changed_at") or reviewer_timestamp
+    
+    if approved_transition:
+        approver_name = approved_transition.get("changed_by_name") or approver_name
+        approver_timestamp = approved_transition.get("changed_at") or approver_timestamp
+    
+    # Build comment
+    comment_parts = [
+        "[ScopeTraceAI Original Requirements]",
+        "",
+        "ScopeTraceAI Requirements (Original) — Reviewed & Approved",
+        ""
+    ]
+    
+    # Add reviewer info
+    if reviewer_name:
+        reviewer_line = f"Reviewed/Locked by: {reviewer_name}"
+        if reviewer_timestamp:
+            try:
+                # Handle ISO format timestamps (with or without timezone)
+                timestamp_str = reviewer_timestamp.replace('Z', '+00:00')
+                dt = datetime.fromisoformat(timestamp_str)
+                # Format as readable date/time
+                reviewer_line += f" on {dt.strftime('%Y-%m-%d %H:%M:%S')}"
+            except Exception:
+                # If parsing fails, just append the raw timestamp
+                reviewer_line += f" at {reviewer_timestamp}"
+        comment_parts.append(reviewer_line)
+    
+    # Add approver info if different from reviewer
+    if approver_name and approver_name != reviewer_name:
+        approver_line = f"Approved by: {approver_name}"
+        if approver_timestamp:
+            try:
+                # Handle ISO format timestamps (with or without timezone)
+                timestamp_str = approver_timestamp.replace('Z', '+00:00')
+                dt = datetime.fromisoformat(timestamp_str)
+                # Format as readable date/time
+                approver_line += f" on {dt.strftime('%Y-%m-%d %H:%M:%S')}"
+            except Exception:
+                # If parsing fails, just append the raw timestamp
+                approver_line += f" at {approver_timestamp}"
+        comment_parts.append(approver_line)
+    
+    # Add divider and original requirements
+    comment_parts.extend([
+        "",
+        "---",
+        "",
+        original_requirements_text
+    ])
+    
+    return "\n".join(comment_parts)
+
+
+def _generate_preserved_original_description_comment(original_jira_description: str) -> str:
+    """
+    Generate Jira comment body containing the preserved original Jira description.
+    
+    Used to store the original description in a comment instead of in the issue description.
+    
+    Args:
+        original_jira_description: The original Jira issue description text (plain text).
+        
+    Returns:
+        Formatted comment text with title "[ScopeTraceAI Context]" and body.
+    """
+    lines = [
+        "[ScopeTraceAI Context]",
+        "",
+        "Original Jira Description (preserved at time of rewrite):",
+        "---",
+        original_jira_description if original_jira_description is not None else "",
+    ]
+    return "\n".join(lines)
+
+
+def _extract_open_questions(package: Dict[str, Any]) -> List[str]:
+    """
+    Collect open questions from the requirements package.
+    - From requirements[].open_questions (each can be a list or single value)
+    - Filter out "N/A", empty strings
+    - De-duplicate while preserving order
+    """
+    seen = set()
+    result: List[str] = []
+    requirements = package.get("requirements") or []
+    for req in requirements:
+        oq = req.get("open_questions")
+        if oq is None:
+            continue
+        if isinstance(oq, list):
+            for item in oq:
+                if item is None:
+                    continue
+                s = (item if isinstance(item, str) else str(item)).strip()
+                if s and s.upper() != "N/A" and s not in seen:
+                    seen.add(s)
+                    result.append(s)
+        elif isinstance(oq, str):
+            s = oq.strip()
+            if s and s.upper() != "N/A" and s not in seen:
+                seen.add(s)
+                result.append(s)
+    return result
+
+
+def _generate_open_questions_comment(
+    questions: List[str],
+    package_id: str,
+    actor_name: str,
+    timestamp: str
+) -> str:
+    """
+    Generate Jira comment body for open questions from the package.
+    Format:
+      [ScopeTraceAI Open Questions]
+      Package: <PKG-XXXX>
+      Captured by: <actor_name> on <timestamp>
+      ---
+      - <question 1>
+      - <question 2>
+    """
+    lines = [
+        "[ScopeTraceAI Open Questions]",
+        "",
+        f"Package: {package_id}",
+        f"Captured by: {actor_name} on {timestamp}",
+        "",
+        "---",
+        "",
+    ]
+    for q in questions:
+        lines.append(f"- {q}")
+    return "\n".join(lines)
+
+
+def _strip_normalized_requirements_from_description(description: str, original_requirements_text: Optional[str] = None) -> str:
+    """
+    Defensively strip any "Normalized Requirements" section from description.
+    
+    This is a safety check to ensure original requirements never leak into Jira description.
+    
+    Args:
+        description: The description text to clean
+        original_requirements_text: Optional original requirements text to check for
+        
+    Returns:
+        Cleaned description with normalized requirements removed
+    """
+    if not description:
+        return description
+    
+    # Check if description contains "Normalized Requirements" marker
+    if "Normalized Requirements" in description:
+        logger.warning("Description contains 'Normalized Requirements' marker - stripping it")
+        # Remove everything from "Normalized Requirements" onwards
+        parts = description.split("Normalized Requirements")
+        if len(parts) > 1:
+            # Take everything before "Normalized Requirements"
+            description = parts[0].rstrip()
+    
+    # If original_requirements_text is provided, check if it appears in description
+    if original_requirements_text and original_requirements_text.strip():
+        # Check if any significant portion of original requirements appears in description
+        # Use first 100 chars as a fingerprint
+        fingerprint = original_requirements_text[:100].strip()
+        if fingerprint and fingerprint in description:
+            logger.warning("Description contains original requirements text - stripping it")
+            # Try to find and remove the matching section
+            idx = description.find(fingerprint)
+            if idx > 0:
+                # Remove from the fingerprint onwards
+                description = description[:idx].rstrip()
+    
+    return description
+
+
 def _generate_comment_preview(
     package_id: str,
     approved_by: Optional[str],
     approved_at: Optional[str],
-    checksum: str
+    checksum: str,
+    actor_name: Optional[str] = None,
+    user_id: Optional[str] = None,
+    db: Optional[Session] = None
 ) -> str:
     """
     Generate Jira comment preview with exact format.
     
     Args:
         package_id: Package identifier
-        approved_by: User who approved (from package metadata)
+        approved_by: User who approved (from package metadata) - may be placeholder "user"
         approved_at: Approval timestamp (from package metadata)
         checksum: SHA-256 checksum
+        actor_name: Pre-resolved actor name (preferred - avoids DB lookup)
+        user_id: Trusted user ID from JWT (used only if actor_name not provided)
+        db: Database session for resolving user name (used only if actor_name not provided)
         
     Returns:
         Formatted comment preview
     """
-    approved_by_str = approved_by or "Unknown"
+    # Use provided actor_name if available (fast - no DB lookup)
+    if actor_name:
+        resolved_name = actor_name
+    else:
+        # Fallback: resolve actor name from trusted user_id (never use literal "user" string)
+        resolved_name = "You"  # Last resort fallback
+        
+        # If approved_by is the literal "user" string (case-insensitive) or empty, ignore it
+        if approved_by and approved_by.lower() != "user" and approved_by.strip():
+            resolved_name = approved_by  # Use provided name if it's not the placeholder
+        
+        # Always prefer resolving from trusted user_id if available
+        if user_id:
+            try:
+                # Get db session if not provided
+                if db is None:
+                    # Get db session from testing agent backend
+                    original_cwd = os.getcwd()
+                    try:
+                        current_file = os.path.abspath(__file__)
+                        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+                        backend_path = os.path.join(project_root, "ai-testing-agent", "backend")
+                        
+                        if backend_path not in sys.path:
+                            sys.path.insert(0, backend_path)
+                        os.chdir(backend_path)
+                        
+                        from db import get_db
+                        db_session = next(get_db())
+                        try:
+                            resolved_name = _get_user_display_name(db_session, user_id)
+                        finally:
+                            db_session.close()
+                    finally:
+                        os.chdir(original_cwd)
+                else:
+                    resolved_name = _get_user_display_name(db, user_id)
+            except Exception as e:
+                logger.warning(f"Could not resolve actor name from user_id {user_id}: {str(e)}")
+                # Keep existing resolved_name (either from approved_by or "You")
+    
+    actor_name = resolved_name
+    
     approved_at_str = approved_at or datetime.now().isoformat()
     
     comment = f"""BA Requirements Rewrite Applied
 
 Package: {package_id}
-Approved by: {approved_by_str}
+Approved by: {actor_name}
 Date: {approved_at_str}
 
 [ATA-BA-WB v{__version__} | Hash: {checksum}]"""
@@ -889,6 +1245,10 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
     # Flask app enforces all policy before calling this agent.
     # ============================================================================
     
+    # Initialize actor_name early (always defined, default fallback)
+    # Will be resolved during run limits check if DB session is available
+    actor_name = "You"  # Default fallback
+    
     # ============================================================================
     # RUN LIMIT ENFORCEMENT (FAIL-CLOSED)
     # Enforce run limits per period based on plan tier BEFORE Jira write operations
@@ -938,9 +1298,17 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
         # Save current directory and change to backend for reliable imports
         original_cwd = os.getcwd()
         try:
+            # Add backend to path first (before chdir)
             if backend_path not in sys.path:
                 sys.path.insert(0, backend_path)
+            
+            # Change to backend directory - this is critical for relative imports
             os.chdir(backend_path)
+            
+            # Clear any cached modules to force reload from correct location
+            modules_to_clear = [k for k in sys.modules.keys() if k.startswith(('db', 'services', 'models'))]
+            for mod in modules_to_clear:
+                del sys.modules[mod]
             
             from db import get_db
             from services.entitlements_centralized import get_tenant_billing
@@ -964,6 +1332,16 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
                     current_period_end=current_period_end,
                     user_id=user_id
                 )
+                
+                # Resolve actor name NOW while DB session is open (fast - no directory changes needed)
+                # This avoids creating a new DB session later, which is slow
+                if user_id:
+                    try:
+                        actor_name = _get_user_display_name(db, user_id)
+                        logger.info(f"[JIRA_WRITEBACK] Resolved actor_name during run limits check: {actor_name} (user_id={user_id})")
+                    except Exception as e:
+                        logger.warning(f"[JIRA_WRITEBACK] Could not resolve actor name during run limits check: {str(e)}")
+                        # Keep default "You" (already set at function start)
                 
                 if not run_allowed:
                     # Determine error type and client-friendly message
@@ -1013,22 +1391,33 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
     except Exception as run_limit_error:
         # FAIL-CLOSED: If usage metering fails, do NOT proceed with Jira writes
         # This prevents unmetered runs and billing discrepancies
-        logger.error(f"Run limit check failed for tenant {tenant_id}: {str(run_limit_error)}", exc_info=True)
+        error_type = type(run_limit_error).__name__
+        error_message = str(run_limit_error)
+        logger.error(
+            f"Run limit check failed for tenant {tenant_id}: {error_type}: {error_message}",
+            exc_info=True
+        )
         
         # Return 503 (service unavailable) with error details
+        # Include error type in response for debugging (not full traceback for security)
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
             content={
                 "ok": False,
                 "error": "USAGE_METER_UNAVAILABLE",
-                "message": "Usage metering unavailable. Please try again shortly."
+                "message": "Usage metering unavailable. Please try again shortly.",
+                "error_type": error_type,  # For debugging
+                "error_detail": error_message[:200] if len(error_message) > 200 else error_message  # Truncated for security
             },
             headers=_get_cors_headers(request)
         )
     
     # Capture start time for usage tracking
     start_time_ms = int(time.time() * 1000)
+    
+    # actor_name was already initialized before run limits check and may have been
+    # resolved during the run limits check if DB session was available
     
     # Generate run_id for this request
     run_id = str(uuid.uuid4())
@@ -1184,12 +1573,30 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
     fields_modified = []
     comment_id = None
     
+    # Extract original requirements text early for defensive stripping
+    original_requirements_text = _extract_original_requirements_text(requirements)
+    
+    # actor_name was already resolved during run limits check (fast, no extra DB calls)
+    # db session is still open and will be closed after Jira updates
+    
     try:
         # Prepare fields to update
         fields_to_update = {}
         
         if proposed_description:
-            fields_to_update["description"] = proposed_description
+            # Defensive: Strip any normalized requirements that might have leaked in
+            cleaned_description = _strip_normalized_requirements_from_description(
+                proposed_description,
+                original_requirements_text
+            )
+            
+            # Debug logging
+            if "Normalized Requirements" in proposed_description:
+                logger.warning(f"[JIRA_WRITEBACK] Description contained 'Normalized Requirements' marker - stripped before sending")
+            if original_requirements_text and original_requirements_text[:50] in proposed_description:
+                logger.warning(f"[JIRA_WRITEBACK] Description contained original requirements text - stripped before sending")
+            
+            fields_to_update["description"] = cleaned_description
             fields_modified.append("description")
         
         if proposed_acceptance_criteria and config.JIRA_ACCEPTANCE_CRITERIA_FIELD_ID:
@@ -1204,16 +1611,111 @@ async def execute(execute_request: ExecuteRequest, request: Request) -> ExecuteR
                 acceptance_criteria_field_id=config.JIRA_ACCEPTANCE_CRITERIA_FIELD_ID
             )
         
-        # Add audit comment
-        comment_text = _generate_comment_preview(
-            package_id=package_id,
-            approved_by=approved_by,
-            approved_at=approved_at,
-            checksum=expected_checksum
-        )
+        # actor_name was already resolved during run limits check (fast, no extra DB calls)
+        # Add audit comment with resolved actor name
+        # Wrap in try/except so comment failures don't fail the whole operation after Jira update succeeds
+        comment_id = None
+        try:
+            # Ensure actor_name is defined (defensive check)
+            if not actor_name or actor_name.strip() == "":
+                actor_name = "You"
+                logger.warning("[JIRA_WRITEBACK] actor_name was empty, using fallback 'You'")
+            
+            comment_text = _generate_comment_preview(
+                package_id=package_id,
+                approved_by=approved_by,
+                approved_at=approved_at,
+                checksum=expected_checksum,
+                actor_name=actor_name  # Pass pre-resolved name (fast - no DB lookup)
+            )
+            
+            logger.info(f"[JIRA_WRITEBACK] Audit comment actor_name: {actor_name}")
+            
+            comment_response = jira_client.add_comment(issue_key, comment_text)
+            comment_id = comment_response.get("id")
+            logger.info(f"[JIRA_WRITEBACK] Successfully added audit comment to {issue_key}")
+        except Exception as comment_error:
+            # Don't fail the whole operation if comment creation fails
+            # Jira issue update already succeeded, so return success
+            logger.error(f"Failed to add audit comment to {issue_key} (Jira update succeeded): {str(comment_error)}", exc_info=True)
+            # Continue - comment_id remains None
         
-        comment_response = jira_client.add_comment(issue_key, comment_text)
-        comment_id = comment_response.get("id")
+        # Add original requirements comment with reviewer/approver info
+        try:
+            if original_requirements_text:
+                logger.info(f"[JIRA_WRITEBACK] Original requirements comment text length: {len(original_requirements_text)}")
+                try:
+                    # Reuse actor_name already resolved during run limits check (fast, no extra DB calls)
+                    # Ensure actor_name is defined (defensive check)
+                    if not actor_name or actor_name.strip() == "":
+                        actor_name = "You"
+                        logger.warning("[JIRA_WRITEBACK] actor_name was empty in original requirements comment, using fallback 'You'")
+                    
+                    reviewer_name = actor_name  # Use the resolved actor name from audit comment
+                    approver_name = reviewer_name  # Same person for now
+                    
+                    # Get timestamps from package metadata if available
+                    scope_transitions = package.get("scope_status_transitions", [])
+                    reviewer_timestamp = None
+                    approver_timestamp = None
+                    
+                    for transition in scope_transitions:
+                        if transition.get("new_status") == "reviewed":
+                            reviewer_timestamp = transition.get("changed_at")
+                        elif transition.get("new_status") == "locked":
+                            approver_timestamp = transition.get("changed_at")
+                    
+                    # Generate and add original requirements comment
+                    original_comment_text = _generate_original_requirements_comment(
+                        original_requirements_text=original_requirements_text,
+                        package=package,
+                        reviewer_name=reviewer_name,
+                        reviewer_timestamp=reviewer_timestamp,
+                        approver_name=approver_name,
+                        approver_timestamp=approver_timestamp
+                    )
+                    
+                    if original_comment_text:
+                        jira_client.add_comment(issue_key, original_comment_text)
+                        logger.info(f"[JIRA_WRITEBACK] Added original requirements comment to {issue_key} (length: {len(original_comment_text)})")
+                    else:
+                        logger.warning(f"[JIRA_WRITEBACK] Original requirements comment text was empty - not adding comment")
+                except Exception as e:
+                    # Don't fail the whole operation if comment addition fails
+                    logger.error(f"Failed to add original requirements comment to {issue_key}: {str(e)}", exc_info=True)
+            else:
+                logger.debug(f"[JIRA_WRITEBACK] No original requirements text found for package {package_id}, skipping comment")
+        except Exception as e:
+            # Don't fail the whole operation if extracting requirements text fails
+            logger.warning(f"Failed to extract original requirements text for package {package_id}: {str(e)}")
+        
+        # Add preserved original Jira description as a comment (not in description)
+        try:
+            preserved_comment_text = _generate_preserved_original_description_comment(current_jira_description)
+            if preserved_comment_text.strip():
+                jira_client.add_comment(issue_key, preserved_comment_text)
+                logger.info(f"[JIRA_WRITEBACK] Added preserved original description comment to {issue_key}")
+        except Exception as comment_err:
+            logger.error(f"Failed to add preserved original description comment to {issue_key} (Jira update succeeded): {str(comment_err)}", exc_info=True)
+        
+        # Add open questions from package as a comment (best-effort; use trusted actor_name)
+        open_questions_list = _extract_open_questions(package)
+        if open_questions_list:
+            try:
+                ts = approved_at if approved_at else datetime.now(timezone.utc).isoformat()
+                try:
+                    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    ts_display = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    ts_display = ts
+                actor = actor_name if actor_name and actor_name.strip() else "You"
+                open_questions_comment = _generate_open_questions_comment(
+                    open_questions_list, package_id, actor, ts_display
+                )
+                jira_client.add_comment(issue_key, open_questions_comment)
+                logger.info(f"[JIRA_WRITEBACK] Added open questions comment to {issue_key} ({len(open_questions_list)} question(s))")
+            except Exception as oq_err:
+                logger.error(f"Failed to add open questions comment to {issue_key} (Jira update succeeded): {str(oq_err)}", exc_info=True)
         
         # Log audit event
         audit_logger.log_event({
@@ -1660,6 +2162,10 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
     # Flask app enforces all policy before calling this agent.
     # ============================================================================
     
+    # Initialize actor_name early (always defined, default fallback)
+    # Will be resolved during run limits check if DB session is available
+    actor_name = "You"  # Default fallback
+    
     # ============================================================================
     # RUN LIMIT ENFORCEMENT (FAIL-CLOSED)
     # Enforce run limits per period based on plan tier BEFORE Jira create operations
@@ -1709,9 +2215,17 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
         # Save current directory and change to backend for reliable imports
         original_cwd = os.getcwd()
         try:
+            # Add backend to path first (before chdir)
             if backend_path not in sys.path:
                 sys.path.insert(0, backend_path)
+            
+            # Change to backend directory - this is critical for relative imports
             os.chdir(backend_path)
+            
+            # Clear any cached modules to force reload from correct location
+            modules_to_clear = [k for k in sys.modules.keys() if k.startswith(('db', 'services', 'models'))]
+            for mod in modules_to_clear:
+                del sys.modules[mod]
             
             from db import get_db
             from services.entitlements_centralized import get_tenant_billing
@@ -1735,6 +2249,16 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
                     current_period_end=current_period_end,
                     user_id=user_id
                 )
+                
+                # Resolve actor name NOW while DB session is open (fast - no directory changes needed)
+                # This avoids creating a new DB session later, which is slow
+                if user_id:
+                    try:
+                        actor_name = _get_user_display_name(db, user_id)
+                        logger.info(f"[JIRA_WRITEBACK] Resolved actor_name during run limits check: {actor_name} (user_id={user_id})")
+                    except Exception as e:
+                        logger.warning(f"[JIRA_WRITEBACK] Could not resolve actor name during run limits check: {str(e)}")
+                        # Keep default "You" (already set at function start)
                 
                 if not run_allowed:
                     # Determine error type and client-friendly message
@@ -1784,22 +2308,33 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
     except Exception as run_limit_error:
         # FAIL-CLOSED: If usage metering fails, do NOT proceed with Jira writes
         # This prevents unmetered runs and billing discrepancies
-        logger.error(f"Run limit check failed for tenant {tenant_id}: {str(run_limit_error)}", exc_info=True)
+        error_type = type(run_limit_error).__name__
+        error_message = str(run_limit_error)
+        logger.error(
+            f"Run limit check failed for tenant {tenant_id}: {error_type}: {error_message}",
+            exc_info=True
+        )
         
         # Return 503 (service unavailable) with error details
+        # Include error type in response for debugging (not full traceback for security)
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
             content={
                 "ok": False,
                 "error": "USAGE_METER_UNAVAILABLE",
-                "message": "Usage metering unavailable. Please try again shortly."
+                "message": "Usage metering unavailable. Please try again shortly.",
+                "error_type": error_type,  # For debugging
+                "error_detail": error_message[:200] if len(error_message) > 200 else error_message  # Truncated for security
             },
             headers=_get_cors_headers(request)
         )
     
     # Capture start time for usage tracking
     start_time_ms = int(time.time() * 1000)
+    
+    # actor_name was already initialized before run limits check and may have been
+    # resolved during the run limits check if DB session was available
     
     # Generate run_id for this request
     run_id = str(uuid.uuid4())
@@ -1958,9 +2493,24 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
     fields_set = []
     comment_id = None
     
+    # Extract original requirements text early for defensive stripping
+    original_requirements_text = _extract_original_requirements_text(requirements)
+    
     try:
+        # Defensive: Strip any normalized requirements that might have leaked in
+        cleaned_description = _strip_normalized_requirements_from_description(
+            proposed_description,
+            original_requirements_text
+        )
+        
+        # Debug logging
+        if "Normalized Requirements" in proposed_description:
+            logger.warning(f"[JIRA_WRITEBACK] Description contained 'Normalized Requirements' marker - stripped before creating issue")
+        if original_requirements_text and original_requirements_text[:50] in proposed_description:
+            logger.warning(f"[JIRA_WRITEBACK] Description contained original requirements text - stripped before creating issue")
+        
         # Convert description to ADF format
-        description_adf = _text_to_adf(proposed_description)
+        description_adf = _text_to_adf(cleaned_description)
         
         # Prepare labels
         labels = [f"reqpkg_{package_id}"]
@@ -1985,16 +2535,111 @@ async def create_execute(execute_request: CreateExecuteRequest, request: Request
             fields_set.append("acceptance_criteria")
         fields_set.append("labels")
         
-        # Add audit comment
-        comment_text = _generate_comment_preview(
-            package_id=package_id,
-            approved_by=approved_by,
-            approved_at=approved_at,
-            checksum=expected_checksum
-        )
+        # actor_name was already resolved during run limits check (fast, no extra DB calls)
+        # Add audit comment with resolved actor name
+        # Wrap in try/except so comment failures don't fail the whole operation after Jira create succeeds
+        comment_id = None
+        try:
+            # Ensure actor_name is defined (defensive check)
+            if not actor_name or actor_name.strip() == "":
+                actor_name = "You"
+                logger.warning("[JIRA_WRITEBACK] actor_name was empty, using fallback 'You'")
+            
+            comment_text = _generate_comment_preview(
+                package_id=package_id,
+                approved_by=approved_by,
+                approved_at=approved_at,
+                checksum=expected_checksum,
+                actor_name=actor_name  # Pass pre-resolved name (fast - no DB lookup)
+            )
+            
+            logger.info(f"[JIRA_WRITEBACK] Audit comment actor_name: {actor_name}")
+            
+            comment_response = jira_client.add_comment(created_issue_key, comment_text)
+            comment_id = comment_response.get("id")
+            logger.info(f"[JIRA_WRITEBACK] Successfully added audit comment to {created_issue_key}")
+        except Exception as comment_error:
+            # Don't fail the whole operation if comment creation fails
+            # Jira issue creation already succeeded, so return success
+            logger.error(f"Failed to add audit comment to {created_issue_key} (Jira create succeeded): {str(comment_error)}", exc_info=True)
+            # Continue - comment_id remains None
         
-        comment_response = jira_client.add_comment(created_issue_key, comment_text)
-        comment_id = comment_response.get("id")
+        # Add original requirements comment with reviewer/approver info
+        try:
+            if original_requirements_text:
+                logger.info(f"[JIRA_WRITEBACK] Original requirements comment text length: {len(original_requirements_text)}")
+                try:
+                    # Reuse actor_name already resolved during run limits check (fast, no extra DB calls)
+                    # Ensure actor_name is defined (defensive check)
+                    if not actor_name or actor_name.strip() == "":
+                        actor_name = "You"
+                        logger.warning("[JIRA_WRITEBACK] actor_name was empty in original requirements comment, using fallback 'You'")
+                    
+                    reviewer_name = actor_name  # Use the resolved actor name from audit comment
+                    approver_name = reviewer_name  # Same person for now
+                    
+                    # Get timestamps from package metadata if available
+                    scope_transitions = package.get("scope_status_transitions", [])
+                    reviewer_timestamp = None
+                    approver_timestamp = None
+                    
+                    for transition in scope_transitions:
+                        if transition.get("new_status") == "reviewed":
+                            reviewer_timestamp = transition.get("changed_at")
+                        elif transition.get("new_status") == "locked":
+                            approver_timestamp = transition.get("changed_at")
+                    
+                    # Generate and add original requirements comment
+                    original_comment_text = _generate_original_requirements_comment(
+                        original_requirements_text=original_requirements_text,
+                        package=package,
+                        reviewer_name=reviewer_name,
+                        reviewer_timestamp=reviewer_timestamp,
+                        approver_name=approver_name,
+                        approver_timestamp=approver_timestamp
+                    )
+                    
+                    if original_comment_text:
+                        jira_client.add_comment(created_issue_key, original_comment_text)
+                        logger.info(f"[JIRA_WRITEBACK] Added original requirements comment to {created_issue_key} (length: {len(original_comment_text)})")
+                    else:
+                        logger.warning(f"[JIRA_WRITEBACK] Original requirements comment text was empty - not adding comment")
+                except Exception as e:
+                    # Don't fail the whole operation if comment addition fails
+                    logger.error(f"Failed to add original requirements comment to {created_issue_key}: {str(e)}", exc_info=True)
+            else:
+                logger.debug(f"[JIRA_WRITEBACK] No original requirements text found for package {package_id}, skipping comment")
+        except Exception as e:
+            # Don't fail the whole operation if extracting requirements text fails
+            logger.warning(f"Failed to extract original requirements text for package {package_id}: {str(e)}")
+        
+        # Add preserved original Jira description as a comment (not in description)
+        try:
+            preserved_comment_text = _generate_preserved_original_description_comment(original_input)
+            if preserved_comment_text.strip():
+                jira_client.add_comment(created_issue_key, preserved_comment_text)
+                logger.info(f"[JIRA_WRITEBACK] Added preserved original description comment to {created_issue_key}")
+        except Exception as comment_err:
+            logger.error(f"Failed to add preserved original description comment to {created_issue_key} (Jira create succeeded): {str(comment_err)}", exc_info=True)
+        
+        # Add open questions from package as a comment (best-effort; use trusted actor_name)
+        open_questions_list = _extract_open_questions(package)
+        if open_questions_list:
+            try:
+                ts = approved_at if approved_at else datetime.now(timezone.utc).isoformat()
+                try:
+                    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    ts_display = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    ts_display = ts
+                actor = actor_name if actor_name and actor_name.strip() else "You"
+                open_questions_comment = _generate_open_questions_comment(
+                    open_questions_list, package_id, actor, ts_display
+                )
+                jira_client.add_comment(created_issue_key, open_questions_comment)
+                logger.info(f"[JIRA_WRITEBACK] Added open questions comment to {created_issue_key} ({len(open_questions_list)} question(s))")
+            except Exception as oq_err:
+                logger.error(f"Failed to add open questions comment to {created_issue_key} (Jira create succeeded): {str(oq_err)}", exc_info=True)
         
         # Log audit event
         audit_logger.log_event({

@@ -13817,7 +13817,26 @@ def jira_rewrite_execute():
         return jsonify(result), 200
     except Exception as e:
         logger.error(f"Error in jira rewrite execute: {str(e)}", exc_info=True)
-        return jsonify({"detail": f"Failed to execute rewrite: {str(e)}"}), 500
+        
+        # Extract detailed error information if available
+        error_detail = str(e)
+        error_response = {"detail": f"Failed to execute rewrite: {error_detail}"}
+        
+        # If the error contains structured information from the jira-writeback-agent, include it
+        if "Error type:" in error_detail or "error_type" in error_detail.lower():
+            # Try to extract error_type and error_detail from the error message
+            if "Error type:" in error_detail:
+                parts = error_detail.split("Error type:")
+                if len(parts) > 1:
+                    error_type_part = parts[1].split(".")[0].strip()
+                    error_response["error_type"] = error_type_part
+            if "error_detail" in error_detail.lower() or "Jira Writeback Agent returned:" in error_detail:
+                # Extract the actual error detail from the message
+                if "Jira Writeback Agent returned:" in error_detail:
+                    detail_part = error_detail.split("Jira Writeback Agent returned:")[-1].strip()
+                    error_response["error_detail"] = detail_part
+        
+        return jsonify(error_response), 500
 
 
 @app.route("/api/v1/jira/create/dry-run", methods=["POST"])

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
-import { Loader2, Plus, X, Upload, Edit2, Save, XCircle, Check, Lock, AlertCircle } from 'lucide-react'
+import { Loader2, Plus, X, Upload, Edit2, Save, XCircle, Check, Lock, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { analyzeRequirements, AnalyzeRequirementsResponse, applyRequirementOverride, RequirementOverrideRequest, markPackageReviewed, lockPackageScope, getJiraProjects, createJiraTicketDryRun, createJiraTicketExecute, JiraProject, CreateDryRunResponse, rewriteDryRun, rewriteExecute, RewriteDryRunResponse, RewriteExecuteRequest, refreshTenantStatus } from '../services/api'
 import { useTenantStatus } from '../contexts/TenantStatusContext'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -49,6 +49,107 @@ interface Requirement {
       fields_changed?: string[]
     }
   }
+}
+
+/**
+ * Build the Jira writeback-style readable summary string from the package.
+ * Same content and section ordering as the Jira description (Scope In/Out, BRs, Gaps, Risks).
+ * Use for display and future export.
+ */
+function buildJiraStyleReadableSummaryString(packageData: Record<string, any>): string {
+  const requirements: Requirement[] = Array.isArray(packageData?.requirements) ? packageData.requirements : []
+  const gapAnalysis = packageData?.gap_analysis ?? {}
+  const riskAnalysis = packageData?.risk_analysis ?? {}
+
+  const lines: string[] = []
+
+  // 1) Scope (In): union from all requirements, preserve order, dedupe
+  const inSeen = new Set<string>()
+  const inScope: string[] = []
+  for (const req of requirements) {
+    const scope = req.scope_boundaries ?? req.manual_override?.scope_boundaries
+    const list = scope?.in_scope ?? []
+    for (const item of list) {
+      if (item && typeof item === 'string' && !inSeen.has(item.trim())) {
+        inSeen.add(item.trim())
+        inScope.push(item)
+      }
+    }
+  }
+  if (inScope.length > 0) {
+    lines.push('Scope (In):')
+    inScope.forEach((item) => lines.push(`- ${item}`))
+    lines.push('')
+  }
+
+  // 2) Scope (Out): union from all requirements, preserve order, dedupe
+  const outSeen = new Set<string>()
+  const outScope: string[] = []
+  for (const req of requirements) {
+    const scope = req.scope_boundaries ?? req.manual_override?.scope_boundaries
+    const list = scope?.out_of_scope ?? []
+    for (const item of list) {
+      if (item && typeof item === 'string' && !outSeen.has(item.trim())) {
+        outSeen.add(item.trim())
+        outScope.push(item)
+      }
+    }
+  }
+  if (outScope.length > 0) {
+    lines.push('Scope (Out):')
+    outScope.forEach((item) => lines.push(`- ${item}`))
+    lines.push('')
+  }
+
+  // 3) Business Requirements (Normalized): flatten all BRs in requirement order, BR-XXX: <statement>
+  const allBRs: Array<{ id: string; statement: string }> = []
+  for (const req of requirements) {
+    const brs = req.business_requirements ?? []
+    for (const br of brs) {
+      const id = br?.id ?? ''
+      const statement = (br?.manual_override?.statement ?? br?.statement) ?? ''
+      if (id || statement) allBRs.push({ id, statement })
+    }
+  }
+  if (allBRs.length > 0) {
+    lines.push('Business Requirements (Normalized):')
+    allBRs.forEach(({ id, statement }) => lines.push(`${id}: ${statement}`))
+    lines.push('')
+  }
+
+  // 4) Identified Gaps: bullet list or N/A
+  const gaps: string[] = Array.isArray(gapAnalysis.gaps) ? gapAnalysis.gaps.filter((g: any) => g && g !== 'N/A') : []
+  lines.push('Identified Gaps:')
+  if (gaps.length > 0) {
+    gaps.forEach((g) => lines.push(`- ${g}`))
+  } else {
+    lines.push('N/A')
+  }
+  lines.push('')
+
+  // 5) Identified Risks: dedupe, bullet list or N/A
+  const rawRisks: string[] = Array.isArray(riskAnalysis.risks) ? riskAnalysis.risks.filter((r: any) => r && r !== 'N/A') : []
+  const riskSeen = new Set<string>()
+  const risks: string[] = []
+  for (const r of rawRisks) {
+    const t = typeof r === 'string' ? r.trim() : String(r)
+    if (t && !riskSeen.has(t)) {
+      riskSeen.add(t)
+      risks.push(t)
+    }
+  }
+  lines.push('Identified Risks:')
+  if (risks.length > 0) {
+    risks.forEach((r) => lines.push(`- ${r}`))
+  } else {
+    lines.push('N/A')
+  }
+  const riskLevel = riskAnalysis.risk_level
+  if (riskLevel && typeof riskLevel === 'string') {
+    lines.push(`Risk Level: ${riskLevel}`)
+  }
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 interface ReadableSummaryViewProps {
@@ -592,6 +693,38 @@ function getScopeStatusBadge(scopeStatus: string) {
   )
 }
 
+// Helper function to get user display name from localStorage
+function getUserDisplayName(): string {
+  try {
+    const userStr = localStorage.getItem('user')
+    if (!userStr) return 'You'
+    
+    const user = JSON.parse(userStr)
+    
+    // Preferred: first_name + last_name
+    if (user.first_name || user.last_name) {
+      const parts = [user.first_name, user.last_name].filter(Boolean)
+      const fullName = parts.join(' ').trim()
+      if (fullName) return fullName
+    }
+    
+    // Fallback: display_name
+    if (user.display_name) {
+      return user.display_name
+    }
+    
+    // Fallback: email
+    if (user.email) {
+      return user.email
+    }
+    
+    // Last resort
+    return 'You'
+  } catch {
+    return 'You'
+  }
+}
+
 export function RequirementsPage() {
   const { tenantStatus, bootstrapStatus } = useTenantStatus()
   const [inputSource, setInputSource] = useState<InputSource>('free-text')
@@ -606,6 +739,7 @@ export function RequirementsPage() {
   const [showLockModal, setShowLockModal] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
+  const [isReqPkgOpen, setIsReqPkgOpen] = useState(false) // Requirements Package section collapsed by default
   
   // Jira Target state (Phase 4B: Create)
   const [jiraProjects, setJiraProjects] = useState<JiraProject[]>([])
@@ -644,7 +778,7 @@ export function RequirementsPage() {
            metadata.jira_context !== undefined
   }
 
-  // Phase 4A: Handle Rewrite Dry-Run
+  // Phase 4A: Handle Rewrite Dry-Run (kept for backward compatibility, but not used in UI)
   const handleRewriteDryRun = async () => {
     if (!results?.package) return
     
@@ -663,7 +797,7 @@ export function RequirementsPage() {
     }
   }
 
-  // Phase 4A: Handle Rewrite Execute
+  // Phase 4A: Handle Rewrite Execute (kept for backward compatibility, but not used in UI)
   const handleRewriteExecute = async () => {
     if (!results?.package || !rewriteDryRunResult) return
     
@@ -684,6 +818,60 @@ export function RequirementsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to execute rewrite')
     } finally {
+      setIsRewritingExecute(false)
+    }
+  }
+
+  // Combined handler: Submit to Jira (dry-run + execute in one flow)
+  const handleSubmitToJira = async () => {
+    if (!results?.package) return
+    
+    // Check gating conditions (same as before - button should be disabled, but defensive check)
+    if (isWritebackDisabled || isJiraNotConfigured) {
+      setError('Jira writeback is not available. Please check your subscription status and Jira configuration.')
+      return
+    }
+    
+    // Step 1: Run dry-run
+    setIsRewritingDryRun(true)
+    setIsRewritingExecute(false)
+    setError(null)
+    setRewriteDryRunResult(null)
+    
+    try {
+      const dryRunResponse = await rewriteDryRun({
+        package: results.package
+      })
+      setRewriteDryRunResult(dryRunResponse)
+      
+      // Step 2: If dry-run succeeds, automatically proceed to execute
+      setIsRewritingDryRun(false)
+      setIsRewritingExecute(true)
+      
+      const executeRequest: RewriteExecuteRequest = {
+        package: results.package,
+        checksum: dryRunResponse.checksum,
+        approved_by: 'user', // TODO: Get actual user ID
+        approved_at: new Date().toISOString()
+      }
+      
+      const executeResponse = await rewriteExecute(executeRequest)
+      setError(null)
+      refreshTenantStatus()
+      
+      // Success - the UI will show updated state via refreshTenantStatus()
+      // If there's a Jira issue key in the response, it's handled by the backend
+    } catch (err) {
+      // If dry-run fails, don't proceed to execute
+      // Show a user-friendly error message
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
+      if (errorMessage.includes('dry-run') || errorMessage.includes('Dry-Run')) {
+        setError(`Unable to submit to Jira. Please review the issues below.`)
+      } else {
+        setError(`Unable to submit to Jira. ${errorMessage}`)
+      }
+    } finally {
+      setIsRewritingDryRun(false)
       setIsRewritingExecute(false)
     }
   }
@@ -1351,24 +1539,51 @@ export function RequirementsPage() {
                       <h3 className="text-sm font-semibold">Scope Lifecycle</h3>
                       {results.package.scope_status_transitions
                         .filter((t: any) => t.new_status === 'reviewed' || t.new_status === 'locked')
-                        .map((transition: any, idx: number) => (
-                          <div key={idx} className="text-sm text-muted-foreground">
-                            {transition.new_status === 'reviewed' && (
-                              <>
-                                <span className="font-medium">Reviewed:</span> {transition.changed_by || 'Unknown'} on {transition.changed_at ? new Date(transition.changed_at).toLocaleString() : 'N/A'}
-                              </>
-                            )}
-                            {transition.new_status === 'locked' && (
-                              <>
-                                <span className="font-medium">Approved:</span> {transition.changed_by || 'Unknown'} on {transition.changed_at ? new Date(transition.changed_at).toLocaleString() : 'N/A'}
-                              </>
-                            )}
-                          </div>
-                        ))}
+                        .map((transition: any, idx: number) => {
+                          // Get display name: prefer backend-provided name, fallback to current user
+                          const getActorDisplayName = (): string => {
+                            // If backend provides a name field (future multi-user support)
+                            if (transition.changed_by_name) {
+                              return transition.changed_by_name
+                            }
+                            
+                            // If changed_by is "user" or matches current user, use current user's display name
+                            const currentUserDisplayName = getUserDisplayName()
+                            if (!transition.changed_by || transition.changed_by === 'user' || transition.changed_by === 'Unknown') {
+                              return currentUserDisplayName
+                            }
+                            
+                            // If changed_by is an email, use it
+                            if (transition.changed_by.includes('@')) {
+                              return transition.changed_by
+                            }
+                            
+                            // Otherwise, use current user's display name as fallback
+                            return currentUserDisplayName
+                          }
+                          
+                          const actorName = getActorDisplayName()
+                          const formattedDate = transition.changed_at ? new Date(transition.changed_at).toLocaleString() : 'N/A'
+                          
+                          return (
+                            <div key={idx} className="text-sm text-muted-foreground">
+                              {transition.new_status === 'reviewed' && (
+                                <>
+                                  <span className="font-medium">Reviewed:</span> {actorName} on {formattedDate}
+                                </>
+                              )}
+                              {transition.new_status === 'locked' && (
+                                <>
+                                  <span className="font-medium">Approved:</span> {actorName} on {formattedDate}
+                                </>
+                              )}
+                            </div>
+                          )
+                        })}
                     </div>
                   )}
                   
-                  {/* Phase 4A: Rewrite Jira Ticket buttons (only for Jira-origin packages) */}
+                  {/* Phase 4A: Rewrite Jira Ticket (only for Jira-origin packages) */}
                   {results.package?.scope_status === 'locked' && 
                    inputSource === 'jira-tickets' && 
                    isJiraOriginPackage() && (
@@ -1376,45 +1591,25 @@ export function RequirementsPage() {
                       <h3 className="text-lg font-semibold">Rewrite Jira Ticket</h3>
                       <div className="flex gap-2">
                         <Button
-                          onClick={handleRewriteDryRun}
-                          disabled={isRewritingDryRun || isRewritingExecute || isJiraNotConfigured}
-                          variant="outline"
+                          onClick={handleSubmitToJira}
+                          disabled={isRewritingDryRun || isRewritingExecute || isWritebackDisabled || isJiraNotConfigured}
                           className="flex items-center gap-2"
                         >
-                          {isRewritingDryRun ? (
+                          {(isRewritingDryRun || isRewritingExecute) ? (
                             <>
                               <Loader2 className="h-4 w-4 animate-spin" />
-                              Running Dry-Run...
+                              Submitting...
                             </>
                           ) : (
-                            'Rewrite Dry-Run'
-                          )}
-                        </Button>
-                        <Button
-                          onClick={handleRewriteExecute}
-                          disabled={isRewritingExecute || isRewritingDryRun || !rewriteDryRunResult || isWritebackDisabled || isJiraNotConfigured}
-                          className="flex items-center gap-2"
-                        >
-                          {isRewritingExecute ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Executing...
-                            </>
-                          ) : (
-                            'Execute'
+                            'Submit to Jira'
                           )}
                         </Button>
                       </div>
                       
-                      {!rewriteDryRunResult && (
-                        <p className="text-xs text-muted-foreground">
-                          Run Dry-Run to enable Execute.
-                        </p>
-                      )}
-                      
+                      {/* Show dry-run preview if available (for debugging/info, but not required for user action) */}
                       {rewriteDryRunResult && (
                         <div className="mt-4 p-4 bg-secondary/50 rounded-md space-y-2">
-                          <p className="text-sm font-medium">Dry-Run Preview:</p>
+                          <p className="text-sm font-medium">Preview:</p>
                           <p className="text-xs text-muted-foreground">
                             <strong>Issue:</strong> {rewriteDryRunResult.jira_issue}
                           </p>
@@ -1600,14 +1795,51 @@ export function RequirementsPage() {
                       )
                     })()}
                     <div>
-                      <h3 className="text-lg font-semibold mb-2">Requirements Package</h3>
-                      <pre className="bg-black/40 border border-white/10 rounded-md p-4 overflow-auto max-h-96 text-sm font-mono text-foreground/80">
-                        {JSON.stringify(results.package, null, 2)}
-                      </pre>
+                      <button
+                        onClick={() => setIsReqPkgOpen(!isReqPkgOpen)}
+                        className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-2"
+                        aria-expanded={isReqPkgOpen}
+                        aria-controls="requirements-package-content"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setIsReqPkgOpen(!isReqPkgOpen)
+                          }
+                        }}
+                      >
+                        <h3 className="text-lg font-semibold">Requirements Package</h3>
+                        {isReqPkgOpen ? (
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </button>
+                      <AnimatePresence>
+                        {isReqPkgOpen && (
+                          <motion.div
+                            id="requirements-package-content"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <pre className="bg-black/40 border border-white/10 rounded-md p-4 overflow-auto max-h-96 text-sm font-mono text-foreground/80">
+                              {JSON.stringify(results.package, null, 2)}
+                            </pre>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                     {results.readable_summary && results.package?.requirements && (
                       <div>
                         <h3 className="text-lg font-semibold mb-4">Readable Summary</h3>
+                        {/* Jira writeback-style summary: same content and section order as Jira description */}
+                        <div className="mb-6 rounded-md border border-border/50 bg-muted/20 p-4">
+                          <pre className="whitespace-pre-wrap text-sm text-foreground/90 font-sans leading-relaxed overflow-x-auto">
+                            {buildJiraStyleReadableSummaryString(results.package)}
+                          </pre>
+                        </div>
                         <ReadableSummaryView 
                           requirements={results.package.requirements}
                           readableSummary={results.readable_summary}
