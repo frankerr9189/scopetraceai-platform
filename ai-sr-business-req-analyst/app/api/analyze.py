@@ -5,6 +5,7 @@ from datetime import datetime
 import re
 import time
 import os
+import uuid as uuid_module
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -457,6 +458,9 @@ async def analyze_requirements(
             headers=_get_cors_headers(request)
         )
     
+    # Generate run_id early so it is in scope for run record, usage_events, and exception paths
+    run_id = str(uuid_module.uuid4())
+    
     # Determine if request is JSON or FormData
     content_type = request.headers.get("content-type", "").lower()
     
@@ -789,6 +793,7 @@ async def analyze_requirements(
         
         # Generate meta and summary (derived from package, presentation-only)
         meta = generate_meta(package, source=source if source else None)
+        meta["run_id"] = run_id  # So platform/UI can link usage_events and run history
         summary = generate_summary(package)
         
         # Generate human-readable summary (presentation-only, does not modify package)
@@ -827,9 +832,7 @@ async def analyze_requirements(
                             
                             db = next(get_db())
                             try:
-                                # Generate run_id (use package_id as run_id for BA runs)
-                                run_id = package.package_id
-                                
+                                # run_id was generated at request start; use it for run record
                                 # Generate run summary text (for run history display)
                                 requirements_count = len(package.requirements)
                                 if jira_ticket_count > 0:
@@ -843,7 +846,7 @@ async def analyze_requirements(
                                 # Get created_by from request header if available
                                 created_by_header = request.headers.get("X-Actor", None)
                                 
-                                # Save run
+                                # Save run (run_id from request start; artifact_id = package id for traceability)
                                 save_run(
                                     db=db,
                                     run_id=run_id,
@@ -918,9 +921,10 @@ async def analyze_requirements(
                                 jira_ticket_count=jira_ticket_count,
                                 input_char_count=input_char_count,
                                 success=True,
+                                run_id=run_id,
                                 duration_ms=duration_ms
                             )
-                            logger.info(f"Successfully recorded usage event for tenant {tenant_id}, agent=requirements_ba, source={usage_source}, jira_tickets={jira_ticket_count}, duration_ms={duration_ms}")
+                            logger.info(f"Successfully recorded usage event for tenant {tenant_id}, agent=requirements_ba, source={usage_source}, run_id={run_id}, jira_tickets={jira_ticket_count}, duration_ms={duration_ms}")
                         finally:
                             db.close()
             except Exception as usage_error:
@@ -989,6 +993,7 @@ async def analyze_requirements(
                                 input_char_count=input_char_count,
                                 success=False,
                                 error_code=error_code,
+                                run_id=run_id,
                                 duration_ms=duration_ms
                             )
                         finally:
@@ -1047,6 +1052,7 @@ async def analyze_requirements(
                                 input_char_count=input_char_count,
                                 success=False,
                                 error_code=error_code,
+                                run_id=run_id,
                                 duration_ms=duration_ms
                             )
                         finally:

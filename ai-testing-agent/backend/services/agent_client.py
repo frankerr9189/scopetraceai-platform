@@ -28,7 +28,7 @@ if not INTERNAL_SERVICE_KEY:
     logger.warning("INTERNAL_SERVICE_KEY not set - agent calls will fail authentication")
 
 
-def get_internal_headers(tenant_id: Optional[str] = None, user_id: Optional[str] = None, agent: Optional[str] = None) -> Dict[str, str]:
+def get_internal_headers(tenant_id: Optional[str] = None, user_id: Optional[str] = None, agent: Optional[str] = None, actor: Optional[str] = None) -> Dict[str, str]:
     """
     Build headers for internal agent service calls.
     
@@ -37,11 +37,13 @@ def get_internal_headers(tenant_id: Optional[str] = None, user_id: Optional[str]
     - X-Tenant-ID: Tenant context (for logging/audit)
     - X-User-ID: User context (for logging/audit)
     - X-Agent-Name: Agent identifier (for logging/audit)
+    - X-Actor: Display name for run attribution (created_by in runs table)
     
     Args:
         tenant_id: Tenant UUID string (from flask.g if not provided)
         user_id: User UUID string (from flask.g if not provided)
         agent: Agent name (e.g., 'requirements_ba', 'jira_writeback')
+        actor: Display name for "Created By" (from client X-Actor or derived)
         
     Returns:
         Dictionary of headers
@@ -63,11 +65,13 @@ def get_internal_headers(tenant_id: Optional[str] = None, user_id: Optional[str]
         headers["X-User-ID"] = user_id
     if agent:
         headers["X-Agent-Name"] = agent
+    if actor:
+        headers["X-Actor"] = actor
     
     return headers
 
 
-def call_ba_agent(endpoint: str, payload: Dict[str, Any], tenant_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
+def call_ba_agent(endpoint: str, payload: Dict[str, Any], tenant_id: Optional[str] = None, user_id: Optional[str] = None, actor: Optional[str] = None) -> Dict[str, Any]:
     """
     Call BA Requirements Agent service.
     
@@ -76,6 +80,7 @@ def call_ba_agent(endpoint: str, payload: Dict[str, Any], tenant_id: Optional[st
         payload: Request payload
         tenant_id: Tenant UUID (optional, uses flask.g if not provided)
         user_id: User UUID (optional, uses flask.g if not provided)
+        actor: Display name for run attribution (forwarded as X-Actor to BA agent)
         
     Returns:
         Response JSON as dictionary
@@ -85,7 +90,7 @@ def call_ba_agent(endpoint: str, payload: Dict[str, Any], tenant_id: Optional[st
         ValueError: If response indicates error
     """
     url = f"{BA_AGENT_BASE_URL}{endpoint}"
-    headers = get_internal_headers(tenant_id=tenant_id, user_id=user_id, agent="requirements_ba")
+    headers = get_internal_headers(tenant_id=tenant_id, user_id=user_id, agent="requirements_ba", actor=actor)
     
     logger.info(f"Calling BA agent: {endpoint} (tenant={tenant_id})")
     

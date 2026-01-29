@@ -1661,7 +1661,7 @@ e) For RTM artifacts: Use these canonical field names consistently:
 f) For "non-blocking/async" requirements: Require explicit measurable thresholds:
    - Test plan creation completion: "completes within X seconds" (specify exact number, e.g., 5 seconds)
    - RTM availability: "becomes available within Y seconds" (specify exact number, e.g., 30 seconds)
-   - Job/status indicator: Specify exact API endpoint, database field, or UI element to check (e.g., "/api/v1/runs/{run_id}/status", "rtm_status field in database", "RTM Status indicator on UI")
+   - Job/status indicator: Specify exact API endpoint, database field, or UI element to check (e.g., "/api/v1/runs/{{run_id}}/status", "rtm_status field in database", "RTM Status indicator on UI")
 
 COMPILED TICKET:
 {json.dumps(compiled_ticket, indent=2)}
@@ -1815,7 +1815,7 @@ TEST CASE ENUMERATION REQUIREMENTS:
    f) For "non-blocking/async" requirements: Require explicit measurable thresholds:
       - Test plan creation completion: "completes within X seconds" (specify exact number, e.g., 5 seconds)
       - RTM availability: "becomes available within Y seconds" (specify exact number, e.g., 30 seconds)
-      - Job/status indicator: Specify exact API endpoint, database field, or UI element to check (e.g., "/api/v1/runs/{run_id}/status", "rtm_status field in database", "RTM Status indicator on UI")
+      - Job/status indicator: Specify exact API endpoint, database field, or UI element to check (e.g., "/api/v1/runs/{{run_id}}/status", "rtm_status field in database", "RTM Status indicator on UI")
    g) RTM-SPECIFIC TEST REQUIREMENTS:
       - For RTM generation/artifact requirements, generate tests that:
         * Verify RTM JSON/CSV download or API endpoint (specify exact endpoint: /api/v1/runs/{{run_id}}/rtm or /export/rtm)
@@ -2048,13 +2048,47 @@ Return valid JSON only. No markdown. No explanations.
         if has_numbered_acceptance_criteria:
             compiled_ticket["_has_numbered_acceptance_criteria"] = True
         
-        # Merge requirements and normalize source field
+        # Precedence: BRs from "Business Requirements (Normalized):" > LLM/numbered/inferred.
+        # Parse the ticket description that actually contains the BR block (same as Jira).
+        debug_requirements = os.getenv("DEBUG_REQUIREMENTS", "0") == "1"
+        extracted_brs = extract_normalized_business_requirements(description)
+        use_explicit_brs = len(extracted_brs) >= 1
+        if use_explicit_brs:
+            br_reqs = []
+            for br_id, statement in extracted_brs:
+                req_id = f"{ticket_id}-{br_id}"
+                req = {"id": req_id, "description": statement, "source": "explicit"}
+                req["quality"] = score_requirement_quality(req)
+                req["coverage_expectations"] = compute_coverage_expectations(req)
+                req["testable"] = is_requirement_testable(req)
+                br_reqs.append(req)
+            test_plan["requirements"] = br_reqs
+            if "metadata" not in test_plan:
+                test_plan["metadata"] = {}
+            test_plan["metadata"]["br_extraction"] = {
+                "found_header": True,
+                "br_count": len(extracted_brs),
+                "br_ids": [br_id for br_id, _ in extracted_brs],
+            }
+            if debug_requirements:
+                logger.info(
+                    f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: EXTRACTION PATH: Explicit BRs (Business Requirements Normalized), count={len(br_reqs)}"
+                )
+        else:
+            if "metadata" not in test_plan:
+                test_plan["metadata"] = {}
+            test_plan["metadata"]["br_extraction"] = {
+                "found_header": False,
+                "br_count": 0,
+                "br_ids": [],
+            }
+        
+        # Merge requirements and normalize source field (only when no explicit BRs)
         # Requirements are scoped to a single ticket and must never be merged,
         # deduplicated, or normalized across tickets, even if the text is identical.
         # Normalization here is only for source field consistency within a single ticket.
         
         # DEBUG: Track requirements extraction pipeline
-        debug_requirements = os.getenv("DEBUG_REQUIREMENTS", "0") == "1"
         extracted_items_total = len(all_numbered_items) + len(acceptance_criteria_items)
         extracted_items_testable = sum(1 for item in (all_numbered_items + acceptance_criteria_items) 
                                       if isinstance(item, dict) and item.get("text"))
@@ -2070,8 +2104,8 @@ Return valid JSON only. No markdown. No explanations.
                 if isinstance(llm_response.get("requirements"), list) and len(llm_response.get("requirements", [])) == 0:
                     logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: requirements key present but empty -> routing to Path B/C")
         
-        if "requirements" in llm_response and isinstance(llm_response["requirements"], list) and len(llm_response["requirements"]) > 0:
-            # STEP3: Path A enter
+        if not use_explicit_brs and "requirements" in llm_response and isinstance(llm_response["requirements"], list) and len(llm_response["requirements"]) > 0:
+            # STEP3: Path A enter (only when no explicit BRs; BRs take precedence)
             if debug_requirements:
                 logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP3_PATH_A_ENTER")
             
@@ -2389,7 +2423,7 @@ Return valid JSON only. No markdown. No explanations.
         path_a_produced_zero = locals().get("path_a_zero_output", False)
         should_execute_path_bc = not path_a_had_requirements or path_a_produced_zero
         
-        if should_execute_path_bc:
+        if not use_explicit_brs and should_execute_path_bc:
             # STEP4: Path B enter
             if debug_requirements:
                 logger.info(f"[DEBUG_REQUIREMENTS] Ticket {ticket_id}: STEP4_PATH_B_ENTER")
@@ -4737,6 +4771,9 @@ def add_ticket_item_traceability(test_plan: dict) -> None:
     ticket_item_coverage = []
     rtm_item_trace_by_req = {}  # requirement_id -> list of item trace entries
     
+    # Ticket descriptions for scope-in mapping (best-effort traceability)
+    ticket_descriptions = test_plan.get("_ticket_descriptions", {})
+    
     for ticket_entry in ticket_traceability:
         if not isinstance(ticket_entry, dict):
             continue
@@ -4746,6 +4783,11 @@ def add_ticket_item_traceability(test_plan: dict) -> None:
         
         if not isinstance(items, list):
             continue
+        
+        # Scope (In) -> requirement mapping for this ticket (best-effort, non-blocking)
+        description = ticket_descriptions.get(ticket_id, "")
+        scope_in_items = parse_scope_in_bullets(description) if description else []
+        scope_in_to_req = map_scope_in_to_requirements(scope_in_items, requirements) if scope_in_items and requirements else {}
         
         for item in items:
             if not isinstance(item, dict):
@@ -4761,6 +4803,13 @@ def add_ticket_item_traceability(test_plan: dict) -> None:
                 item_text = item_text[2:].lstrip()  # Remove "0 " and any following whitespace
                 # Update the item dict so cleaned text propagates
                 item["text"] = item_text
+            
+            # Best-effort: map Scope (In) bullets to BR-based requirements when match is obvious
+            if scope_in_to_req and item_text:
+                norm_item = _normalize_text_for_scope_matching(item_text)
+                if norm_item in scope_in_to_req:
+                    item["mapped_requirement_id"] = scope_in_to_req[norm_item]
+                    item["classification"] = "system_behavior"
             
             classification = item.get("classification", "")
             
@@ -8095,13 +8144,16 @@ def classify_ticket_item(item_text, requirements=None):
     if not isinstance(item_text, str):
         return "unclear_needs_clarification"
     
+    # BR lines (Business Requirements Normalized) are explicit requirements; do not treat as informational_only
+    if re.match(r"^\s*BR-\d{3}\s*:\s*.+", item_text, re.IGNORECASE):
+        return "system_behavior"
+    
     text_lower = item_text.lower().strip()
     
     # Check for UI element indicators
     ui_keywords = ["button", "link", "field", "menu", "tab", "page", "screen", "form", "input", "download", "export"]
     has_ui_element = any(keyword in text_lower for keyword in ui_keywords)
     # Also check for quoted UI element names
-    import re
     has_quoted_label = bool(re.search(r'"[^"]+"', item_text))
     
     if has_ui_element or has_quoted_label:
@@ -8964,85 +9016,96 @@ def compute_coverage_expectations(requirement, all_tests_by_category=None):
 def generate_happy_path_inferred_tests(requirements, all_tests_by_category):
     """
     Generate inferred happy-path tests based on coverage_expectations.
-    
-    Generates inferred tests for requirements where happy_path is expected but not yet covered
-    by any existing api_tests or ui_tests.
-    
+
+    Requirement-derived happy-path wins; inferred happy-path is a fallback.
+    Only add an inferred HAPPY test for a requirement if there is NOT already
+    a happy-path test for that requirement with steps_origin=="requirement-derived".
+
+    Generates inferred tests for requirements where happy_path is expected but not yet
+    covered by any existing api_tests or ui_tests, and no requirement-derived happy-path exists.
+
     Args:
         requirements: List of requirement dicts with coverage_expectations
         all_tests_by_category: Dict mapping test categories to lists of tests
-    
+
     Returns:
-        list: Generated happy-path inferred tests
+        list: Generated happy-path inferred tests (IDs HAPPY-001, HAPPY-002, ... in deterministic order)
     """
     generated_tests = []
-    
-    # Build a set of requirement IDs already covered by api_tests or ui_tests
-    covered_requirements = set()
+
     api_tests = all_tests_by_category.get("api_tests", [])
     ui_tests = all_tests_by_category.get("ui_tests", [])
-    
+
+    # Requirement IDs already covered by any api_tests or ui_tests
+    covered_requirements = set()
     for test in api_tests + ui_tests:
         if isinstance(test, dict):
             reqs_covered = test.get("requirements_covered", [])
             if isinstance(reqs_covered, list):
                 covered_requirements.update(reqs_covered)
-    
-    # Track test ID counter
-    test_id_counter = 0
-    
-    # Generate tests for each requirement
+
+    # Requirement IDs that already have a requirement-derived happy-path test.
+    # Inferred happy-path is skipped for these (requirement-derived wins).
+    reqs_with_requirement_derived_happy_path = set()
+    for test in api_tests + ui_tests:
+        if not isinstance(test, dict):
+            continue
+        steps_origin = test.get("steps_origin", "")
+        intent_type = test.get("intent_type", "")
+        dimension = test.get("dimension", "")
+        is_happy = (intent_type == "happy_path" or dimension == "happy_path")
+        if steps_origin == "requirement-derived" and is_happy:
+            reqs_covered = test.get("requirements_covered", [])
+            if isinstance(reqs_covered, list):
+                reqs_with_requirement_derived_happy_path.update(reqs_covered)
+
+    # Collect requirements that need an inferred happy-path (deterministic order: input order)
+    reqs_needing_inferred_happy = []
     for req in requirements:
         if not isinstance(req, dict):
             continue
-        
         req_id = req.get("id", "")
         if not req_id:
             continue
-        
-        # Skip if requirement is not testable - generate no tests and no test steps
-        is_testable = req.get("testable", True)  # Default to True for backward compatibility
-        if not is_testable:
+        if not req.get("testable", True):
             continue
-        
-        # Skip if requirement is already covered by api_tests or ui_tests
         if req_id in covered_requirements:
             continue
-        
+        if req_id in reqs_with_requirement_derived_happy_path:
+            continue
         coverage_exp = req.get("coverage_expectations", {})
         if not isinstance(coverage_exp, dict):
             continue
-        
-        # Check if happy_path is expected but not covered
-        if coverage_exp.get("happy_path") == "expected":
-            test_id_counter += 1
-            req_description = req.get("description", "")
-            
-            # Check if requirement names UI elements or output artifacts
-            has_ui = names_ui_element(req_description)
-            has_artifact = names_output_artifact(req_description)
-            can_generate_steps = has_ui or has_artifact
-            
-            # Do not generate generic steps - return empty steps with explanation
-            happy_path_test = {
-                "id": f"HAPPY-{test_id_counter:03d}",
-                "title": f"Inferred happy-path test for {req_id}",
-                "steps": [],
-                "steps_origin": "none",
-                "expected_result": "Requirement-specific behavior validated",
-                "requirements_covered": [req_id],
-                "confidence": "inferred",
-                "priority": "medium",
-                "dimension": "happy_path"
-            }
-            
-            # Only set "Cannot generate" explanation if UI elements/artifacts are NOT named
-            if not can_generate_steps:
-                happy_path_test["steps_explanation"] = f"Cannot generate concrete test steps from requirement: '{req_description[:100]}...'. Requirement lacks specific execution details (UI elements, API endpoints, inputs, or observable outcomes)."
-            # If UI elements/artifacts are named, let LLM generate steps (don't pre-emptively block)
-            
-            generated_tests.append(happy_path_test)
-    
+        if coverage_exp.get("happy_path") != "expected":
+            continue
+        reqs_needing_inferred_happy.append(req)
+
+    # Assign HAPPY-001, HAPPY-002, ... in deterministic order (no renumbering of existing tests)
+    for idx, req in enumerate(reqs_needing_inferred_happy, 1):
+        req_id = req.get("id", "")
+        req_description = req.get("description", "")
+        has_ui = names_ui_element(req_description)
+        has_artifact = names_output_artifact(req_description)
+        can_generate_steps = has_ui or has_artifact
+
+        happy_path_test = {
+            "id": f"HAPPY-{idx:03d}",
+            "title": f"Inferred happy-path test for {req_id}",
+            "steps": [],
+            "steps_origin": "none",
+            "expected_result": "Requirement-specific behavior validated",
+            "requirements_covered": [req_id],
+            "confidence": "inferred",
+            "priority": "medium",
+            "dimension": "happy_path"
+        }
+        if not can_generate_steps:
+            happy_path_test["steps_explanation"] = (
+                f"Cannot generate concrete test steps from requirement: '{req_description[:100]}...'. "
+                "Requirement lacks specific execution details (UI elements, API endpoints, inputs, or observable outcomes)."
+            )
+        generated_tests.append(happy_path_test)
+
     return generated_tests
 
 
@@ -10348,6 +10411,171 @@ def score_requirement_quality(requirement):
     }
 
 
+# Deterministic stopword list for scope-in to requirement mapping (do not reorder)
+# Excludes "changes"/"updates" etc. so "permission updates", "configuration changes" retain keywords
+_SCOPE_IN_MAPPING_STOPWORDS = frozenset({
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from",
+    "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
+    "will", "would", "should", "could", "may", "might", "must", "can", "shall",
+    "system", "solution", "platform", "capability", "log", "logging", "made", "admins",
+    "admin", "into", "support", "provide",
+})
+
+
+def _normalize_text_for_scope_matching(text):
+    """Normalize text: lowercase, remove punctuation, collapse whitespace. Deterministic."""
+    if not text or not isinstance(text, str):
+        return ""
+    t = text.lower().strip()
+    t = re.sub(r"[^\w\s]", " ", t)
+    t = re.sub(r"\s+", " ", t)
+    return t.strip()
+
+
+def _keywords_for_scope_matching(normalized_text):
+    """Extract keywords from normalized text (remove stopwords). Deterministic."""
+    if not normalized_text:
+        return set()
+    words = set(normalized_text.split())
+    return words - _SCOPE_IN_MAPPING_STOPWORDS
+
+
+def parse_scope_in_bullets(description: str) -> list:
+    """
+    Parse "Scope (In):" bullets from Jira ticket description.
+    Accepts bullets starting with "-" or "•". Stops at next section header.
+    Returns list of scope_in items (trimmed, whitespace collapsed). Best-effort, non-blocking.
+    """
+    if not description or not isinstance(description, str):
+        return []
+    text = description.strip()
+    header = "Scope (In):"
+    idx = text.lower().find(header.lower())
+    if idx == -1:
+        return []
+    after_header = text[idx + len(header) :].lstrip()
+    if not after_header:
+        return []
+    stop_header_pattern = re.compile(
+        r"^\s*(Scope\s*\(\s*Out\s*\)|Business Requirements|Identified Gaps|Identified Risks|Open Questions|Normalized Requirements)\s*:",
+        re.IGNORECASE,
+    )
+    bullet_pattern = re.compile(r"^\s*([\-\*•▪▫◦‣⁃]|\u2022)[\s]+(.+)$", re.MULTILINE)
+    results = []
+    saw_blank = False
+    for line in after_header.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            saw_blank = True
+            continue
+        if saw_blank and stop_header_pattern.match(stripped):
+            break
+        saw_blank = False
+        match = bullet_pattern.match(line)
+        if match:
+            item = re.sub(r"\s+", " ", match.group(2).strip())
+            if item:
+                results.append(item)
+    return results
+
+
+def map_scope_in_to_requirements(scope_in_items: list, requirements: list) -> dict:
+    """
+    Map each scope_in item to at most one requirement_id when the match is obvious.
+    Returns dict: normalized_scope_text -> requirement_id.
+    Mapping only if overlap_score >= 0.60 and at least 2 shared keywords.
+    Tie-break: highest score, then lowest requirement_id. Deterministic.
+    """
+    if not requirements or not isinstance(requirements, list):
+        return {}
+    req_list = sorted(
+        [r for r in requirements if isinstance(r, dict) and r.get("id") and r.get("description")],
+        key=lambda r: r.get("id", ""),
+    )
+    if not req_list:
+        return {}
+    out = {}
+    for scope_text in scope_in_items:
+        norm_scope = _normalize_text_for_scope_matching(scope_text)
+        if not norm_scope:
+            continue
+        scope_keywords = _keywords_for_scope_matching(norm_scope)
+        if len(scope_keywords) < 2:
+            continue
+        best_req_id = None
+        best_score = 0.0
+        for req in req_list:
+            req_id = req.get("id", "")
+            req_desc = req.get("description", "")
+            norm_req = _normalize_text_for_scope_matching(req_desc)
+            req_keywords = _keywords_for_scope_matching(norm_req)
+            shared = scope_keywords & req_keywords
+            if len(shared) < 2:
+                continue
+            denom = max(1, min(len(scope_keywords), len(req_keywords)))
+            score = len(shared) / denom
+            if score >= 0.60 and score > best_score:
+                best_score = score
+                best_req_id = req_id
+        if best_req_id is not None:
+            out[norm_scope] = best_req_id
+    return out
+
+
+def extract_normalized_business_requirements(description: str) -> list:
+    """
+    Parse Jira ticket description for explicit "Business Requirements (Normalized)" block.
+    Precedence: BRs from BA agent > inferred requirements. Used to fix regression where
+    tickets with BRs were falling back to single inferred requirement.
+
+    - Header: case-insensitive, tolerates whitespace: "Business Requirements (Normalized):"
+    - Parse lines: ^\\s*BR-(\\d{3})\\s*:\\s*(.+?)\\s*$
+    - Stop when a new section header begins (Identified Risks:, Scope (In):, Open Questions:, etc.)
+    - Return list of (br_id, statement) e.g. [("BR-001", "The system shall ..."), ...].
+
+    Args:
+        description: Raw ticket description (the one that may contain the BR block).
+
+    Returns:
+        List of (br_id, statement); empty if no BR block or no matching lines.
+    """
+    if not description or not isinstance(description, str):
+        return []
+    text = description.strip()
+    header = "Business Requirements (Normalized):"
+    idx = text.lower().find(header.lower())
+    if idx == -1:
+        return []
+    after_header = text[idx + len(header) :].lstrip()
+    if not after_header:
+        return []
+    stop_header_pattern = re.compile(
+        r"^\s*(Identified Risks|Risk Level|Scope\s*\(\s*In\s*\)|Scope\s*\(\s*Out\s*\)|"
+        r"Open Questions|Identified Gaps|Normalized Requirements)\s*:",
+        re.IGNORECASE,
+    )
+    br_line_pattern = re.compile(r"^\s*BR-(\d{3})\s*:\s*(.+?)\s*$", re.IGNORECASE)
+    results = []
+    saw_blank = False
+    for line in after_header.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            saw_blank = True
+            continue
+        if saw_blank and stop_header_pattern.match(stripped):
+            break
+        saw_blank = False
+        match = br_line_pattern.match(line)
+        if match:
+            br_num = match.group(1)
+            statement = match.group(2).strip()
+            if statement:
+                results.append((f"BR-{br_num}", statement))
+        else:
+            saw_blank = False
+    return results
+
+
 def prefix_requirement_ids(requirements, ticket_id):
     """
     Prefix requirement IDs with ticket ID to ensure strict ticket scoping.
@@ -10942,9 +11170,10 @@ def generate_test_plan():
                 
                 test_plan = generate_test_plan_with_llm(compiled_ticket)
                 
-                # Store ticket items in test plan metadata for later mapping
+                # Store ticket items and description in test plan metadata for later mapping
                 test_plan["_ticket_items"] = ticket_items
                 test_plan["_ticket_id"] = ticket_id
+                test_plan["_ticket_description"] = ticket.get("description", "")
                 
                 # Track requirements count per ticket for debugging and integrity checking
                 requirements = test_plan.get("requirements", [])
@@ -10975,8 +11204,9 @@ def generate_test_plan():
                     ticket_requirement_counts[ticket_id] = requirements_count
                 
                 # Determine if ticket is structured (has explicit requirements)
+                # Explicit = jira (numbered in ticket) or explicit (Business Requirements Normalized from BA agent)
                 has_explicit_requirements = any(
-                    req.get("source") == "jira" for req in requirements
+                    req.get("source") in ("jira", "explicit") for req in requirements
                 ) if requirements else False
                 # Force has_acceptance_criteria = true if numbered/bulleted items were detected
                 # This ensures acceptance criteria precedence even if has_acceptance_criteria was initially false
@@ -10992,6 +11222,8 @@ def generate_test_plan():
                         explanation = "This ticket lacks explicit acceptance criteria or numbered requirements. The AI could not extract testable requirements from the available content."
                     else:
                         explanation = "This ticket has acceptance criteria but no testable requirements could be extracted. The criteria may be too abstract or lack specific, verifiable behaviors."
+                elif has_explicit_requirements and requirements and any(r.get("source") == "explicit" for r in requirements):
+                    explanation = "Requirements were extracted from the ticket's Business Requirements (Normalized) section."
                 elif not has_explicit_requirements and requirements_count > 0:
                     explanation = "This ticket has inferred requirements only. No explicit, numbered requirements were found in the ticket content."
                 
@@ -12120,9 +12352,10 @@ def generate_test_plan():
             result["requirements"] = requirements
 
         # Build ticket traceability mapping AFTER all tests and RTM are generated
-        # Collect all ticket items from all test plans
+        # Collect all ticket items and descriptions from all test plans
         ticket_id_to_items = {}
         ticket_id_to_requirements = {}  # Map ticket IDs to their requirements
+        ticket_id_to_description = {}  # For scope-in mapping (best-effort traceability)
         
         for plan in test_plans:
             ticket_id = plan.get("_ticket_id", "")
@@ -12140,6 +12373,12 @@ def generate_test_plan():
                     ticket_id_to_requirements[ticket_id] = []
                 if requirements:
                     ticket_id_to_requirements[ticket_id].extend(requirements)
+                
+                # Store description for scope-in mapping (best-effort traceability)
+                if ticket_id not in ticket_id_to_description:
+                    ticket_id_to_description[ticket_id] = plan.get("_ticket_description", "")
+        
+        result["_ticket_descriptions"] = ticket_id_to_description
         
         # Map ticket items to requirements and tests
         # Include all tickets, even if no items were extracted (for audit compliance)
@@ -13472,6 +13711,27 @@ def analyze_requirements():
     try:
         from services.agent_client import call_ba_agent, get_internal_headers
         
+        # Created By attribution: forward client X-Actor or derive from authenticated user (same as Test Plan)
+        actor = request.headers.get("X-Actor") or None
+        if not actor and user_id:
+            try:
+                from db import get_db
+                from models import TenantUser
+                db = next(get_db())
+                try:
+                    user = db.query(TenantUser).filter(TenantUser.id == user_id).first()
+                    if user and getattr(user, 'email', None):
+                        actor = user.email
+                    if user and (getattr(user, 'first_name', None) or getattr(user, 'last_name', None)):
+                        parts = [getattr(user, 'first_name', None), getattr(user, 'last_name', None)]
+                        actor = " ".join(p for p in parts if p) or actor
+                finally:
+                    db.close()
+            except Exception:
+                pass
+        if not actor:
+            actor = "anonymous"
+        
         # Determine request type and prepare payload
         content_type = request.content_type or ""
         
@@ -13486,8 +13746,8 @@ def analyze_requirements():
             from services.agent_client import BA_AGENT_BASE_URL
             url = f"{BA_AGENT_BASE_URL}/api/v1/analyze"
             
-            # Build headers with internal service key
-            headers = get_internal_headers(tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None, agent="requirements_ba")
+            # Build headers with internal service key and X-Actor for run attribution
+            headers = get_internal_headers(tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None, agent="requirements_ba", actor=actor)
             # Remove Content-Type - let requests set it with boundary for multipart
             headers.pop("Content-Type", None)
             
@@ -13564,8 +13824,8 @@ def analyze_requirements():
             except Exception:
                 input_char_count = 0
             
-            # Call BA agent via agent_client
-            result = call_ba_agent("/api/v1/analyze", payload, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None)
+            # Call BA agent via agent_client (actor forwarded so runs.created_by is set)
+            result = call_ba_agent("/api/v1/analyze", payload, tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None, actor=actor)
         
         # Consume trial run after successful requirements generation
         if tenant_id:
@@ -13603,6 +13863,7 @@ def analyze_requirements():
                 
                 db = next(get_db())
                 try:
+                    run_id_from_ba = (result.get("meta") or {}).get("run_id") if result else None
                     record_usage_event(
                         db=db,
                         tenant_id=str(tenant_id),
@@ -13613,10 +13874,10 @@ def analyze_requirements():
                         input_char_count=input_char_count if input_char_count > 0 else None,
                         success=True,
                         error_code=None,
-                        run_id=None,  # Requirements generation doesn't create runs
+                        run_id=run_id_from_ba,
                         duration_ms=duration_ms
                     )
-                    logger.info(f"Usage event recorded for tenant {tenant_id}, agent=requirements_ba, source={source}")
+                    logger.info(f"Usage event recorded for tenant {tenant_id}, agent=requirements_ba, source={source}, run_id={run_id_from_ba}")
                 finally:
                     db.close()
             except Exception as usage_error:

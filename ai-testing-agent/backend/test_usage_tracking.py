@@ -106,6 +106,23 @@ def test_record_usage_event_failure_with_error_code(db_session, test_tenant):
     assert usage_event.tenant_id == test_tenant.id
 
 
+def test_record_usage_event_stores_run_id(db_session, test_tenant, test_user):
+    """Regression: BA Requirements runs must record usage_events.run_id for Run History."""
+    run_id = "550e8400-e29b-41d4-a716-446655440000"
+    usage_event = record_usage_event(
+        db=db_session,
+        tenant_id=str(test_tenant.id),
+        user_id=str(test_user.id),
+        agent="requirements_ba",
+        source="text",
+        success=True,
+        run_id=run_id,
+        duration_ms=100,
+    )
+    assert usage_event.run_id == run_id
+    assert usage_event.agent == "requirements_ba"
+
+
 def test_usage_event_tenant_isolation(db_session, test_tenant):
     """Test that usage events are tenant-isolated."""
     # Create second tenant
