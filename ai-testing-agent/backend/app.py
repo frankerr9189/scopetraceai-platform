@@ -740,7 +740,7 @@ def generate_audit_metadata(scope: dict, tickets: list, source_type: str) -> dic
         "agent_metadata": {
             "agent": "test-plan-agent",
             "agent_version": AGENT_VERSION,
-            "logic_version": "testplan-v1+coverage-enforcer-v1",
+            "logic_version": "testplan-v1.1",
             "determinism": "LLM + deterministic post-pass",
             "change_policy": "idempotent"
         },
@@ -4013,11 +4013,13 @@ def generate_executable_test_steps(req_description: str, intent_type: str, test_
             elif ui_elements:
                 steps.append(f"Locate and interact with the {ui_elements[0]} mentioned in the requirement")
             else:
-                steps.append("Trigger the action described in the requirement")
+                # FIX 1: Use observable outcome instead of vague "trigger the action"
+                steps.append("Perform the action that satisfies the requirement (e.g., submit form, start process)")
+                steps.append("Verify an observable outcome: state change (e.g., status becomes Approved/Pending), export allowed/blocked, or confirmation message visible")
             
-            # Ensure minimum 3 steps
+            # Ensure minimum 3 steps with at least one explicit observable verification
             if len(steps) < 3:
-                steps.append("Observe the system response and verify it matches the expected outcome")
+                steps.append("Verify the outcome is visible to the user (e.g., status field, success message, or updated data)")
             if len(steps) < 3:
                 steps.append("Confirm the requirement behavior is functioning as specified")
         elif intent_type == "negative":
@@ -4049,8 +4051,8 @@ def generate_executable_test_steps(req_description: str, intent_type: str, test_
             else:
                 # Generic error-handling negative (for system_behavior, data_validation, api_behavior)
                 steps.append("Navigate to the application")
-                steps.append("Attempt to trigger the action with invalid or missing data")
-                steps.append("Observe the system response and verify appropriate error handling")
+                steps.append("Submit invalid or missing data (e.g., blank required field, invalid format)")
+                steps.append("Verify the system rejects the input (e.g., error message visible, operation blocked, or validation indicator shown)")
             if len(steps) < 3:
                 if req_classification in ["ui_structure", "ui_element"]:
                     steps.append("Document any UI elements that are missing, inaccessible, or in an incorrect state")
@@ -4062,8 +4064,8 @@ def generate_executable_test_steps(req_description: str, intent_type: str, test_
             steps.append("Observe the system response and verify access is denied appropriately")
         else:  # boundary or other
             steps.append("Navigate to the application")
-            steps.append("Trigger the action with boundary or edge case values")
-            steps.append("Observe the system response and verify it handles the boundary condition correctly")
+            steps.append("Enter or submit boundary or edge case values (e.g., min/max length, zero, empty list)")
+            steps.append("Verify observable result: system accepts with correct result, or shows validation/error as expected")
     
     elif category == "api_tests" or any(api in req_lower for api in ["api", "endpoint", "request", "response"]):
         # API-focused steps
@@ -4085,23 +4087,23 @@ def generate_executable_test_steps(req_description: str, intent_type: str, test_
             steps.append("Observe the response and verify it handles the boundary condition correctly")
     
     else:
-        # Generic system behavior steps
+        # Generic system behavior steps (FIX 1: observable outcomes, no "trigger the action described")
         if intent_type == "happy_path":
             steps.append("Navigate to the application or access the system component")
-            steps.append("Trigger the action described in the requirement")
-            steps.append("Observe the system response and verify it matches the expected outcome")
+            steps.append("Perform the action that fulfills the requirement")
+            steps.append("Verify an observable outcome: state change, status field, export/result visible, or confirmation present")
         elif intent_type == "negative":
             steps.append("Navigate to the application or access the system component")
-            steps.append("Attempt to trigger the action with invalid conditions")
-            steps.append("Observe the system response and verify appropriate error handling")
+            steps.append("Perform the action with invalid or missing conditions (e.g., wrong role, missing data)")
+            steps.append("Verify access is denied or error is shown (e.g., HTTP 403, error message, or operation blocked)")
         elif intent_type == "authorization":
             steps.append("Navigate to the application or access the system component")
             steps.append("Attempt to access the functionality without proper permissions")
-            steps.append("Observe the system response and verify access is denied appropriately")
+            steps.append("Verify access is denied (e.g., HTTP 403, login redirect, or permission message visible)")
         else:  # boundary or other
             steps.append("Navigate to the application or access the system component")
-            steps.append("Trigger the action with boundary or edge case values")
-            steps.append("Observe the system response and verify it handles the boundary condition correctly")
+            steps.append("Submit boundary or edge case inputs (e.g., zero, max value, empty)")
+            steps.append("Verify the system handles it correctly: correct result, validation message, or defined error")
     
     # Ensure minimum 3 steps
     while len(steps) < 3:
@@ -7451,7 +7453,7 @@ def generate_execution_report_csv(test_plan_data: dict, run_id_param: str = None
     
     # Get agent_metadata for versioning
     agent_metadata = audit_metadata.get("agent_metadata", {})
-    logic_version = agent_metadata.get("logic_version", "testplan-v1+coverage-enforcer-v1")
+    logic_version = agent_metadata.get("logic_version", "testplan-v1.1")
     agent_version = agent_metadata.get("agent_version", "1.0.0")
     
     # Get test plan sections
@@ -9171,7 +9173,7 @@ def generate_dimension_specific_inferred_tests(requirements, all_tests_by_catego
         if not isinstance(coverage_exp, dict):
             continue
         
-        # Check data_validation dimension
+        # Check data_validation dimension (FIX 2: enforce DATA-VAL when expected; placeholder + low confidence if no details)
         if (coverage_exp.get("data_validation") == "expected" and 
             "data_validation" not in req_dimension_tests.get(req_id, set())):
             test_id_counters["data_validation"] += 1
@@ -9182,19 +9184,32 @@ def generate_dimension_specific_inferred_tests(requirements, all_tests_by_catego
             
             data_val_test = {
                 "id": f"DATA-VAL-{test_id_counters['data_validation']:03d}",
-                "title": f"Inferred data validation test for {req_id}",
+                "title": f"Data validation for {req_id}: validate inputs and outputs per requirement",
+                "source_requirement_id": req_id,
                 "steps": [],
                 "steps_origin": "none",
-                "expected_result": "Invalid input is rejected with appropriate error",
+                "expected_result": "Inputs and outputs described in the requirement are validated (format, required fields, allowed values); invalid input is rejected with observable error or validation message.",
                 "requirements_covered": [req_id],
-                "confidence": "inferred",
+                "confidence": "low" if not can_generate_steps else "inferred",
                 "priority": "medium",
                 "dimension": "data_validation"
             }
             
-            # Only set "Cannot generate" explanation if UI elements/artifacts are NOT named
             if not can_generate_steps:
-                data_val_test["steps_explanation"] = f"Cannot generate concrete data validation steps from requirement: '{req_description[:100]}...'. Requirement lacks specific validation rules, input formats, or error conditions."
+                data_val_test["steps_explanation"] = (
+                    f"Placeholder DATA-VAL test: requirement does not specify validation rules, input formats, or error conditions. "
+                    f"Validate inputs/outputs referenced in: '{req_description[:120]}...'"
+                )
+                # FIX 2: Add note to requirement coverage_confidence so coverage count stays, confidence is honest
+                cov_conf = req.get("coverage_confidence")
+                if isinstance(cov_conf, dict):
+                    reasons = cov_conf.get("reasons")
+                    if not isinstance(reasons, list):
+                        reasons = list(reasons) if reasons else []
+                    note = "Data validation test is placeholder; inputs/outputs to validate not specified in requirement."
+                    if note not in reasons:
+                        reasons.append(note)
+                        cov_conf["reasons"] = reasons
             
             generated_tests["data_validation_tests"].append(data_val_test)
             req_dimension_tests.setdefault(req_id, set()).add("data_validation")
@@ -9675,6 +9690,100 @@ def enrich_test_quality_for_rtm_tickets(test_plan: dict) -> None:
                 test_plan_section.setdefault("data_validation_tests", []).append(validation_test)
 
 
+def replace_vague_trigger_steps_with_observable_outcomes(test_plan: dict) -> None:
+    """
+    FIX 1 post-pass: Replace any step containing vague "Trigger the action" wording
+    with observable-outcome language. Runs over ALL test categories (LLM may still emit these).
+    
+    Does NOT add/remove requirements or tests; only rewrites step strings in place.
+    """
+    test_plan_section = test_plan.get("test_plan", {})
+    if not isinstance(test_plan_section, dict):
+        return
+    
+    vague_trigger_phrases = [
+        ("trigger the action described", "Perform the action that fulfills the requirement; verify an observable outcome (e.g., state change, status field, or confirmation visible)"),
+        ("trigger the action with boundary or edge case values", "Submit boundary or edge case values (e.g., min/max, zero, empty); verify observable result or validation/error as expected"),
+    ]
+    
+    test_categories = ["api_tests", "ui_tests", "negative_tests", "data_validation_tests", "edge_cases", "system_tests"]
+    for category in test_categories:
+        tests = test_plan_section.get(category, [])
+        if not isinstance(tests, list):
+            continue
+        for test in tests:
+            if not isinstance(test, dict):
+                continue
+            steps = test.get("steps", [])
+            if not isinstance(steps, list):
+                continue
+            changed = False
+            new_steps = []
+            for step in steps:
+                if not isinstance(step, str):
+                    new_steps.append(step)
+                    continue
+                step_lower = step.lower()
+                replaced = False
+                for phrase, replacement in vague_trigger_phrases:
+                    if phrase in step_lower:
+                        new_steps.append(replacement)
+                        changed = True
+                        replaced = True
+                        break
+                if not replaced:
+                    new_steps.append(step)
+            if changed:
+                test["steps"] = new_steps
+
+
+def add_risk_tags_to_tests(test_plan: dict) -> None:
+    """
+    FIX 3: Bind risks to existing tests via risk_tags (no new risk suite).
+    Tags tests that relate to approval gate, low-confidence flagging, provenance, or scale.
+    Does NOT add/remove requirements or tests; only adds risk_tags list to test dicts.
+    """
+    requirements = test_plan.get("requirements", [])
+    req_lookup = {req.get("id", ""): req for req in requirements if isinstance(req, dict) and req.get("id")}
+    
+    test_plan_section = test_plan.get("test_plan", {})
+    if not isinstance(test_plan_section, dict):
+        return
+    
+    # Risk tag rules: requirement text or test title keywords -> risk tag
+    risk_keyword_to_tag = [
+        (["approval", "approve", "approval gate", "finalized", "export gate"], "approval_gate"),
+        (["low-confidence", "low confidence", "confidence", "uncertainty", "flag", "review"], "accuracy_trust"),
+        (["provenance", "traceability", "source input", "traceability"], "provenance"),
+        (["scale", "drawing scale", "scale detection", "scale notation"], "scale_detection"),
+        (["accuracy", "trust", "distrust"], "accuracy_trust"),
+    ]
+    
+    test_categories = ["api_tests", "ui_tests", "negative_tests", "data_validation_tests", "edge_cases", "system_tests"]
+    for category in test_categories:
+        tests = test_plan_section.get(category, [])
+        if not isinstance(tests, list):
+            continue
+        for test in tests:
+            if not isinstance(test, dict):
+                continue
+            tags = set()
+            source_req_id = test.get("source_requirement_id", "")
+            reqs_covered = test.get("requirements_covered", [])
+            req_ids = [source_req_id] if source_req_id else (reqs_covered if isinstance(reqs_covered, list) else [])
+            text_parts = [test.get("title", ""), test.get("expected_result", "")]
+            for req_id in req_ids:
+                req = req_lookup.get(req_id)
+                if isinstance(req, dict):
+                    text_parts.append(req.get("description", ""))
+            combined = " ".join(text_parts).lower()
+            for keywords, tag in risk_keyword_to_tag:
+                if any(kw in combined for kw in keywords):
+                    tags.add(tag)
+            if tags:
+                test["risk_tags"] = sorted(tags)
+
+
 def enrich_execution_steps_for_ui_tests(test_plan: dict) -> None:
     """
     Enrich execution steps for UI tests or user-executable tests.
@@ -9896,8 +10005,8 @@ def enrich_execution_steps_for_ui_tests(test_plan: dict) -> None:
                 # Try to infer invalid input scenarios
                 if "field" in primary_element.lower() or "input" in req_description.lower():
                     enriched_steps.append(f"Leave the '{primary_element}' field blank or enter invalid data")
-                    enriched_steps.append("Attempt to trigger the action (click submit button, press Enter, etc.)")
-                    enriched_steps.append("Verify an appropriate error message is displayed")
+                    enriched_steps.append("Submit the form (click submit button or press Enter)")
+                    enriched_steps.append("Verify an observable outcome: error message displayed, validation indicator, or operation blocked")
                     enriched_steps.append("Verify the error message clearly indicates what is wrong")
                 else:
                     enriched_steps.append(f"Attempt to interact with the '{primary_element}' without meeting prerequisites")
@@ -11302,6 +11411,17 @@ def generate_test_plan():
         # This enriches overly-generic steps and ensures negative/edge/resilience/schema tests
         # ============================================================================
         enrich_test_quality_for_rtm_tickets(result)
+
+        # ============================================================================
+        # FIX 1 POST-PASS: Replace vague "Trigger the action" wording with observable outcomes
+        # Runs over ALL test categories so LLM output is also corrected
+        # ============================================================================
+        replace_vague_trigger_steps_with_observable_outcomes(result)
+
+        # ============================================================================
+        # FIX 3: Bind risks to existing tests via risk_tags (no new risk suite)
+        # ============================================================================
+        add_risk_tags_to_tests(result)
 
         # Post-process: Ensure all requirements have multiple test cases based on enumerated intents
         # This ensures the "one requirement -> multiple test cases" enumeration is enforced
