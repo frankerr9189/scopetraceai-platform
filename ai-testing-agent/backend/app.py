@@ -10631,57 +10631,90 @@ def map_scope_in_to_requirements(scope_in_items: list, requirements: list) -> di
     return out
 
 
+# BR marker pattern: 1-4 digits (BR-003, BR-026, BR-1234). Used for pre-check and newline-agnostic extraction.
+_BR_MARKER_PATTERN = re.compile(r"BR-(\d{1,4})\s*:", re.IGNORECASE)
+_STOP_HEADER_PATTERN = re.compile(
+    r"\n\s*(Identified Risks|Risk Level|Scope\s*\(\s*In\s*\)|Scope\s*\(\s*Out\s*\)|"
+    r"Open Questions|Identified Gaps|Normalized Requirements)\s*:",
+    re.IGNORECASE,
+)
+
+
+def _count_br_markers_in_text(text: str) -> int:
+    """Return the number of occurrences of BR-\\d{1,4}\\s*: in text (newline-agnostic)."""
+    if not text:
+        return 0
+    return len(_BR_MARKER_PATTERN.findall(text))
+
+
+def _extract_br_block_after_header(text: str, header: str) -> str:
+    """Return the content block after the given header until the first stop header or end of text."""
+    idx = text.lower().find(header.lower())
+    if idx == -1:
+        return ""
+    after_header = text[idx + len(header) :].lstrip()
+    if not after_header:
+        return ""
+    stop = _STOP_HEADER_PATTERN.search(after_header)
+    if stop:
+        after_header = after_header[: stop.start()].rstrip()
+    return after_header
+
+
 def extract_normalized_business_requirements(description: str) -> list:
     """
     Parse Jira ticket description for explicit "Business Requirements (Normalized)" block.
-    Precedence: BRs from BA agent > inferred requirements. Used to fix regression where
-    tickets with BRs were falling back to single inferred requirement.
+    Deterministic: if explicit BR markers (e.g. BR-003:) are present, use them only when
+    extraction count matches marker count; otherwise fall back (return empty) so caller
+    uses prose/scope-based generation.
 
-    - Header: case-insensitive, tolerates whitespace: "Business Requirements (Normalized):"
-    - Parse lines: ^\\s*BR-(\\d{3})\\s*:\\s*(.+?)\\s*$
-    - Stop when a new section header begins (Identified Risks:, Scope (In):, Open Questions:, etc.)
+    - Pre-check: marker_count = number of BR-\\d{1,4}\\s*: in the block after header.
+    - If marker_count == 0: return [] (caller uses existing prose/scope behavior).
+    - If marker_count > 0: extract BR entries in a newline-agnostic way (BR markers may appear mid-line).
+    - Validation gate: if extracted_count != marker_count (or <), log BR_PARSE_PARTIAL and return []
+      so caller falls back to prose/scope-based generation.
     - Return list of (br_id, statement) e.g. [("BR-001", "The system shall ..."), ...].
 
     Args:
         description: Raw ticket description (the one that may contain the BR block).
 
     Returns:
-        List of (br_id, statement); empty if no BR block or no matching lines.
+        List of (br_id, statement); empty if no BR block, no markers, or partial parse (validation failed).
     """
     if not description or not isinstance(description, str):
         return []
     text = description.strip()
     header = "Business Requirements (Normalized):"
-    idx = text.lower().find(header.lower())
-    if idx == -1:
+    block = _extract_br_block_after_header(text, header)
+    if not block:
         return []
-    after_header = text[idx + len(header) :].lstrip()
-    if not after_header:
+
+    marker_count = _count_br_markers_in_text(block)
+    if marker_count == 0:
         return []
-    stop_header_pattern = re.compile(
-        r"^\s*(Identified Risks|Risk Level|Scope\s*\(\s*In\s*\)|Scope\s*\(\s*Out\s*\)|"
-        r"Open Questions|Identified Gaps|Normalized Requirements)\s*:",
-        re.IGNORECASE,
-    )
-    br_line_pattern = re.compile(r"^\s*BR-(\d{3})\s*:\s*(.+?)\s*$", re.IGNORECASE)
+
+    # Newline-agnostic extraction: find all BR-XXX: and take statement until next BR- or end
     results = []
-    saw_blank = False
-    for line in after_header.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            saw_blank = True
-            continue
-        if saw_blank and stop_header_pattern.match(stripped):
-            break
-        saw_blank = False
-        match = br_line_pattern.match(line)
-        if match:
-            br_num = match.group(1)
-            statement = match.group(2).strip()
-            if statement:
-                results.append((f"BR-{br_num}", statement))
+    for match in _BR_MARKER_PATTERN.finditer(block):
+        br_num = match.group(1)
+        start = match.end()
+        rest = block[start:]
+        next_br = _BR_MARKER_PATTERN.search(rest)
+        if next_br:
+            statement = rest[: next_br.start()].strip()
         else:
-            saw_blank = False
+            statement = rest.strip()
+        if statement:
+            results.append((f"BR-{br_num}", statement))
+
+    extracted_count = len(results)
+    if extracted_count != marker_count:
+        logger.warning(
+            "BR_PARSE_PARTIAL marker_count=%s extracted_count=%s (falling back to prose/scope-based generation)",
+            marker_count,
+            extracted_count,
+        )
+        return []
     return results
 
 

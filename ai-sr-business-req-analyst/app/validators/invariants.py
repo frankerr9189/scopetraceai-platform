@@ -73,14 +73,20 @@ class InvariantValidator:
                 if not br.statement or not br.statement.strip():
                     violations.append(f"Business requirement {idx + 1} missing declarative statement")
                 else:
-                    # Check that it's a declarative statement
-                    # Accept variations: "the system shall", "the solution shall", "the platform shall", "this capability shall"
-                    statement_text = br.statement.strip().lower()
+                    # Normalize: strip leading numbering/bullets (e.g. "8. ", "12) ", "- ") so we check the actual start
+                    statement_text = br.statement.strip()
+                    statement_text = re.sub(r'^\s*\d+[.)]\s*', '', statement_text)
+                    statement_text = re.sub(r'^\s*[-*]\s+', '', statement_text)
+                    statement_text = statement_text.strip().lower()
+                    # Accept declarative variations (canonical + common LLM variants)
                     valid_starters = [
                         r'^the\s+system\s+shall',
                         r'^the\s+solution\s+shall',
                         r'^the\s+platform\s+shall',
                         r'^this\s+capability\s+shall',
+                        r'^the\s+application\s+shall',
+                        r'^the\s+product\s+shall',
+                        r'^the\s+service\s+shall',
                     ]
                     if not any(re.match(pattern, statement_text) for pattern in valid_starters):
                         violations.append(

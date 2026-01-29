@@ -12,8 +12,8 @@ The LLM output is advisory only and does NOT:
 - Apply Jira semantics
 - Produce final RequirementPackage objects
 """
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Union, Any
 from app.models.enums import RiskLevel, ConfidenceLevel
 
 
@@ -86,6 +86,27 @@ class ProposedRequirement(BaseModel):
         default_factory=list,
         description="Risks associated with this requirement"
     )
+
+    @field_validator("risks", mode="before")
+    @classmethod
+    def coerce_risks_to_strings(cls, v: Any) -> List[str]:
+        """Accept LLM returning risk dicts (type/description/severity) and coerce to list of strings."""
+        if not isinstance(v, list):
+            return v
+        out: List[str] = []
+        for item in v:
+            if isinstance(item, str):
+                out.append(item)
+            elif isinstance(item, dict):
+                desc = item.get("description") or item.get("type") or str(item)
+                severity = item.get("severity", "")
+                if severity:
+                    out.append(f"{desc} (severity: {severity})")
+                else:
+                    out.append(desc)
+            else:
+                out.append(str(item))
+        return out
 
 
 class ProposedCapability(BaseModel):
