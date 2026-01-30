@@ -31,9 +31,10 @@ if not _env_loaded:
     else:
         logger.error(f"Testing agent .env not found at {testing_env} - DATABASE_URL and JWT_SECRET will not be available!")
     
-    # Load local .env file AFTER (for other BA agent-specific config like OPENAI_API_KEY)
-    # But DATABASE_URL and JWT_SECRET are already set from testing agent's .env above
-    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    # Load local .env file AFTER (for other BA agent-specific config like OPENAI_API_KEY, DB_SCHEMA)
+    # Use absolute path so it loads regardless of cwd (e.g. when running from ai-sr-business-req-analyst)
+    _ba_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env_path = os.path.join(_ba_root, '.env')
     try:
         # Save DATABASE_URL, JWT_SECRET, and INTERNAL_SERVICE_KEY before loading local .env
         saved_db_url = os.getenv("DATABASE_URL")
@@ -50,6 +51,11 @@ if not _env_loaded:
             os.environ["JWT_SECRET"] = saved_jwt_secret
         if saved_internal_service_key:
             os.environ["INTERNAL_SERVICE_KEY"] = saved_internal_service_key
+        
+        # Prefer DB_SCHEMA from local .env (so local runs can use test schema)
+        _local_schema = os.getenv("DB_SCHEMA", "").strip().lower()
+        if _local_schema in ("public", "test"):
+            os.environ["DB_SCHEMA"] = _local_schema
             
         logger.info("Loaded local .env (DATABASE_URL and JWT_SECRET preserved from testing agent)")
     except (PermissionError, OSError):
@@ -57,7 +63,8 @@ if not _env_loaded:
         logger.warning("Could not load local .env file")
         pass
     
-    # Log DATABASE_URL type (no secrets, just type)
+    # Log DB_SCHEMA and DATABASE_URL type (no secrets)
+    logger.info("DB_SCHEMA=%s (from env after loading .env)", os.getenv("DB_SCHEMA", "(unset)") or "public")
     db_url = os.getenv("DATABASE_URL", "")
     if db_url:
         if db_url.startswith("postgresql://") or db_url.startswith("postgres://"):
@@ -72,16 +79,34 @@ if not _env_loaded:
     _env_loaded = True
 
 # Now safe to import modules that may use db/session
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from app.api import analyze, overrides, scope_status
+from app.db import verify_db_schema_sentinel, get_db_schema
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: when DB_SCHEMA=test, verify test.env_sentinel (fail fast)."""
+    if os.getenv("DB_SCHEMA", "").strip().lower() == "test":
+        try:
+            verify_db_schema_sentinel()
+        except Exception as e:
+            logger.error("DB schema sentinel check failed at startup: %s", e)
+            raise
+    yield
+    # shutdown: nothing to do
+    pass
+
 
 app = FastAPI(
-    title="AI Sr Business Requirement Analyst",
+    title="AI Senior Business Requirement Analyst",
     description="An AI agent that acts as a Senior Business Requirement Analyst",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS configuration with explicit allowlist
@@ -196,4 +221,19 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/health/db")
+async def health_db():
+    """DB health: current_schema and search_path (for test env debugging)."""
+    from app.db import engine
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT current_schema(), current_setting('search_path')")).fetchone()
+    return {
+        "status": "healthy",
+        "DB_SCHEMA_env": get_db_schema(),
+        "current_schema": row[0] if row else None,
+        "search_path": row[1] if row else None,
+    }
 

@@ -88,6 +88,13 @@ CORS(
     max_age=3600
 )
 
+# DB schema sentinel: fail fast in TEST when test.env_sentinel is missing or wrong
+from db import get_db_schema
+logger.warning("DB_SCHEMA at startup: %s", get_db_schema())
+if get_db_schema() == "test":
+    from db import verify_db_schema_sentinel
+    verify_db_schema_sentinel()
+
 # Import JWT utilities (will fail fast if JWT_SECRET is not set)
 from auth.jwt import create_access_token, decode_and_verify_token
 
@@ -5245,20 +5252,40 @@ def health():
 def health_db():
     """
     Database connectivity health check endpoint.
-    
-    Returns:
-        JSON with {"ok": true} on success, or {"ok": false, "error": "<message>"} on failure (HTTP 500).
+    When DB_SCHEMA is set, also returns current_schema and search_path for debugging.
+    Includes debug info when schema is not 'test' so we can see why.
     """
     try:
-        from db import get_db
+        from db import get_db, get_db_schema, get_db_schema_debug
         from sqlalchemy import text
-        
+
+        # Diagnostic: what does the process see for DB_SCHEMA?
+        debug = get_db_schema_debug()
+        logger.warning(
+            "health/db: get_db_schema=%s os_getenv_DB_SCHEMA=%r env_keys=%s",
+            debug["get_db_schema"],
+            debug["os_getenv_DB_SCHEMA"],
+            debug["env_keys_containing_DB_SCHEMA"],
+        )
+
         db = next(get_db())
         try:
-            # Execute a simple query to test database connectivity
             result = db.execute(text("SELECT 1"))
-            result.fetchone()  # Consume the result
-            return jsonify({"ok": True}), 200
+            result.fetchone()
+            payload = {"ok": True}
+            try:
+                schema_row = db.execute(text("SELECT current_schema()")).fetchone()
+                path_row = db.execute(text("SELECT current_setting('search_path')")).fetchone()
+                payload["DB_SCHEMA"] = get_db_schema()
+                if schema_row:
+                    payload["current_schema"] = schema_row[0]
+                if path_row:
+                    payload["search_path"] = path_row[0]
+                # Expose debug so caller can see why schema might be public
+                payload["_debug"] = debug
+            except Exception:
+                pass
+            return jsonify(payload), 200
         finally:
             db.close()
     except Exception as e:
@@ -6359,7 +6386,7 @@ def stripe_webhook():
             app.logger.warning("Stripe webhook missing Stripe-Signature header")
             return jsonify({"ok": False, "error": "Missing Stripe-Signature header"}), 400
         
-        # Create DB session directly using SessionLocal (works for public routes)
+        # Use same SessionLocal as rest of app so search_path (DB_SCHEMA) applies to webhook writes
         db = SessionLocal()
         try:
             # Ingest event (verifies signature and inserts into database)

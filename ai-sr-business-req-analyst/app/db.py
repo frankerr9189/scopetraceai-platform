@@ -2,8 +2,22 @@
 SQLAlchemy database setup and session management for BA Agent.
 """
 import os
-from sqlalchemy import create_engine
+import logging
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
+
+logger = logging.getLogger(__name__)
+
+
+def get_db_schema() -> str:
+    """Read DB_SCHEMA from environment at runtime (avoids import-order issues with .env loading)."""
+    v = os.getenv("DB_SCHEMA") or os.environ.get("DB_SCHEMA ") or "public"
+    v = (v or "public").strip().lower()
+    return v if v in ("public", "test") else "public"
+
+
+# Expose for health/debug; code should use get_db_schema() so schema is read after .env is loaded
+DB_SCHEMA = get_db_schema()
 
 # Get database URL from environment - REQUIRED for Postgres
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -47,8 +61,54 @@ engine = create_engine(
     }
 )
 
+
+@event.listens_for(engine, "connect")
+def _set_search_path_connect(dbapi_connection, connection_record):
+    """Set search_path on every new connection (pool-safe)."""
+    schema = get_db_schema()
+    cursor = dbapi_connection.cursor()
+    try:
+        if schema == "test":
+            cursor.execute("SET search_path TO test, public")
+        else:
+            cursor.execute("SET search_path TO public")
+    finally:
+        cursor.close()
+
+
+@event.listens_for(engine, "begin")
+def _set_search_path_begin(conn):
+    """Set search_path at start of each transaction (works with Supabase transaction pooler)."""
+    schema = get_db_schema()
+    if schema == "test":
+        conn.execute(text("SET search_path TO test, public"))
+    else:
+        conn.execute(text("SET search_path TO public"))
+
+
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def verify_db_schema_sentinel():
+    """
+    When DB_SCHEMA=test, verify test.env_sentinel so TEST env fails fast if misconfigured.
+    When DB_SCHEMA=public, skip. Raises RuntimeError if test schema sentinel check fails.
+    """
+    if get_db_schema() != "test":
+        return
+    db = SessionLocal()
+    try:
+        r = db.execute(text("SELECT env FROM test.env_sentinel WHERE id = 1")).fetchone()
+        if not r or (r[0] or "").strip().lower() != "test":
+            raise RuntimeError(
+                "DB_SCHEMA=test but test.env_sentinel check failed: "
+                "expected env='test' from test.env_sentinel where id=1. "
+                "Ensure the test schema and env_sentinel table exist and are populated."
+            )
+        logger.info("DB schema sentinel verified: test.env_sentinel.env = test")
+    finally:
+        db.close()
 
 
 def get_db() -> Session:

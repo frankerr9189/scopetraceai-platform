@@ -112,7 +112,20 @@ def _process_checkout_session_completed(event: Dict[str, Any], db: Session, even
         logger.warning(f"checkout.session.completed event {event_id}: {error_msg}")
         _mark_event_error(db, event_id, error_msg)
         return
-    
+
+    # Guardrail log: verify webhook writes use same schema as app (DB_SCHEMA + search_path)
+    try:
+        from db import get_db_schema
+        current_schema = db.execute(text("SELECT current_schema()")).scalar()
+        logger.info(
+            "Stripe webhook guardrail: DB_SCHEMA=%s, current_schema()=%s, tenant_id=%s",
+            get_db_schema(),
+            current_schema,
+            tenant_id,
+        )
+    except Exception as guardrail_err:
+        logger.warning("Stripe webhook guardrail log failed: %s", guardrail_err)
+
     if not stripe_subscription_id:
         error_msg = "missing_metadata: subscription_id not found in session (not a subscription checkout)"
         logger.warning(f"checkout.session.completed event {event_id}: {error_msg}")
